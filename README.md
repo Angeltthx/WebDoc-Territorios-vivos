@@ -37,10 +37,11 @@ Flechas, AvPág y espacio avanzan una página.
 - Pestañas de cada estación: Pensamiento, Historia, Galería… llevan a su página.
 - La URL refleja la página visible (`/`, `/2` … `/22`) para compartir un punto exacto.
 - Sonido (sintetizado con Web Audio, `src/application/sound.ts`, botón para silenciar junto a
-  las redes): un vaivén de agua suave en cada cambio de página y ambientes de marea continuos
+  las redes): una ola de mar corta y lejana en cada cambio de página y ambientes de marea continuos
   solo en las escenas Marea alta y Marea baja. Empieza tras el primer clic, toque o tecla.
 - Galerías con las fotos completas (proporciones reales en `src/content/media-manifest.json`,
-  generado con `npm run media:manifest`) y botón "Ver galería completa" con zoom.
+  generado con `npm run media:manifest`), flechas ← → para pasar de foto y botón "Ver galería
+  completa" con control de tamaño.
 - La portada es el video
   `panguí_v1` (1080p/720p sin audio en `public/media/video/`), que se pausa al quedar
   cubierto y continúa desde el mismo punto al volver.

@@ -1,5 +1,5 @@
 // Sonido del recorrido, sintetizado con Web Audio (sin archivos de audio):
-// - playTransition(): un vaivén de agua suave y lento al cambiar de página.
+// - playTransition(): una ola corta y lejana al cambiar de página.
 // - setAmbient('alta' | 'baja' | null): ambiente de marea continuo mientras se está en esa escena.
 // Los navegadores solo permiten audio tras un gesto del visitante (clic, toque o tecla);
 // si se pide antes, queda pendiente y empieza con el primer gesto.
@@ -40,10 +40,10 @@ function audio(): AudioContext | null {
     if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.9;
+    master.gain.value = 0.8;
     const soften = ctx.createBiquadFilter();
     soften.type = 'lowpass';
-    soften.frequency.value = 2600;
+    soften.frequency.value = 11000;
     master.connect(soften).connect(ctx.destination);
   }
   if (ctx.state === 'suspended') void ctx.resume();
@@ -64,17 +64,25 @@ export function initAudioUnlock() {
   for (const type of GESTURES) window.addEventListener(type, unlock, true);
 }
 
-/** Ruido "marrón": grave y suave, la base de todos los sonidos de agua. */
+/** Ruido rosa estéreo (dos canales distintos): la base más natural para el sonido del mar. */
 function noiseBuffer(ac: AudioContext): AudioBuffer {
   if (noise) return noise;
-  const len = ac.sampleRate * 4;
+  const len = ac.sampleRate * 6;
   noise = ac.createBuffer(2, len, ac.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
     const data = noise.getChannelData(ch);
-    let last = 0;
+    // Filtro de Paul Kellet: aproxima ruido rosa a partir de ruido blanco.
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < len; i++) {
-      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
-      data[i] = last * 3.5;
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856;
+      b4 = 0.55 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.016898;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+      b6 = w * 0.115926;
     }
   }
   return noise;
@@ -87,82 +95,83 @@ function noiseSource(ac: AudioContext, loop = false) {
   return src;
 }
 
-/** Gota lejana: tono breve y muy suave. */
-function droplet(ac: AudioContext, at: number, out: AudioNode, level = 0.025) {
-  const f = 700 + Math.random() * 600;
-  const osc = ac.createOscillator();
-  osc.frequency.setValueAtTime(f, at);
-  osc.frequency.exponentialRampToValueAtTime(f * 1.8, at + 0.08);
-  const g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, at);
-  g.gain.exponentialRampToValueAtTime(level, at + 0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
-  osc.connect(g).connect(out);
-  osc.start(at);
-  osc.stop(at + 0.2);
+interface WaveShape {
+  /** Segundos que tarda la ola en crecer y en retirarse. */
+  rise: number;
+  fall: number;
+  /** Volumen del cuerpo de la ola y de la espuma. */
+  body: number;
+  foam: number;
+  /** Frecuencia máxima del cuerpo al romper (más alta = ola más fuerte). */
+  crest: number;
 }
 
-/** Vaivén de agua al cambiar de página: entra y sale despacio, sin golpes. */
+/**
+ * Una ola de mar: el cuerpo (rumor grave que crece y se abre al romper) y la espuma
+ * (siseo agudo que aparece al romper y se retira despacio sobre la arena).
+ */
+function seaWave(ac: AudioContext, t: number, out: AudioNode, w: WaveShape) {
+  const end = t + w.rise + w.fall;
+  const pan = ac.createStereoPanner();
+  pan.pan.value = (Math.random() * 2 - 1) * 0.35;
+  pan.connect(out);
+
+  const body = noiseSource(ac);
+  const bodyFilter = ac.createBiquadFilter();
+  bodyFilter.type = 'lowpass';
+  bodyFilter.Q.value = 0.4;
+  bodyFilter.frequency.setValueAtTime(300, t);
+  bodyFilter.frequency.exponentialRampToValueAtTime(w.crest, t + w.rise);
+  bodyFilter.frequency.exponentialRampToValueAtTime(380, end);
+  const bodyGain = ac.createGain();
+  bodyGain.gain.setValueAtTime(0.0001, t);
+  bodyGain.gain.exponentialRampToValueAtTime(w.body, t + w.rise);
+  bodyGain.gain.exponentialRampToValueAtTime(0.0001, end);
+  body.connect(bodyFilter).connect(bodyGain).connect(pan);
+  body.start(t, Math.random() * 4);
+  body.stop(end + 0.05);
+
+  const foam = noiseSource(ac);
+  const hp = ac.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 2200;
+  const air = ac.createBiquadFilter();
+  air.type = 'lowpass';
+  air.frequency.setValueAtTime(9000, t + w.rise * 0.8);
+  air.frequency.exponentialRampToValueAtTime(3500, end);
+  const foamGain = ac.createGain();
+  foamGain.gain.setValueAtTime(0.0001, t);
+  foamGain.gain.setValueAtTime(0.0001, t + w.rise * 0.6);
+  foamGain.gain.exponentialRampToValueAtTime(w.foam, t + w.rise * 1.05);
+  foamGain.gain.exponentialRampToValueAtTime(0.0001, end + 0.3);
+  foam.connect(hp).connect(air).connect(foamGain).connect(pan);
+  foam.start(t, Math.random() * 4);
+  foam.stop(end + 0.4);
+
+  window.setTimeout(() => pan.disconnect(), (end - ac.currentTime + 0.6) * 1000);
+}
+
+/** Una ola corta y lejana al cambiar de página: suave, sin golpes. */
 export function playTransition() {
   if (isMuted()) return;
   const ac = audio();
   if (!ac || !master) return;
   const now = performance.now();
-  if (now - lastTransition < 900) return; // desplazamientos rápidos: un solo sonido
+  if (now - lastTransition < 1200) return; // desplazamientos rápidos: una sola ola
   lastTransition = now;
-
-  const t = ac.currentTime + 0.02;
-  const src = noiseSource(ac);
-  const filter = ac.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.Q.value = 0.6;
-  filter.frequency.setValueAtTime(260, t);
-  filter.frequency.exponentialRampToValueAtTime(950, t + 0.9);
-  filter.frequency.exponentialRampToValueAtTime(240, t + 2.6);
-  const pan = ac.createStereoPanner();
-  pan.pan.setValueAtTime(-0.35, t);
-  pan.pan.linearRampToValueAtTime(0.35, t + 2.6);
-  const g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(0.32, t + 0.8);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
-  src.connect(filter).connect(g).connect(pan).connect(master);
-  src.start(t, Math.random() * 2);
-  src.stop(t + 3);
-
-  for (let i = 0; i < 2; i++) droplet(ac, t + 0.9 + Math.random() * 1.2, master);
+  seaWave(ac, ac.currentTime + 0.02, master, { rise: 0.75, fall: 1.5, body: 0.13, foam: 0.05, crest: 1600 });
 }
 
 /** Programa olas sucesivas del ambiente de marea mientras siga activo. */
 function scheduleWave(ac: AudioContext, tide: Tide, out: GainNode) {
   const high = tide === 'alta';
-  const t = ac.currentTime + 0.05;
-  const rise = high ? 2.2 + Math.random() : 0.9 + Math.random() * 0.5;
-  const fall = high ? 3.6 + Math.random() * 1.5 : 1.4 + Math.random() * 0.8;
-  const peak = high ? 0.42 + Math.random() * 0.15 : 0.16 + Math.random() * 0.06;
-
-  const src = noiseSource(ac);
-  const filter = ac.createBiquadFilter();
-  filter.type = high ? 'lowpass' : 'bandpass';
-  filter.Q.value = high ? 0.5 : 0.9;
-  const base = high ? 320 : 520;
-  filter.frequency.setValueAtTime(base, t);
-  filter.frequency.exponentialRampToValueAtTime(high ? 1500 : 1100, t + rise);
-  filter.frequency.exponentialRampToValueAtTime(base, t + rise + fall);
-  const pan = ac.createStereoPanner();
-  pan.pan.value = (Math.random() * 2 - 1) * 0.5;
-  const g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(peak, t + rise);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + rise + fall);
-  src.connect(filter).connect(g).connect(pan).connect(out);
-  src.start(t, Math.random() * 3);
-  src.stop(t + rise + fall + 0.1);
-
-  if (!high && Math.random() < 0.6) droplet(ac, t + rise + Math.random() * fall, out, 0.018);
+  const shape: WaveShape = high
+    ? { rise: 2.2 + Math.random(), fall: 3.4 + Math.random() * 1.6, body: 0.32 + Math.random() * 0.1, foam: 0.1 + Math.random() * 0.04, crest: 2400 + Math.random() * 600 }
+    : { rise: 1 + Math.random() * 0.5, fall: 1.6 + Math.random() * 0.8, body: 0.1 + Math.random() * 0.04, foam: 0.045 + Math.random() * 0.02, crest: 1200 + Math.random() * 300 };
+  seaWave(ac, ac.currentTime + 0.05, out, shape);
 
   // La siguiente ola llega antes de que termine esta, para que el sonido no se corte.
-  const gap = high ? rise + fall * 0.55 : rise + fall * 0.7 + Math.random() * 0.8;
+  const gap = high ? shape.rise + shape.fall * 0.5 : shape.rise + shape.fall * 0.6 + Math.random() * 0.6;
   return window.setTimeout(() => {
     if (ambient && ambient.out === out) ambient.timer = scheduleWave(ac, tide, out);
   }, gap * 1000);
@@ -182,9 +191,9 @@ function startAmbient(tide: Tide) {
   const bed = noiseSource(ac, true);
   const bedFilter = ac.createBiquadFilter();
   bedFilter.type = 'lowpass';
-  bedFilter.frequency.value = tide === 'alta' ? 380 : 600;
+  bedFilter.frequency.value = tide === 'alta' ? 420 : 700;
   const bedGain = ac.createGain();
-  bedGain.gain.value = tide === 'alta' ? 0.07 : 0.035;
+  bedGain.gain.value = tide === 'alta' ? 0.09 : 0.04;
   bed.connect(bedFilter).connect(bedGain).connect(out);
   bed.start();
 

@@ -53,11 +53,33 @@ export function VideoPanel({ video, bar }: { video: VideoAsset; bar?: string }) 
 export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['gallery']> }) {
   const [open, setOpen] = useState<number | null>(null);
   const [grid, setGrid] = useState(false);
+  const track = useRef<HTMLDivElement>(null);
+
+  // Flechas ← → del teclado: pasan de foto en foto en la franja (solo en la página visible).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const el = track.current;
+      if (!el || !el.closest('.stack-page.is-active') || document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      const cards = Array.from(el.children) as HTMLElement[];
+      const center = el.scrollLeft + el.clientWidth / 2;
+      const current = cards.reduce((best, c, i) => {
+        const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - center);
+        return d < best.d ? { i, d } : best;
+      }, { i: 0, d: Infinity }).i;
+      const next = cards[Math.max(0, Math.min(cards.length - 1, current + (e.key === 'ArrowRight' ? 1 : -1)))];
+      el.scrollTo({ left: next.offsetLeft + next.offsetWidth / 2 - el.clientWidth / 2, behavior: 'smooth' });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <>
       <Backdrop photo={gallery.background} tint="rgba(8,16,14,.55)" blur />
       <div className="gallery reveal">
-        <div className="gallery__track" data-no-arrows>
+        <div className="gallery__track" ref={track} data-no-arrows>
           {gallery.photos.map((ph, i) => (
             <button
               key={ph.id + i}
@@ -73,20 +95,38 @@ export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['galler
           ))}
         </div>
         <button type="button" className="gallery__all" onClick={() => setGrid(true)}>
-          <GridIcon /> Ver galería completa <span>· {gallery.photos.length} fotos</span>
+          <GridIcon size="small" /> Ver galería completa <span>· {gallery.photos.length} fotos</span>
         </button>
       </div>
-      <GalleryGrid photos={gallery.photos} title={gallery.intro} open={grid} onClose={() => setGrid(false)} onPick={setOpen} />
+      <GalleryGrid
+        photos={gallery.photos}
+        title={gallery.intro}
+        background={gallery.background}
+        open={grid}
+        onClose={() => setGrid(false)}
+        onPick={setOpen}
+      />
       <Lightbox photos={gallery.photos} index={open} onChange={setOpen} />
     </>
   );
 }
 
-function GridIcon() {
+/** Ícono de cuadrícula: "small" (muchas fotos pequeñas) o "large" (pocas fotos grandes). */
+function GridIcon({ size }: { size: 'small' | 'large' }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
-      <rect x="1" y="1" width="6" height="6" rx="1" /><rect x="9" y="1" width="6" height="6" rx="1" />
-      <rect x="1" y="9" width="6" height="6" rx="1" /><rect x="9" y="9" width="6" height="6" rx="1" />
+      {size === 'small' ? (
+        <>
+          <rect x="1" y="1" width="4" height="4" rx=".8" /><rect x="6" y="1" width="4" height="4" rx=".8" /><rect x="11" y="1" width="4" height="4" rx=".8" />
+          <rect x="1" y="6" width="4" height="4" rx=".8" /><rect x="6" y="6" width="4" height="4" rx=".8" /><rect x="11" y="6" width="4" height="4" rx=".8" />
+          <rect x="1" y="11" width="4" height="4" rx=".8" /><rect x="6" y="11" width="4" height="4" rx=".8" /><rect x="11" y="11" width="4" height="4" rx=".8" />
+        </>
+      ) : (
+        <>
+          <rect x="1" y="1" width="6.5" height="6.5" rx="1" /><rect x="8.5" y="1" width="6.5" height="6.5" rx="1" />
+          <rect x="1" y="8.5" width="6.5" height="6.5" rx="1" /><rect x="8.5" y="8.5" width="6.5" height="6.5" rx="1" />
+        </>
+      )}
     </svg>
   );
 }
@@ -94,10 +134,14 @@ function GridIcon() {
 /** Tamaños de la cuadrícula (ancho de columna en px), del más pequeño al más grande. */
 const GRID_STEPS = [120, 170, 240, 330, 460, 640];
 
-/** Galería completa: todas las fotos en columnas, con zoom para agrandar o achicar la vista. */
-function GalleryGrid({ photos, title, open, onClose, onPick }: {
+/**
+ * Galería completa: todas las fotos en columnas sobre el fondo difuminado de la estación,
+ * con el mismo rótulo del resto del sitio y un control flotante para agrandar o achicar las fotos.
+ */
+function GalleryGrid({ photos, title, background, open, onClose, onPick }: {
   photos: Photo[];
   title: string;
+  background: Photo;
   open: boolean;
   onClose: () => void;
   onPick: (i: number) => void;
@@ -122,26 +166,12 @@ function GalleryGrid({ photos, title, open, onClose, onPick }: {
         if (e.key === '-') zoom(-1);
       }}
     >
-      <header className="grid-view__bar">
-        <div>
-          <p className="eyebrow">Galería</p>
-          <h2>{title} <span>· {photos.length} fotos</span></h2>
-        </div>
-        <div className="grid-view__zoom" role="group" aria-label="Tamaño de las fotos">
-          <button type="button" className="icon-btn" onClick={() => zoom(-1)} disabled={step === 0} aria-label="Fotos más pequeñas">−</button>
-          <input
-            type="range"
-            min={0}
-            max={GRID_STEPS.length - 1}
-            value={step}
-            onChange={(e) => setStep(Number(e.target.value))}
-            aria-label="Tamaño de las fotos"
-          />
-          <button type="button" className="icon-btn" onClick={() => zoom(1)} disabled={step === GRID_STEPS.length - 1} aria-label="Fotos más grandes">+</button>
-        </div>
-        <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar galería">✕</button>
-      </header>
+      <Backdrop photo={background} tint="rgba(6,14,12,.78)" blur />
       <div className="grid-view__body">
+        <div className="grid-view__head">
+          <span className="chip chip--plain">Galería · {title}</span>
+          <span className="grid-view__count">{photos.length} fotos</span>
+        </div>
         <div className="grid-view__cols" style={{ ['--col' as string]: `${GRID_STEPS[step]}px` }}>
           {photos.map((ph, i) => (
             <button key={ph.id + i} type="button" className="grid-view__item" onClick={() => onPick(i)} aria-label={`Ampliar: ${ph.alt}`}>
@@ -150,6 +180,18 @@ function GalleryGrid({ photos, title, open, onClose, onPick }: {
             </button>
           ))}
         </div>
+      </div>
+      <button type="button" className="icon-btn grid-view__close" onClick={onClose} aria-label="Cerrar galería">✕</button>
+      <div className="grid-view__zoom" role="group" aria-label="Tamaño de las fotos">
+        <button type="button" onClick={() => zoom(-1)} disabled={step === 0} aria-label="Ver más fotos, más pequeñas" title="Más fotos">
+          <GridIcon size="small" />
+        </button>
+        <span className="grid-view__dots" aria-hidden="true">
+          {GRID_STEPS.map((_, i) => <i key={i} className={i === step ? 'is-on' : ''} />)}
+        </span>
+        <button type="button" onClick={() => zoom(1)} disabled={step === GRID_STEPS.length - 1} aria-label="Ver fotos más grandes" title="Fotos más grandes">
+          <GridIcon size="large" />
+        </button>
       </div>
     </dialog>
   );
@@ -178,7 +220,12 @@ function Lightbox({ photos, index, onChange }: { photos: Photo[]; index: number 
       className="lightbox"
       aria-label="Fotografía ampliada"
       onClose={() => onChange(null)}
-      onKeyDown={(e) => { if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1); }}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          go(e.key === 'ArrowRight' ? 1 : -1);
+        }
+      }}
       onClick={(e) => e.target === ref.current && onChange(null)}
       onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
       onTouchEnd={onTouchEnd}
