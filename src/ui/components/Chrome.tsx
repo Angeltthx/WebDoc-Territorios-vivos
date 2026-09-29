@@ -1,13 +1,24 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { stations } from '../../content/journey';
 import type { Tabs } from '../../content/pages';
+import { menu, social, type SocialNetwork } from '../../content/site';
 import type { Transition } from '../../domain/types';
-import { pagePath } from '../../application/journey';
 import { Illustration } from './Media';
 
-/** Página de entrada de cada estación dentro del PDF. */
-export const STATION_PAGE: Record<string, number> = { chori: 2, atrato: 7, nuqui: 11, pangui: 15 };
+/** Navegación del recorrido disponible para cualquier componente. */
+export const JourneyNav = createContext<{ scrollToPage: (id: string) => void; scrollToIndex: (i: number) => void }>({
+  scrollToPage: () => {},
+  scrollToIndex: () => {},
+});
+export const useJourneyNav = () => useContext(JourneyNav);
+
+/** Primera página de cada estación. */
+export const STATION_PAGE: Record<string, string> = {
+  chori: 'chori-pensamiento',
+  atrato: 'atrato-pensamiento',
+  nuqui: 'nuqui-pensamiento',
+  pangui: 'pangui-marea-alta',
+};
 
 export function Chip({ children }: { children: ReactNode }) {
   return <span className="chip">{children}</span>;
@@ -42,40 +53,23 @@ export function ChachitaTag({ plain }: { plain?: boolean }) {
   );
 }
 
-/** Pestañas de la estación, como en el PDF. Cada una lleva a su página si existe. */
+/** Pestañas de la estación. Cada una desplaza el recorrido hasta su página. */
 export function PageTabs({ tabs }: { tabs: Tabs }) {
+  const { scrollToPage } = useJourneyNav();
   return (
     <nav className="tabs" aria-label="Secciones de la estación">
       {tabs.items.map((t) => {
         const active = t.label === tabs.active;
         const cls = `tab${active ? ' is-active' : ''}${t.warm ? ' tab--warm' : ''}`;
-        return t.page ? (
-          <Link key={t.label} to={pagePath(t.page)} className={cls} aria-current={active ? 'page' : undefined}>
+        return t.to ? (
+          <button key={t.label} type="button" className={cls} aria-current={active ? 'page' : undefined} onClick={() => scrollToPage(t.to!)}>
             {t.label}
-          </Link>
+          </button>
         ) : (
           <span key={t.label} className={`${cls} tab--off`}>{t.label}</span>
         );
       })}
     </nav>
-  );
-}
-
-/** Flechas laterales para pasar de página. */
-export function PageArrows({ page, total, onPrev, onNext }: { page: number; total: number; onPrev: () => void; onNext: () => void }) {
-  return (
-    <>
-      {page > 1 && (
-        <button type="button" className="page-arrow page-arrow--prev" onClick={onPrev} aria-label="Página anterior">
-          <Arrow dir="left" />
-        </button>
-      )}
-      {page < total && (
-        <button type="button" className="page-arrow page-arrow--next" onClick={onNext} aria-label="Página siguiente">
-          <Arrow dir="right" />
-        </button>
-      )}
-    </>
   );
 }
 
@@ -105,8 +99,7 @@ export function TransitionSymbol({ kind }: { kind: Transition['symbol'] }) {
   );
 }
 
-/** Guía de estaciones (reemplaza al mapa 3D durante esta entrega). */
-export function StationGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
+function useDialog(open: boolean) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -114,6 +107,13 @@ export function StationGuide({ open, onClose }: { open: boolean; onClose: () => 
     if (open && !d.open) d.showModal();
     if (!open && d.open) d.close();
   }, [open]);
+  return ref;
+}
+
+/** Guía de estaciones (reemplaza al mapa 3D durante esta entrega). */
+export function StationGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const ref = useDialog(open);
+  const { scrollToPage } = useJourneyNav();
   return (
     <dialog ref={ref} className="guide" onClose={onClose} onClick={(e) => e.target === ref.current && onClose()} aria-labelledby="guide-title">
       <div className="guide__inner">
@@ -127,16 +127,91 @@ export function StationGuide({ open, onClose }: { open: boolean; onClose: () => 
         <ol className="guide__list">
           {stations.map((s) => (
             <li key={s.id}>
-              <Link to={pagePath(STATION_PAGE[s.id])} className="guide__item" onClick={onClose} style={{ ['--accent' as string]: s.accent }}>
+              <button
+                type="button"
+                className="guide__item"
+                onClick={() => { onClose(); scrollToPage(STATION_PAGE[s.id]); }}
+                style={{ ['--accent' as string]: s.accent }}
+              >
                 <Illustration id={s.illustration} className="guide__art" />
                 <span className="guide__num">Estación {s.number}</span>
                 <strong>{s.name}</strong>
                 <span className="guide__place">{s.place}</span>
-              </Link>
+              </button>
             </li>
           ))}
         </ol>
       </div>
     </dialog>
+  );
+}
+
+/** Menú principal: botón fijo arriba a la derecha y panel a pantalla completa. */
+export function SiteMenu({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
+  const ref = useDialog(open);
+  const { scrollToPage } = useJourneyNav();
+  return (
+    <>
+      <button type="button" className="menu-btn" onClick={onOpen} aria-label="Abrir menú" aria-haspopup="dialog">
+        <span /><span /><span />
+      </button>
+      <dialog ref={ref} className="menu" onClose={onClose} aria-label="Menú">
+        <button type="button" className="icon-btn menu__close" onClick={onClose} aria-label="Cerrar menú">✕</button>
+        <nav className="menu__nav">
+          <p className="menu__brand">Territorios <em>Vivos</em></p>
+          <ul>
+            {menu.map((item, i) => (
+              <li key={item.label} style={{ animationDelay: `${0.05 * i}s` }}>
+                {item.to ? (
+                  <button type="button" onClick={() => { onClose(); scrollToPage(item.to!); }}>{item.label}</button>
+                ) : (
+                  <span className="menu__soon" aria-disabled="true">
+                    {item.label} <small>Próximamente</small>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <SocialLinks className="menu__social" />
+        </nav>
+      </dialog>
+    </>
+  );
+}
+
+const ICONS: Record<SocialNetwork, ReactNode> = {
+  youtube: (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path fill="currentColor" d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12 31 31 0 0 0 1 16.8a3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8ZM9.7 15.1V8.9l5.8 3.1-5.8 3.1Z" />
+    </svg>
+  ),
+  instagram: (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="17.4" cy="6.6" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  tiktok: (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path fill="currentColor" d="M16.6 2h-3.3v13.2a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9a6.3 6.3 0 1 0 5.3 6.2V8.6a8 8 0 0 0 4.6 1.5V6.8a4.7 4.7 0 0 1-4.6-4.8Z" />
+    </svg>
+  ),
+};
+
+/** Íconos de redes sociales. Sin dirección confirmada, el ícono se muestra sin enlace. */
+export function SocialLinks({ className = '' }: { className?: string }) {
+  return (
+    <ul className={`social ${className}`} aria-label="Redes sociales">
+      {social.map((s) => (
+        <li key={s.network}>
+          {s.url ? (
+            <a href={s.url} target="_blank" rel="noopener noreferrer" aria-label={s.label} title={s.label}>{ICONS[s.network]}</a>
+          ) : (
+            <span aria-label={`${s.label} (enlace pendiente)`} title={`${s.label} · enlace pendiente`}>{ICONS[s.network]}</span>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
