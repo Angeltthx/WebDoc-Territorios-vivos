@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "media": "node scripts/optimize-media.mjs && node scripts/media-manifest.mjs",
     "media:video": "node scripts/optimize-video.mjs",
-    "media:manifest": "node scripts/media-manifest.mjs"
+    "media:manifest": "node scripts/media-manifest.mjs",
+    "media:audio": "node scripts/optimize-audio.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",

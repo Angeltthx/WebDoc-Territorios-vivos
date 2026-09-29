@@ -10,6 +10,7 @@ imágenes reales y animaciones de interfaz.
 npm install
 npm run media        # fotos e ilustraciones → public/media/*.webp + índice de medidas (desde ../Contenido)
 npm run media:video  # video de portada → public/media/video/ (desde ../Contenido)
+npm run media:audio  # olas de transición → public/media/audio/ (desde ../Contenido)
 npm run dev     # http://localhost:5173
 npm run build   # verificación de tipos + build de producción en dist/
 ```
@@ -36,9 +37,10 @@ Flechas, AvPág y espacio avanzan una página.
   `src/content/site.ts`; las que aún no tienen destino se muestran como "Próximamente".
 - Pestañas de cada estación: Pensamiento, Historia, Galería… llevan a su página.
 - La URL refleja la página visible (`/`, `/2` … `/22`) para compartir un punto exacto.
-- Sonido (sintetizado con Web Audio, `src/application/sound.ts`, botón para silenciar junto a
-  las redes): una ola de mar corta y lejana en cada cambio de página y ambientes de marea continuos
-  solo en las escenas Marea alta y Marea baja. Empieza tras el primer clic, toque o tecla.
+- Sonido con grabaciones reales (`src/application/sound.ts`, botón para silenciar junto a las
+  redes): una ola corta en cada cambio de página (`ola-1/2/3.mp3`, alternándose; `?ola=N` fija
+  una) y ambiente de marea en bucle solo en Marea alta y Marea baja (`marea-alta.mp3`,
+  `marea-baja.mp3`). Empieza tras el primer clic, toque o tecla.
 - Galerías con las fotos completas (proporciones reales en `src/content/media-manifest.json`,
   generado con `npm run media:manifest`), flechas ← → para pasar de foto y botón "Ver galería
   completa" con control de tamaño.
