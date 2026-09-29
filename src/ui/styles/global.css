@@ -146,21 +146,60 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .video__time { font-variant-numeric: tabular-nums; }
 
 /* ───────── Galería ───────── */
-.gallery { position: absolute; inset: 0; display: grid; align-content: center; padding: 70px 0 120px; }
+.gallery { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 18px; padding: 70px 0 130px; }
 .gallery__track {
-  display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth;
-  padding: 6px max(80px, calc((100vw - 1000px) / 2)); scrollbar-width: none;
+  display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; scroll-behavior: smooth; width: 100%;
+  padding: 6px max(80px, calc((100vw - 1100px) / 2)); scrollbar-width: none; align-items: center;
 }
 .gallery__track::-webkit-scrollbar { display: none; }
 .gallery__card {
-  position: relative; flex: 0 0 clamp(200px, 23vw, 320px); aspect-ratio: 3 / 4; padding: 0; border: 0; border-radius: 2px; overflow: hidden;
+  position: relative; flex: none; height: min(44vh, 24vw, 460px); padding: 0; border: 0; border-radius: 3px; overflow: hidden;
   scroll-snap-align: center; background: #243029; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); animation: rise 0.8s var(--ease) both;
 }
-.gallery__card img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s var(--ease); }
-.gallery__card:hover img { transform: scale(1.05); }
+.gallery__card img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.8s var(--ease); }
+.gallery__card:hover img { transform: scale(1.04); }
 .gallery__card:nth-child(2) { animation-delay: 0.08s; }
 .gallery__card:nth-child(3) { animation-delay: 0.16s; }
 .gallery__card:nth-child(4) { animation-delay: 0.24s; }
+.gallery__all {
+  display: inline-flex; align-items: center; gap: 9px; min-height: 42px; padding: 0 18px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(8px);
+  font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; transition: background 0.2s, color 0.2s;
+}
+.gallery__all span { opacity: 0.7; text-transform: none; letter-spacing: 0.02em; }
+.gallery__all:hover { background: #fff; color: var(--forest); }
+
+/* Galería completa */
+.grid-view {
+  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+  background: #0b1714; color: #fff; overflow: hidden;
+}
+.grid-view[open] { display: grid; grid-template-rows: auto 1fr; animation: fade 0.3s ease both; }
+.grid-view::backdrop { background: rgba(5, 12, 10, 0.85); }
+.grid-view__bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px clamp(14px, 3vw, 32px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1); background: rgba(11, 23, 20, 0.95);
+}
+.grid-view__bar > div:first-child { flex: 1; min-width: 180px; }
+.grid-view__bar h2 { font: 700 italic clamp(18px, 2vw, 24px) var(--serif); }
+.grid-view__bar h2 span { font: 400 13px var(--sans); opacity: 0.6; }
+.grid-view__zoom { display: flex; align-items: center; gap: 8px; }
+.grid-view__zoom input { width: clamp(90px, 16vw, 180px); accent-color: var(--gold); }
+.grid-view .icon-btn { font-size: 20px; }
+.grid-view .icon-btn:disabled { opacity: 0.35; cursor: default; }
+.grid-view__body { overflow-y: auto; overflow-x: hidden; min-height: 0; padding: clamp(10px, 2vw, 24px); overscroll-behavior: contain; }
+.grid-view__cols { columns: var(--col) auto; column-gap: 10px; }
+.grid-view__item {
+  position: relative; display: block; width: 100%; margin: 0 0 10px; padding: 0; border: 0; border-radius: 3px;
+  overflow: hidden; background: #1b2a25; break-inside: avoid;
+}
+.grid-view__item img { width: 100%; height: auto; transition: transform 0.6s var(--ease); }
+.grid-view__item:hover img { transform: scale(1.03); }
+.grid-view__caption {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 10px 8px; font-size: 12px; text-align: left;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65)); opacity: 0; transition: opacity 0.25s;
+}
+.grid-view__item:hover .grid-view__caption, .grid-view__item:focus-visible .grid-view__caption { opacity: 1; }
 .gallery__tag { position: absolute; z-index: 1; top: 10px; left: 10px; font-size: 11px; padding: 3px 8px; border-radius: 5px; background: rgba(0, 0, 0, 0.5); }
 
 .lightbox { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: rgba(5, 12, 10, 0.95); color: #fff; }
@@ -262,39 +301,76 @@ h1, h2, p, blockquote, figure { margin: 0; }
 
 /* ───────── Recorrido vertical ─────────
    Cada página es "sticky": al desplazarse, la siguiente sube y cubre a la anterior.
-   Los puntos de parada (.snaps) son bloques de una pantalla fuera del apilado, para que
-   el scroll snap funcione de forma fiable aunque las páginas estén fijadas. */
+   El acomodo al detenerse lo hace application/journey.ts (sin scroll snap del navegador,
+   que saltaba de página con cualquier movimiento pequeño). */
 .scroller {
   position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden;
-  scroll-snap-type: y mandatory; overscroll-behavior: none; background: var(--forest);
-  scrollbar-width: none;
+  overscroll-behavior: none; background: var(--forest); scrollbar-width: none;
 }
 .scroller::-webkit-scrollbar { display: none; }
-.snaps { position: absolute; top: 0; left: 0; width: 1px; pointer-events: none; }
-.snaps__stop { height: 100dvh; scroll-snap-align: start; scroll-snap-stop: always; }
 .stack-page { position: sticky; top: 0; height: 100dvh; min-height: 480px; overflow: hidden; background: var(--forest); }
 .stack-page.is-covered { visibility: hidden; }
 
 /* Las animaciones de entrada esperan a que la página llegue a la pantalla. */
-.stack-page:not(.is-seen) *, .stack-page:not(.is-seen) *::before, .stack-page:not(.is-seen) *::after { animation-play-state: paused !important; }
+.stack-page:not(.is-seen) .screen *, .stack-page:not(.is-seen) .screen *::before, .stack-page:not(.is-seen) .screen *::after { animation-play-state: paused !important; }
 
-/* Borde de ola: la página entra con el borde superior ondulado y se aplana al llegar arriba.
-   Usa animaciones ligadas al desplazamiento; donde no existen, la página entra con borde recto. */
+/* ───────── Ola al desplazarse ─────────
+   La página que sube trae un borde de dos olas que se mueven a distinto ritmo, una línea de
+   espuma y un velo de agua que se disuelve mientras "emerge". Todo está ligado al scroll:
+   al llegar arriba el borde queda recto y el velo desaparece. Sin soporte, entra con borde recto. */
+@property --wave-h { syntax: '<length>'; inherits: true; initial-value: 0px; }
+@property --veil { syntax: '<number>'; inherits: true; initial-value: 0; }
+
 @supports (animation-timeline: view()) {
   .stack-page:not(.stack-page--first) {
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.4' d='M0,38 C60,8 140,8 200,38 C260,68 340,68 400,38 L400,100 L0,100 Z'/%3E%3Cpath d='M0,55 C60,25 140,25 200,55 C260,85 340,85 400,55 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.4' d='M0,38 C60,8 140,8 200,38 C260,68 340,68 400,38 L400,100 L0,100 Z'/%3E%3Cpath d='M0,55 C60,25 140,25 200,55 C260,85 340,85 400,55 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
-    -webkit-mask-repeat: repeat-x, no-repeat; mask-repeat: repeat-x, no-repeat;
-    -webkit-mask-position: 0 0, 0 var(--wave-h); mask-position: 0 0, 0 var(--wave-h);
-    -webkit-mask-size: 34vw var(--wave-h), 100% 100%; mask-size: 34vw var(--wave-h), 100% 100%;
-    animation: tide linear both, drift 5s linear infinite;
-    animation-timeline: view(), auto;
+    view-timeline: --page block;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath d='M0,58 C60,24 140,24 200,58 C260,92 340,92 400,58 L400,100 L0,100 Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.45' d='M0,40 C70,6 130,6 200,40 C270,74 330,74 400,40 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath d='M0,58 C60,24 140,24 200,58 C260,92 340,92 400,58 L400,100 L0,100 Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.45' d='M0,40 C70,6 130,6 200,40 C270,74 330,74 400,40 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
+    -webkit-mask-repeat: repeat-x, repeat-x, no-repeat; mask-repeat: repeat-x, repeat-x, no-repeat;
+    -webkit-mask-size: 36vw var(--wave-h), 58vw var(--wave-h), 100% 100%;
+    mask-size: 36vw var(--wave-h), 58vw var(--wave-h), 100% 100%;
+    -webkit-mask-position: 0 0, 0 0, 0 var(--wave-h); mask-position: 0 0, 0 0, 0 var(--wave-h);
+    animation: tide linear both;
+    animation-timeline: --page;
+    animation-range: entry 0% entry 100%;
+  }
+  /* El vaivén continuo solo corre en las páginas que pueden estar en movimiento (actual y siguiente),
+     para no recalcular máscaras de pantalla completa en todo el recorrido. */
+  .stack-page.is-active:not(.stack-page--first), .stack-page.is-next {
+    animation: tide linear both, drift 9s linear infinite;
+    animation-timeline: --page, auto;
     animation-range: entry 0% entry 100%, normal;
   }
+
+  /* Espuma sobre el borde de la ola */
+  .stack-page:not(.stack-page--first)::before {
+    content: ''; position: absolute; z-index: 30; left: 0; right: 0; top: 0; pointer-events: none;
+    height: var(--wave-h); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath d='M0,58 C60,24 140,24 200,58 C260,92 340,92 400,58' fill='none' stroke='white' stroke-opacity='.75' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0,64 C60,30 140,30 200,64 C260,98 340,98 400,64' fill='none' stroke='white' stroke-opacity='.3' stroke-width='6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") repeat-x 0 0 / 36vw 100%;
+    opacity: calc(var(--veil) * 1.4);
+  }
+  .stack-page.is-active:not(.stack-page--first)::before, .stack-page.is-next::before { animation: foam-drift 9s linear infinite; }
+
+  /* Velo de agua: la página llega teñida y un poco más abajo, y se aclara al asentarse */
+  .stack-page:not(.stack-page--first)::after {
+    content: ''; position: absolute; z-index: 29; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(160, 225, 235, 0.55) 0%, rgba(40, 120, 140, 0.35) 30%, rgba(10, 60, 70, 0.25) 100%);
+    opacity: var(--veil);
+  }
+  .stack-page:not(.stack-page--first) > .screen {
+    animation: surface linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
+  }
 }
-@property --wave-h { syntax: '<length>'; inherits: false; initial-value: 0px; }
-@keyframes tide { from { --wave-h: 14vh; } 75% { --wave-h: 7vh; } to { --wave-h: 0px; } }
-@keyframes drift { from { -webkit-mask-position: 0 0, 0 var(--wave-h); mask-position: 0 0, 0 var(--wave-h); } to { -webkit-mask-position: 34vw 0, 0 var(--wave-h); mask-position: 34vw 0, 0 var(--wave-h); } }
+@keyframes tide {
+  from { --wave-h: 20vh; --veil: 0.9; }
+  60% { --wave-h: 11vh; --veil: 0.45; }
+  to { --wave-h: 0px; --veil: 0; }
+}
+@keyframes drift {
+  from { -webkit-mask-position: 0 0, 0 0, 0 var(--wave-h); mask-position: 0 0, 0 0, 0 var(--wave-h); }
+  to { -webkit-mask-position: 72vw 0, -58vw 0, 0 var(--wave-h); mask-position: 72vw 0, -58vw 0, 0 var(--wave-h); }
+}
+@keyframes foam-drift { to { background-position: 72vw 0; } }
+@keyframes surface { from { transform: translateY(7vh) scale(1.04); } to { transform: none; } }
 
 /* ───────── Menú y redes (fijos) ───────── */
 .menu-btn {
@@ -333,7 +409,13 @@ h1, h2, p, blockquote, figure { margin: 0; }
   border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.28); backdrop-filter: blur(8px); transition: background 0.2s, color 0.2s;
 }
 .social a:hover { background: #fff; color: var(--forest); }
-.social--fixed { position: fixed; z-index: 55; left: 14px; bottom: max(14px, env(safe-area-inset-bottom)); flex-direction: column; }
+.dock { position: fixed; z-index: 55; left: 14px; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+.dock .social { flex-direction: column; }
+.dock__sound {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.28); backdrop-filter: blur(8px);
+}
+.dock__sound[aria-pressed='false'] { opacity: 0.6; }
 .menu__social { margin-top: 12px; }
 
 /* ───────── Móvil ───────── */
@@ -344,8 +426,8 @@ h1, h2, p, blockquote, figure { margin: 0; }
 }
 
 @media (max-width: 640px) {
-  .social--fixed { left: auto; right: 10px; bottom: auto; top: 50%; transform: translateY(-50%); }
-  .social--fixed a, .social--fixed span { width: 34px; height: 34px; }
+  .dock { left: auto; right: 10px; bottom: auto; top: 50%; transform: translateY(-50%); }
+  .dock .social a, .dock .social span, .dock__sound { width: 34px; height: 34px; }
   .chip { font-size: 10px; letter-spacing: 0.12em; max-width: 60vw; }
   .ghost-link { font-size: 11px; letter-spacing: 0.1em; }
   .page-foot { padding: 0 12px max(10px, env(safe-area-inset-bottom)); }
@@ -354,9 +436,9 @@ h1, h2, p, blockquote, figure { margin: 0; }
   .quote { left: 20px; right: 20px; top: auto; bottom: 130px; transform: none; max-width: none; }
   .quote.reveal { animation-name: rise; }
   .video__bar { left: 20px; right: 20px; bottom: 120px; }
-  .gallery { padding-bottom: 130px; }
+  .gallery { padding-bottom: 140px; }
   .gallery__track { padding: 6px 20px; }
-  .gallery__card { flex-basis: 72vw; }
+  .gallery__card { height: min(46vh, 420px); max-width: 84vw; }
   .songs { flex-direction: column; gap: 14px; padding: 60px 20px 120px; }
   .glass-card { width: min(300px, 86vw); min-height: 110px; }
   .transition { padding: 0 24px 60px; }
@@ -370,7 +452,7 @@ h1, h2, p, blockquote, figure { margin: 0; }
 @media (max-height: 560px) and (orientation: landscape) {
   .welcome__voice { margin-top: 16px; }
   .gallery { padding: 50px 0 100px; }
-  .gallery__card { flex-basis: 22vw; }
+  .gallery__card { height: 44vh; }
 }
 
 /* Movimiento reducido: sin zoom, rebotes ni lluvia. El video de portada se mantiene. */

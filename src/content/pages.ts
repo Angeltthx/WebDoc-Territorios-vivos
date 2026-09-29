@@ -48,7 +48,8 @@ const nuqui = (active: string): Tabs => ({
 const pangui = (active: string): Tabs => ({
   active,
   items: [
-    { label: 'Silencio', to: 'pangui-silencio' },
+    { label: 'Marea alta', to: 'pangui-marea-alta' },
+    { label: 'Marea baja', to: 'pangui-marea-baja' },
     { label: 'Historia', to: 'pangui-historia' },
     { label: '360 · Cantos', to: 'pangui-cantos' },
     { label: 'Video canción', to: 'pangui-video-cancion' },
@@ -63,7 +64,7 @@ export type PageBody =
   | { kind: 'gallery'; station: StationId; label: string; tabs: Tabs }
   | { kind: 'recipe'; label: string; tabs: Tabs }
   | { kind: 'transition'; index: number }
-  | { kind: 'silence'; label: string }
+  | { kind: 'silence'; label: string; tide: 'alta' | 'baja'; title: string; hint: string; photo: Photo; tabs: Tabs }
   | { kind: 'songs'; label: string; tabs: Tabs }
   | { kind: 'closing' };
 
@@ -114,7 +115,27 @@ export const pages: PageSpec[] = [
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },
   { id: 'transicion-3', kind: 'transition', index: 2 },
 
-  { id: 'pangui-silencio', kind: 'silence', label: 'Estación 4 · El silencio' },
+  // El silencio se divide en dos escenas, cada una con su propio sonido de marea.
+  {
+    id: 'pangui-marea-alta',
+    kind: 'silence',
+    tide: 'alta',
+    label: 'Estación 4 · El silencio',
+    title: 'Marea alta',
+    hint: 'sin voz · solo la marea que sube',
+    photo: p('6i3a4281', 'Una mujer toca las ramas del manglar', { focus: '55% 30%' }),
+    tabs: pangui('Marea alta'),
+  },
+  {
+    id: 'pangui-marea-baja',
+    kind: 'silence',
+    tide: 'baja',
+    label: 'Estación 4 · El silencio',
+    title: 'marea baja',
+    hint: 'sin voz · solo la marea que baja',
+    photo: p('6i3a5069', 'El manglar reflejado en el agua, con garzas', { focus: '50% 60%' }),
+    tabs: pangui('Marea baja'),
+  },
   {
     id: 'pangui-historia',
     kind: 'video',

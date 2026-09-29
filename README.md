@@ -8,7 +8,7 @@ imágenes reales y animaciones de interfaz.
 
 ```bash
 npm install
-npm run media        # fotos e ilustraciones → public/media/*.webp (desde ../Contenido)
+npm run media        # fotos e ilustraciones → public/media/*.webp + índice de medidas (desde ../Contenido)
 npm run media:video  # video de portada → public/media/video/ (desde ../Contenido)
 npm run dev     # http://localhost:5173
 npm run build   # verificación de tipos + build de producción en dist/
@@ -27,14 +27,21 @@ almacenamiento externo (R2 u otro).
 
 El webdoc es un **recorrido vertical**: las páginas de los wireframes van en orden, cada una
 ocupa la pantalla y, al desplazarse hacia abajo, la siguiente sube sobre la anterior con un
-borde de ola que se aplana al llegar (animación ligada al scroll; donde el navegador no la
-admite, entra con borde recto). El desplazamiento se detiene en cada página.
+borde de dos olas, espuma y un velo de agua que se disuelve al asentarse (animación ligada al
+scroll; donde el navegador no la admite, entra con borde recto). Al soltar, la página se acomoda
+con suavidad: si solo te pasaste un poco vuelve a su lugar; desde un 25 % de pantalla avanza.
+Flechas, AvPág y espacio avanzan una página.
 
 - Menú fijo (arriba a la derecha) y redes sociales siempre visibles. Opciones y enlaces en
   `src/content/site.ts`; las que aún no tienen destino se muestran como "Próximamente".
 - Pestañas de cada estación: Pensamiento, Historia, Galería… llevan a su página.
 - La URL refleja la página visible (`/`, `/2` … `/22`) para compartir un punto exacto.
-- Sin efectos de sonido: el audio vendrá de los propios videos. La portada es el video
+- Sonido (sintetizado con Web Audio, `src/application/sound.ts`, botón para silenciar junto a
+  las redes): un vaivén de agua suave en cada cambio de página y ambientes de marea continuos
+  solo en las escenas Marea alta y Marea baja. Empieza tras el primer clic, toque o tecla.
+- Galerías con las fotos completas (proporciones reales en `src/content/media-manifest.json`,
+  generado con `npm run media:manifest`) y botón "Ver galería completa" con zoom.
+- La portada es el video
   `panguí_v1` (1080p/720p sin audio en `public/media/video/`), que se pausa al quedar
   cubierto y continúa desde el mismo punto al volver.
 

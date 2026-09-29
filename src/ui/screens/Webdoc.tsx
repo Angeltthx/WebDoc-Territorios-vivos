@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getStation, stations, transitions } from '../../content/journey';
 import { pages, type PageSpec } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
+import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
   Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, STATION_PAGE, SiteMenu, SocialLinks,
@@ -21,22 +22,35 @@ export function Webdoc() {
   // Páginas ya vistas: sus animaciones de entrada corren una vez, al llegar a ellas.
   const [seen, setSeen] = useState(() => new Set([active]));
 
+  const [muted, setMutedState] = useState(isMuted);
+  const first = useRef(true);
+
+  useEffect(() => initAudioUnlock(), []);
+
   useEffect(() => {
     setSeen((s) => (s.has(active) ? s : new Set(s).add(active)));
     document.title = `Territorios Vivos · ${active + 1} / ${pages.length}`;
+    // Sonido de agua al cambiar de página (no al cargar) y ambiente de marea en su escena.
+    if (first.current) first.current = false;
+    else playTransition();
+    const spec = pages[active];
+    setAmbient(spec.kind === 'silence' ? spec.tide : null);
   }, [active]);
+
+  useEffect(() => () => setAmbient(null), []);
+
+  const toggleSound = () => {
+    setMuted(!muted);
+    setMutedState(!muted);
+  };
 
   const nav = useMemo(() => ({ scrollToPage, scrollToIndex }), [scrollToPage, scrollToIndex]);
 
   return (
     <JourneyNav.Provider value={nav}>
       <main className="scroller" ref={scroller}>
-        {/* Puntos de parada del desplazamiento: una pantalla por página. */}
-        <div className="snaps" aria-hidden="true">
-          {pages.map((pg) => <div key={pg.id} className="snaps__stop" />)}
-        </div>
         {pages.map((spec, i) => {
-          const state = i === active ? ' is-active' : i < active - 1 ? ' is-covered' : '';
+          const state = i === active ? ' is-active' : i === active + 1 ? ' is-next' : i < active - 1 ? ' is-covered' : '';
           return (
             <section
               key={spec.id}
@@ -52,7 +66,19 @@ export function Webdoc() {
         })}
       </main>
       <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} />
-      <SocialLinks className="social--fixed" />
+      <div className="dock">
+        <button
+          type="button"
+          className="dock__sound"
+          onClick={toggleSound}
+          aria-pressed={!muted}
+          aria-label={muted ? 'Activar sonido' : 'Silenciar sonido'}
+          title={muted ? 'Activar sonido' : 'Silenciar sonido'}
+        >
+          {muted ? <SoundOff /> : <SoundOn />}
+        </button>
+        <SocialLinks />
+      </div>
       <StationGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </JourneyNav.Provider>
   );
@@ -152,9 +178,10 @@ function PageView({ spec, playing, openGuide }: { spec: PageSpec; playing: boole
 
     case 'silence':
       return (
-        <div className="screen" aria-label={spec.label}>
-          <div className="screen__content"><SilencePanel silence={getStation('pangui')!.silence!} /></div>
+        <div className="screen" aria-label={`${spec.label}: ${spec.title}`}>
+          <div className="screen__content"><SilencePanel tide={spec.tide} title={spec.title} hint={spec.hint} photo={spec.photo} /></div>
           <TopBar label={spec.label} />
+          <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
         </div>
       );
 
@@ -200,6 +227,24 @@ function PortadaVideo({ playing }: { playing: boolean }) {
       />
       <div className="backdrop__tint" style={{ background: 'radial-gradient(ellipse at center, rgba(6,18,14,.08), rgba(6,18,14,.42))' }} />
     </div>
+  );
+}
+
+function SoundOn() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 8v4h3l4 3V5L6 8Z" />
+      <path d="M13 7.5c1.2 1.4 1.2 3.6 0 5M15.5 5.5c2.3 2.6 2.3 6.4 0 9" />
+    </svg>
+  );
+}
+
+function SoundOff() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 8v4h3l4 3V5L6 8Z" />
+      <path d="m13 8 4 4m0-4-4 4" />
+    </svg>
   );
 }
 

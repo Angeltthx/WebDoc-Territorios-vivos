@@ -1,5 +1,14 @@
 import type { CSSProperties } from 'react';
 import type { Photo } from '../../domain/types';
+import manifest from '../../content/media-manifest.json';
+
+const SIZES: Record<string, number[]> = manifest;
+
+/** Proporción ancho/alto real de una imagen (1.5 si aún no está en el índice). */
+export const aspectOf = (id: string) => {
+  const d = SIZES[id];
+  return d ? d[0] / d[1] : 1.5;
+};
 
 // Las ilustraciones (PNG con transparencia) se publican en un solo tamaño;
 // las fotografías tienen versión grande y pequeña (-sm). Ver scripts/optimize-media.mjs.
@@ -26,6 +35,8 @@ export function Img({ photo, className, priority, sizes = '100vw', style }: ImgP
       srcSet={single ? undefined : `${mediaUrl(photo.id, true)} 900w, ${mediaUrl(photo.id)} 2200w`}
       sizes={single ? undefined : sizes}
       alt={photo.alt}
+      width={SIZES[photo.id]?.[0]}
+      height={SIZES[photo.id]?.[1]}
       loading={priority ? 'eager' : 'lazy'}
       fetchPriority={priority ? 'high' : 'auto'}
       decoding="async"

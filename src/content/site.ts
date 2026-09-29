@@ -19,9 +19,9 @@ export const menu: MenuItem[] = [
 
 export type SocialNetwork = 'youtube' | 'instagram' | 'tiktok';
 
-/** Enlaces de las cuentas oficiales. Pendientes: el cliente debe enviar las direcciones. */
+/** Enlaces de prueba (no son las cuentas oficiales definitivas). */
 export const social: { network: SocialNetwork; label: string; url?: string }[] = [
-  { network: 'youtube', label: 'YouTube' },
-  { network: 'instagram', label: 'Instagram' },
-  { network: 'tiktok', label: 'TikTok' },
+  { network: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/@territoriosvivos' },
+  { network: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/territorios_vivos/' },
+  { network: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/tag/territoriosvivo' },
 ];

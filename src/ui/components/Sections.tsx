@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type TouchEvent } from 'react';
 import type { Photo, Station, VideoAsset } from '../../domain/types';
-import { Backdrop, Img } from './Media';
+import { aspectOf, Backdrop, Img } from './Media';
 import { Arrow } from './Chrome';
 
 export function QuotePanel({ station }: { station: Station }) {
@@ -52,21 +52,106 @@ export function VideoPanel({ video, bar }: { video: VideoAsset; bar?: string }) 
 
 export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['gallery']> }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [grid, setGrid] = useState(false);
   return (
     <>
       <Backdrop photo={gallery.background} tint="rgba(8,16,14,.55)" blur />
       <div className="gallery reveal">
         <div className="gallery__track" data-no-arrows>
           {gallery.photos.map((ph, i) => (
-            <button key={ph.id + i} type="button" className="gallery__card" onClick={() => setOpen(i)} aria-label={`Ampliar: ${ph.alt}`}>
+            <button
+              key={ph.id + i}
+              type="button"
+              className="gallery__card"
+              style={{ aspectRatio: String(aspectOf(ph.id)) }}
+              onClick={() => setOpen(i)}
+              aria-label={`Ampliar: ${ph.alt}`}
+            >
               {ph.tag === 'dron' && <span className="gallery__tag">◈ dron</span>}
-              <Img photo={ph} sizes="(max-width: 700px) 80vw, 30vw" />
+              <Img photo={ph} sizes="(max-width: 700px) 80vw, 40vw" />
+            </button>
+          ))}
+        </div>
+        <button type="button" className="gallery__all" onClick={() => setGrid(true)}>
+          <GridIcon /> Ver galería completa <span>· {gallery.photos.length} fotos</span>
+        </button>
+      </div>
+      <GalleryGrid photos={gallery.photos} title={gallery.intro} open={grid} onClose={() => setGrid(false)} onPick={setOpen} />
+      <Lightbox photos={gallery.photos} index={open} onChange={setOpen} />
+    </>
+  );
+}
+
+function GridIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+      <rect x="1" y="1" width="6" height="6" rx="1" /><rect x="9" y="1" width="6" height="6" rx="1" />
+      <rect x="1" y="9" width="6" height="6" rx="1" /><rect x="9" y="9" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
+
+/** Tamaños de la cuadrícula (ancho de columna en px), del más pequeño al más grande. */
+const GRID_STEPS = [120, 170, 240, 330, 460, 640];
+
+/** Galería completa: todas las fotos en columnas, con zoom para agrandar o achicar la vista. */
+function GalleryGrid({ photos, title, open, onClose, onPick }: {
+  photos: Photo[];
+  title: string;
+  open: boolean;
+  onClose: () => void;
+  onPick: (i: number) => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [step, setStep] = useState(() => (window.innerWidth < 640 ? 1 : 2));
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) d.showModal();
+    if (!open && d.open) d.close();
+  }, [open]);
+  const zoom = (dir: number) => setStep((s) => Math.max(0, Math.min(GRID_STEPS.length - 1, s + dir)));
+  return (
+    <dialog
+      ref={ref}
+      className="grid-view"
+      aria-label={`Galería completa: ${title}`}
+      onClose={onClose}
+      onKeyDown={(e) => {
+        if (e.key === '+' || e.key === '=') zoom(1);
+        if (e.key === '-') zoom(-1);
+      }}
+    >
+      <header className="grid-view__bar">
+        <div>
+          <p className="eyebrow">Galería</p>
+          <h2>{title} <span>· {photos.length} fotos</span></h2>
+        </div>
+        <div className="grid-view__zoom" role="group" aria-label="Tamaño de las fotos">
+          <button type="button" className="icon-btn" onClick={() => zoom(-1)} disabled={step === 0} aria-label="Fotos más pequeñas">−</button>
+          <input
+            type="range"
+            min={0}
+            max={GRID_STEPS.length - 1}
+            value={step}
+            onChange={(e) => setStep(Number(e.target.value))}
+            aria-label="Tamaño de las fotos"
+          />
+          <button type="button" className="icon-btn" onClick={() => zoom(1)} disabled={step === GRID_STEPS.length - 1} aria-label="Fotos más grandes">+</button>
+        </div>
+        <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar galería">✕</button>
+      </header>
+      <div className="grid-view__body">
+        <div className="grid-view__cols" style={{ ['--col' as string]: `${GRID_STEPS[step]}px` }}>
+          {photos.map((ph, i) => (
+            <button key={ph.id + i} type="button" className="grid-view__item" onClick={() => onPick(i)} aria-label={`Ampliar: ${ph.alt}`}>
+              <Img photo={ph} sizes={`${GRID_STEPS[step] * 1.5}px`} />
+              {ph.caption && <span className="grid-view__caption">{ph.caption}</span>}
             </button>
           ))}
         </div>
       </div>
-      <Lightbox photos={gallery.photos} index={open} onChange={setOpen} />
-    </>
+    </dialog>
   );
 }
 
@@ -134,15 +219,15 @@ export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']>
   );
 }
 
-export function SilencePanel({ silence }: { silence: NonNullable<Station['silence']> }) {
+/** Escena de silencio (marea alta / marea baja): sin voz, el título aparece despacio. */
+export function SilencePanel({ tide, title, hint, photo }: { tide: 'alta' | 'baja'; title: string; hint: string; photo: Photo }) {
   return (
     <>
-      <Backdrop photo={silence.photo} tint="rgba(20,110,80,.5)" />
-      <div className="silence">
-        <h2 className="silence__title">{silence.title}</h2>
-        <p className="silence__hint"><span aria-hidden="true">🔇</span> {silence.hint}</p>
+      <Backdrop photo={photo} tint={tide === 'alta' ? 'rgba(20,110,80,.5)' : 'rgba(30,90,110,.42)'} />
+      <div className={`silence silence--${tide}`}>
+        <h2 className="silence__title">{title}</h2>
+        <p className="silence__hint"><span aria-hidden="true">≋</span> {hint}</p>
       </div>
-      <p className="page-note">un respiro antes del clímax · sin voz · el título aparece despacio</p>
     </>
   );
 }

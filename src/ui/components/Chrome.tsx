@@ -17,7 +17,7 @@ export const STATION_PAGE: Record<string, string> = {
   chori: 'chori-pensamiento',
   atrato: 'atrato-pensamiento',
   nuqui: 'nuqui-pensamiento',
-  pangui: 'pangui-silencio',
+  pangui: 'pangui-marea-alta',
 };
 
 export function Chip({ children }: { children: ReactNode }) {
