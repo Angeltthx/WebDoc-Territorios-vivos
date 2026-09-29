@@ -27,12 +27,13 @@ export function VideoPanel({ video, bar }: { video: VideoAsset; bar?: string }) 
   return (
     <>
       {video.poster ? (
-        <Backdrop photo={video.poster} tint={video.tint ? `${video.tint}c7` : 'rgba(70,80,70,.62)'} />
+        // Sin filtro de color: el video (o su portada) se ve con sus colores originales.
+        <Backdrop photo={video.poster} tint="transparent" />
       ) : (
         <div className="backdrop" style={{ background: video.tint ?? '#2d3a33' }} aria-hidden="true" />
       )}
       <div className="video reveal">
-        <button type="button" className={`play${video.poster ? ' play--bare' : ''}`} onClick={() => setAsked(true)} aria-label={`Reproducir ${video.title}`}>
+        <button type="button" className={`play${video.poster ? ' play--on-image' : ''}`} onClick={() => setAsked(true)} aria-label={`Reproducir ${video.title}`}>
           <svg width="34" height="34" viewBox="0 0 30 30" aria-hidden="true"><path d="M10 6v18l14-9Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
         </button>
         {!video.poster && <p className="video__title">{video.title}{video.duration && <span> · {video.duration}</span>}</p>}

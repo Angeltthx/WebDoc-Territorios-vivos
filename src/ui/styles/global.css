@@ -41,9 +41,6 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .wordmark__sub { margin-top: 0.9em; font: 400 clamp(13px, 1.5vw, 18px) var(--sans); letter-spacing: 0.32em; }
 
 /* ───────── Página ───────── */
-.webdoc { position: fixed; inset: 0; background: var(--forest); overflow: hidden; }
-.page { position: absolute; inset: 0; animation: page-in 0.7s ease both; }
-@keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
 .screen { position: relative; height: 100%; overflow: hidden; isolation: isolate; }
 .screen__content { position: absolute; inset: 0; }
 
@@ -91,7 +88,7 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .tabs { display: flex; gap: clamp(14px, 3vw, 30px); overflow-x: auto; max-width: 100%; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
-  position: relative; padding: 10px 2px; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;
+  position: relative; border: 0; background: none; padding: 10px 2px; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none;
   font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
   color: rgba(255, 255, 255, 0.72); transition: color 0.25s; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
@@ -103,18 +100,6 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .tab--warm::after { background: #f4d7a6aa; }
 .tab--off { cursor: default; }
 
-/* Flechas para pasar de página */
-.page-arrow {
-  position: fixed; z-index: 20; top: 50%; transform: translateY(-50%);
-  width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.22); backdrop-filter: blur(6px);
-  opacity: 0.75; transition: opacity 0.2s, background 0.2s, transform 0.2s;
-}
-.page-arrow:hover { opacity: 1; background: rgba(255, 255, 255, 0.2); }
-.page-arrow--prev { left: 12px; }
-.page-arrow--next { right: 12px; }
-.page-arrow--next:hover { transform: translateY(-50%) translateX(2px); }
-.page-arrow--prev:hover { transform: translateY(-50%) translateX(-2px); }
 
 .reveal { animation: rise 0.9s var(--ease) both; }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
@@ -150,11 +135,11 @@ h1, h2, p, blockquote, figure { margin: 0; }
 /* ───────── Video ───────── */
 .video { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 20px; }
 .play { width: 84px; height: 84px; border-radius: 50%; border: 1.5px solid #fff; background: none; display: grid; place-items: center; transition: transform 0.3s var(--ease), background 0.3s; }
-.play--bare { border-color: transparent; }
+.play--on-image { background: rgba(0, 0, 0, 0.28); border-color: rgba(255, 255, 255, 0.9); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.35); }
 .play svg { margin-left: 4px; }
 .play:hover { transform: scale(1.08); background: rgba(255, 255, 255, 0.12); }
 .video__title { font-size: 15px; }
-.video__bar { position: absolute; left: 60px; right: 60px; bottom: 96px; display: flex; align-items: center; gap: 18px; font-size: 12px; }
+.video__bar { text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7); position: absolute; left: 60px; right: 60px; bottom: 96px; display: flex; align-items: center; gap: 18px; font-size: 12px; }
 .video__pause { font-size: 16px; letter-spacing: -2px; }
 .video__track { flex: 1; height: 3px; background: rgba(255, 255, 255, 0.35); border-radius: 3px; }
 .video__track span { display: block; height: 100%; background: #fff; border-radius: 3px; }
@@ -241,7 +226,7 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .closing__map { position: relative; width: min(560px, 80vw); aspect-ratio: 16 / 9; margin-top: 30px; }
 .closing__lake { position: absolute; left: 12%; right: 12%; top: 30%; bottom: 20%; border-radius: 50%; background: #75716c; border: 1px solid #8f8a84; transform: rotate(-3deg); }
 .closing__pin {
-  position: absolute; width: clamp(34px, 5vw, 56px); aspect-ratio: 1; display: grid; place-items: center; animation: rise 0.9s var(--ease) both; transition: transform 0.3s var(--ease);
+  position: absolute; border: 0; padding: 0; cursor: pointer; width: clamp(34px, 5vw, 56px); aspect-ratio: 1; display: grid; place-items: center; animation: rise 0.9s var(--ease) both; transition: transform 0.3s var(--ease);
 }
 .closing__pin span { width: 30%; aspect-ratio: 1; border-radius: 50%; background: rgba(90, 170, 150, 0.9); }
 .closing__pin:hover { transform: translateY(-5px) scale(1.06); }
@@ -268,56 +253,88 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .guide__head h2 { font: 700 italic 28px var(--serif); margin-top: 4px; }
 .guide .icon-btn { background: #e8ede5; color: var(--ink); }
 .guide__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.guide__item { display: grid; justify-items: center; gap: 2px; padding: 16px 10px; border-radius: 14px; text-decoration: none; text-align: center; border: 1px solid var(--line); background: #fff; transition: transform 0.25s var(--ease), border-color 0.25s; }
+.guide__item { width: 100%; font: inherit; color: inherit; cursor: pointer; display: grid; justify-items: center; gap: 2px; padding: 16px 10px; border-radius: 14px; text-decoration: none; text-align: center; border: 1px solid var(--line); background: #fff; transition: transform 0.25s var(--ease), border-color 0.25s; }
 .guide__item:hover { transform: translateY(-3px); border-color: var(--accent); }
 .guide__art { width: 88px; height: 88px; object-fit: contain; margin-bottom: 8px; }
 .guide__num { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .guide__item strong { font-size: 16px; }
 .guide__place { font-size: 13px; color: var(--muted); font-style: italic; }
 
-/* ───────── Paso de página: ola de agua ─────────
-   La página nueva entra sobre la anterior con un borde ondulado (máscara SVG)
-   que barre la pantalla en la dirección del movimiento. */
-.page--leaving { z-index: 1; pointer-events: none; }
-.page--leaving *, .page--leaving *::before, .page--leaving *::after { animation: none !important; }
-.page--enter {
-  z-index: 2; animation: none;
-  -webkit-mask-size: 300% 100%; mask-size: 300% 100%;
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+/* ───────── Recorrido vertical ─────────
+   Cada página es "sticky": al desplazarse, la siguiente sube y cubre a la anterior.
+   Los puntos de parada (.snaps) son bloques de una pantalla fuera del apilado, para que
+   el scroll snap funcione de forma fiable aunque las páginas estén fijadas. */
+.scroller {
+  position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden;
+  scroll-snap-type: y mandatory; overscroll-behavior: none; background: var(--forest);
+  scrollbar-width: none;
 }
-.page--enter-next {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 100' preserveAspectRatio='none'%3E%3Cpath d='M300,0 L150,0 C141,14 159,22 150,34 C141,46 159,55 150,67 C141,79 159,88 150,100 L300,100 Z' fill-opacity='1'/%3E%3Cpath d='M300,0 L142,0 C133,14 151,22 142,34 C133,46 151,55 142,67 C133,79 151,88 142,100 L300,100 Z' fill-opacity='0.55'/%3E%3Cpath d='M300,0 L134,0 C125,14 143,22 134,34 C125,46 143,55 134,67 C125,79 143,88 134,100 L300,100 Z' fill-opacity='0.25'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 100' preserveAspectRatio='none'%3E%3Cpath d='M300,0 L150,0 C141,14 159,22 150,34 C141,46 159,55 150,67 C141,79 159,88 150,100 L300,100 Z' fill-opacity='1'/%3E%3Cpath d='M300,0 L142,0 C133,14 151,22 142,34 C133,46 151,55 142,67 C133,79 151,88 142,100 L300,100 Z' fill-opacity='0.55'/%3E%3Cpath d='M300,0 L134,0 C125,14 143,22 134,34 C125,46 143,55 134,67 C125,79 143,88 134,100 L300,100 Z' fill-opacity='0.25'/%3E%3C/svg%3E");
-  animation: tide-next 1.2s cubic-bezier(.65,0,.35,1) both;
-}
-.page--enter-prev {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 100' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L150,0 C141,14 159,22 150,34 C141,46 159,55 150,67 C141,79 159,88 150,100 L0,100 Z' fill-opacity='1'/%3E%3Cpath d='M0,0 L158,0 C149,14 167,22 158,34 C149,46 167,55 158,67 C149,79 167,88 158,100 L0,100 Z' fill-opacity='0.55'/%3E%3Cpath d='M0,0 L166,0 C157,14 175,22 166,34 C157,46 175,55 166,67 C157,79 175,88 166,100 L0,100 Z' fill-opacity='0.25'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 100' preserveAspectRatio='none'%3E%3Cpath d='M0,0 L150,0 C141,14 159,22 150,34 C141,46 159,55 150,67 C141,79 159,88 150,100 L0,100 Z' fill-opacity='1'/%3E%3Cpath d='M0,0 L158,0 C149,14 167,22 158,34 C149,46 167,55 158,67 C149,79 167,88 158,100 L0,100 Z' fill-opacity='0.55'/%3E%3Cpath d='M0,0 L166,0 C157,14 175,22 166,34 C157,46 175,55 166,67 C157,79 175,88 166,100 L0,100 Z' fill-opacity='0.25'/%3E%3C/svg%3E");
-  animation: tide-prev 1.2s cubic-bezier(.65,0,.35,1) both;
-}
-@keyframes tide-next { from { -webkit-mask-position: 0% 0; mask-position: 0% 0; } to { -webkit-mask-position: 100% 0; mask-position: 100% 0; } }
-@keyframes tide-prev { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0% 0; mask-position: 0% 0; } }
-.page--enter > .screen { animation: settle 1.3s ease-out both; }
-@keyframes settle { from { transform: scale(1.04); filter: blur(5px) saturate(1.2); } to { transform: none; filter: none; } }
+.scroller::-webkit-scrollbar { display: none; }
+.snaps { position: absolute; top: 0; left: 0; width: 1px; pointer-events: none; }
+.snaps__stop { height: 100dvh; scroll-snap-align: start; scroll-snap-stop: always; }
+.stack-page { position: sticky; top: 0; height: 100dvh; min-height: 480px; overflow: hidden; background: var(--forest); }
+.stack-page.is-covered { visibility: hidden; }
 
-/* Brillo de agua que acompaña al borde de la ola */
-.water-veil {
-  position: absolute; inset: 0; z-index: 10; pointer-events: none;
-  background: linear-gradient(90deg, transparent 0%, rgba(150, 215, 225, 0) 35%, rgba(170, 230, 235, 0.35) 48%, rgba(255, 255, 255, 0.18) 50%, rgba(150, 215, 225, 0) 62%, transparent 100%);
-  background-size: 250% 100%; mix-blend-mode: screen;
-}
-.water-veil--next { animation: veil-next 1.2s cubic-bezier(.65,0,.35,1) both; }
-.water-veil--prev { animation: veil-prev 1.2s cubic-bezier(.65,0,.35,1) both; }
-@keyframes veil-next { from { background-position: 0% 0; opacity: 1; } 80% { opacity: 1; } to { background-position: 100% 0; opacity: 0; } }
-@keyframes veil-prev { from { background-position: 100% 0; opacity: 1; } 80% { opacity: 1; } to { background-position: 0% 0; opacity: 0; } }
+/* Las animaciones de entrada esperan a que la página llegue a la pantalla. */
+.stack-page:not(.is-seen) *, .stack-page:not(.is-seen) *::before, .stack-page:not(.is-seen) *::after { animation-play-state: paused !important; }
 
-/* Video de portada y botón de sonido */
-.backdrop__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.sound-toggle {
-  position: fixed; z-index: 20; left: 14px; bottom: max(14px, env(safe-area-inset-bottom));
-  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.22); backdrop-filter: blur(6px);
-  opacity: 0.7; transition: opacity 0.2s;
+/* Borde de ola: la página entra con el borde superior ondulado y se aplana al llegar arriba.
+   Usa animaciones ligadas al desplazamiento; donde no existen, la página entra con borde recto. */
+@supports (animation-timeline: view()) {
+  .stack-page:not(.stack-page--first) {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.4' d='M0,38 C60,8 140,8 200,38 C260,68 340,68 400,38 L400,100 L0,100 Z'/%3E%3Cpath d='M0,55 C60,25 140,25 200,55 C260,85 340,85 400,55 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.4' d='M0,38 C60,8 140,8 200,38 C260,68 340,68 400,38 L400,100 L0,100 Z'/%3E%3Cpath d='M0,55 C60,25 140,25 200,55 C260,85 340,85 400,55 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
+    -webkit-mask-repeat: repeat-x, no-repeat; mask-repeat: repeat-x, no-repeat;
+    -webkit-mask-position: 0 0, 0 var(--wave-h); mask-position: 0 0, 0 var(--wave-h);
+    -webkit-mask-size: 34vw var(--wave-h), 100% 100%; mask-size: 34vw var(--wave-h), 100% 100%;
+    animation: tide linear both, drift 5s linear infinite;
+    animation-timeline: view(), auto;
+    animation-range: entry 0% entry 100%, normal;
+  }
 }
-.sound-toggle:hover { opacity: 1; }
+@property --wave-h { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@keyframes tide { from { --wave-h: 14vh; } 75% { --wave-h: 7vh; } to { --wave-h: 0px; } }
+@keyframes drift { from { -webkit-mask-position: 0 0, 0 var(--wave-h); mask-position: 0 0, 0 var(--wave-h); } to { -webkit-mask-position: 34vw 0, 0 var(--wave-h); mask-position: 34vw 0, 0 var(--wave-h); } }
+
+/* ───────── Menú y redes (fijos) ───────── */
+.menu-btn {
+  position: fixed; z-index: 60; top: max(14px, env(safe-area-inset-top)); right: 14px;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(8px);
+  display: grid; place-content: center; gap: 4px;
+}
+.menu-btn span { display: block; width: 18px; height: 1.6px; background: #fff; border-radius: 2px; transition: transform 0.3s var(--ease); }
+.menu-btn:hover span:nth-child(2) { transform: translateX(3px); }
+.topbar { padding-right: 70px; }
+
+.menu {
+  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+  background: rgba(8, 26, 22, 0.94); backdrop-filter: blur(14px); color: #fff; overflow: auto;
+}
+.menu[open] { animation: fade 0.35s ease both; }
+.menu::backdrop { background: transparent; }
+.menu__close { position: fixed; top: max(14px, env(safe-area-inset-top)); right: 14px; }
+.menu__nav { min-height: 100%; display: grid; align-content: center; gap: 28px; padding: 80px clamp(24px, 8vw, 120px); }
+.menu__brand { font: 700 14px var(--serif); letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8; }
+.menu__brand em { font-style: italic; }
+.menu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.menu li { animation: rise 0.6s var(--ease) both; }
+.menu li button, .menu__soon {
+  display: inline-flex; align-items: baseline; gap: 12px; border: 0; background: none; padding: 6px 0; text-align: left;
+  font: 700 clamp(24px, min(3.6vw, 5.2vh), 46px)/1.12 var(--serif); color: #fff;
+}
+.menu li button:hover { color: var(--gold); font-style: italic; }
+.menu__soon { color: rgba(255, 255, 255, 0.45); cursor: default; }
+.menu__soon small { font: 500 11px var(--sans); letter-spacing: 0.14em; text-transform: uppercase; }
+
+.social { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
+.social a, .social span {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.28); backdrop-filter: blur(8px); transition: background 0.2s, color 0.2s;
+}
+.social a:hover { background: #fff; color: var(--forest); }
+.social--fixed { position: fixed; z-index: 55; left: 14px; bottom: max(14px, env(safe-area-inset-bottom)); flex-direction: column; }
+.menu__social { margin-top: 12px; }
 
 /* ───────── Móvil ───────── */
 @media (max-width: 900px) {
@@ -327,10 +344,10 @@ h1, h2, p, blockquote, figure { margin: 0; }
 }
 
 @media (max-width: 640px) {
+  .social--fixed { left: auto; right: 10px; bottom: auto; top: 50%; transform: translateY(-50%); }
+  .social--fixed a, .social--fixed span { width: 34px; height: 34px; }
   .chip { font-size: 10px; letter-spacing: 0.12em; max-width: 60vw; }
   .ghost-link { font-size: 11px; letter-spacing: 0.1em; }
-  .page-arrow { width: 42px; height: 42px; top: auto; bottom: max(62px, calc(env(safe-area-inset-bottom) + 56px)); transform: none; }
-  .page-arrow--next:hover, .page-arrow--prev:hover { transform: none; }
   .page-foot { padding: 0 12px max(10px, env(safe-area-inset-bottom)); }
   .tabs { justify-content: flex-start; }
   .tab { font-size: 11px; }
@@ -356,8 +373,7 @@ h1, h2, p, blockquote, figure { margin: 0; }
   .gallery__card { flex-basis: 22vw; }
 }
 
-/* Movimiento reducido: se quitan zoom, desenfoque, rebotes y lluvia.
-   Se conservan el video de portada y el barrido de ola (un cambio de página, sin desplazamiento de cámara). */
+/* Movimiento reducido: sin zoom, rebotes ni lluvia. El video de portada se mantiene. */
 @media (prefers-reduced-motion: reduce) {
-  *:not(.page--enter):not(.water-veil), *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

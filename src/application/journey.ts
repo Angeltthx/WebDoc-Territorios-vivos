@@ -1,65 +1,62 @@
-// Navegación página a página, igual que el PDF: cada página tiene su URL (/1 … /20)
-// y se avanza o retrocede con flechas (pantalla, teclado o deslizamiento en móvil).
+// Recorrido por desplazamiento vertical: cada página ocupa una pantalla y el navegador
+// se detiene en cada una (scroll snap). La URL refleja la página visible (/, /2 … /N)
+// para poder compartir un punto exacto del recorrido.
 
-import { useCallback, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { pages } from '../content/pages';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { pageIndex, pages } from '../content/pages';
 
 export const TOTAL_PAGES = pages.length;
 
-export const pagePath = (n: number) => (n <= 1 ? '/' : `/${n}`);
+const pathFor = (index: number) => (index <= 0 ? '/' : `/${index + 1}`);
 
-export function usePages() {
-  const params = useParams();
-  const navigate = useNavigate();
-  const raw = params.page === undefined ? 1 : Number(params.page);
-  const page = Number.isInteger(raw) && raw >= 1 && raw <= TOTAL_PAGES ? raw : null;
-
-  const goTo = useCallback((n: number) => {
-    navigate(pagePath(Math.max(1, Math.min(TOTAL_PAGES, n))));
-  }, [navigate]);
-
-  const next = useCallback(() => page && page < TOTAL_PAGES && goTo(page + 1), [goTo, page]);
-  const prev = useCallback(() => page && page > 1 && goTo(page - 1), [goTo, page]);
-
-  return { page, goTo, next, prev };
+function indexFromPath(pathname: string): number {
+  const n = Number(pathname.replace(/^\//, '') || '1');
+  return Number.isInteger(n) && n >= 1 && n <= TOTAL_PAGES ? n - 1 : 0;
 }
 
-/**
- * Flechas del teclado y deslizamiento horizontal para pasar de página.
- * Se ignoran dentro de elementos con desplazamiento propio (galerías) y con diálogos abiertos.
- */
-export function usePageGestures(next: () => void, prev: () => void) {
-  const start = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
+export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
+  const [active, setActive] = useState(() => indexFromPath(window.location.pathname));
+  const activeRef = useRef(active);
 
+  const scrollToIndex = useCallback((i: number, smooth = true) => {
+    const el = scroller.current;
+    if (!el) return;
+    const target = Math.max(0, Math.min(TOTAL_PAGES - 1, i));
+    el.scrollTo({ top: target * el.clientHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }, [scroller]);
+
+  const scrollToPage = useCallback((id: string) => {
+    const i = pageIndex(id);
+    if (i >= 0) scrollToIndex(i);
+  }, [scrollToIndex]);
+
+  // Posición inicial según la URL (enlace directo a una página).
   useEffect(() => {
-    const blocked = (t: EventTarget | null) =>
-      !!(t as HTMLElement | null)?.closest?.('input, textarea, select, [data-no-arrows]') || !!document.querySelector('dialog[open]');
+    scrollToIndex(indexFromPath(window.location.pathname), false);
+  }, [scrollToIndex]);
 
-    const onKey = (e: KeyboardEvent) => {
-      if (blocked(e.target)) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); next(); }
-      if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+  // Página activa = la que ocupa la mayor parte de la pantalla.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const i = Math.round(el.scrollTop / el.clientHeight);
+        if (i !== activeRef.current && i >= 0 && i < TOTAL_PAGES) {
+          activeRef.current = i;
+          setActive(i);
+          window.history.replaceState(null, '', pathFor(i));
+        }
+      });
     };
-    const onStart = (e: TouchEvent) => {
-      start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, ignore: blocked(e.target) };
-    };
-    const onEnd = (e: TouchEvent) => {
-      const s = start.current;
-      start.current = null;
-      if (!s || s.ignore) return;
-      const dx = e.changedTouches[0].clientX - s.x;
-      const dy = e.changedTouches[0].clientY - s.y;
-      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) (dx < 0 ? next : prev)();
-    };
-
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('touchstart', onStart, { passive: true });
-    window.addEventListener('touchend', onEnd);
+    el.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('touchstart', onStart);
-      window.removeEventListener('touchend', onEnd);
+      el.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
     };
-  }, [next, prev]);
+  }, [scroller]);
+
+  return { active, scrollToIndex, scrollToPage };
 }

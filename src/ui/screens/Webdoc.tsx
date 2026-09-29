@@ -1,107 +1,70 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
-import { closing, getStation, stations, transitions, welcome } from '../../content/journey';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { getStation, stations, transitions } from '../../content/journey';
 import { pages, type PageSpec } from '../../content/pages';
-import { pagePath, TOTAL_PAGES, usePageGestures, usePages } from '../../application/journey';
-import { isMuted, playWater, setMuted } from '../../application/sound';
+import { useScrollJourney } from '../../application/journey';
 import { Backdrop } from '../components/Media';
-import { Arrow, ChachitaTag, GuideButton, PageArrows, PageTabs, STATION_PAGE, StationGuide, TopBar, TransitionSymbol } from '../components/Chrome';
+import {
+  Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, STATION_PAGE, SiteMenu, SocialLinks,
+  StationGuide, TopBar, TransitionSymbol, useJourneyNav,
+} from '../components/Chrome';
 import { GalleryPanel, QuotePanel, RecipePanel, SilencePanel, SongsPanel, VideoPanel } from '../components/Sections';
 
-/** El webdoc: una página del PDF a la vez, a pantalla completa. */
+/**
+ * El webdoc como un recorrido vertical: cada página ocupa la pantalla y, al desplazarse,
+ * la siguiente sube sobre la anterior con un borde de ola que se aplana al llegar.
+ */
 export function Webdoc() {
-  const { page, next, prev, goTo } = usePages();
+  const scroller = useRef<HTMLDivElement>(null);
+  const { active, scrollToIndex, scrollToPage } = useScrollJourney(scroller);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [muted, setMutedState] = useState(isMuted);
-  // Página que sale: se mantiene debajo mientras la nueva entra con el borde de ola.
-  const [leaving, setLeaving] = useState<{ page: number; dir: 'next' | 'prev' } | null>(null);
-  const shown = useRef(page);
-
-  usePageGestures(next, prev);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Páginas ya vistas: sus animaciones de entrada corren una vez, al llegar a ellas.
+  const [seen, setSeen] = useState(() => new Set([active]));
 
   useEffect(() => {
-    const before = shown.current;
-    shown.current = page;
-    if (!page || !before || before === page) return;
-    setLeaving({ page: before, dir: page > before ? 'next' : 'prev' });
-    playWater();
-    const t = window.setTimeout(() => setLeaving(null), 1300);
-    return () => window.clearTimeout(t);
-  }, [page]);
+    setSeen((s) => (s.has(active) ? s : new Set(s).add(active)));
+    document.title = `Territorios Vivos · ${active + 1} / ${pages.length}`;
+  }, [active]);
 
-  const toggleSound = () => {
-    setMuted(!muted);
-    setMutedState(!muted);
-  };
+  const nav = useMemo(() => ({ scrollToPage, scrollToIndex }), [scrollToPage, scrollToIndex]);
 
-  useEffect(() => {
-    if (page) document.title = `Territorios Vivos · ${page} / ${TOTAL_PAGES}`;
-  }, [page]);
-
-  // Precarga ligera de la página siguiente para que el paso sea inmediato.
-  useEffect(() => {
-    if (!page || page >= TOTAL_PAGES) return;
-    const link = document.createElement('link');
-    link.rel = 'prefetch';
-    link.href = `/media/${nextImage(pages[page])}-sm.webp`;
-    document.head.appendChild(link);
-    return () => link.remove();
-  }, [page]);
-
-  if (page === null) return <Navigate to="/" replace />;
-
-  const view = (n: number) => <PageView spec={pages[n - 1]} onStart={next} goTo={goTo} openGuide={() => setGuideOpen(true)} />;
   return (
-    <main className="webdoc">
-      {leaving && (
-        <div className="page page--leaving" key={`out-${leaving.page}`} aria-hidden="true" inert>
-          {view(leaving.page)}
+    <JourneyNav.Provider value={nav}>
+      <main className="scroller" ref={scroller}>
+        {/* Puntos de parada del desplazamiento: una pantalla por página. */}
+        <div className="snaps" aria-hidden="true">
+          {pages.map((pg) => <div key={pg.id} className="snaps__stop" />)}
         </div>
-      )}
-      <div className={`page${leaving ? ` page--enter page--enter-${leaving.dir}` : ''}`} key={page}>
-        {view(page)}
-        {leaving && <div className={`water-veil water-veil--${leaving.dir}`} aria-hidden="true" />}
-      </div>
-      <PageArrows page={page} total={TOTAL_PAGES} onPrev={prev} onNext={next} />
-      <button
-        type="button"
-        className="sound-toggle"
-        onClick={toggleSound}
-        aria-pressed={!muted}
-        aria-label={muted ? 'Activar sonido' : 'Silenciar sonido'}
-        title={muted ? 'Activar sonido' : 'Silenciar sonido'}
-      >
-        {muted ? <SoundOff /> : <SoundOn />}
-      </button>
+        {pages.map((spec, i) => {
+          const state = i === active ? ' is-active' : i < active - 1 ? ' is-covered' : '';
+          return (
+            <section
+              key={spec.id}
+              id={spec.id}
+              className={`stack-page${state}${seen.has(i) ? ' is-seen' : ''}${i === 0 ? ' stack-page--first' : ''}`}
+              style={{ zIndex: i + 1 }}
+              aria-hidden={i !== active ? true : undefined}
+              inert={i !== active ? true : undefined}
+            >
+              <PageView spec={spec} playing={i === active} openGuide={() => setGuideOpen(true)} />
+            </section>
+          );
+        })}
+      </main>
+      <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} />
+      <SocialLinks className="social--fixed" />
       <StationGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
-    </main>
+    </JourneyNav.Provider>
   );
 }
 
-function nextImage(spec: PageSpec): string {
-  switch (spec.kind) {
-    case 'quote': return getStation(spec.station)!.quote.portrait.id;
-    case 'gallery': return getStation(spec.station)!.gallery!.background.id;
-    case 'video': return spec.video.poster?.id ?? welcome.background.id;
-    case 'transition': return transitions[spec.index].background?.id ?? welcome.background.id;
-    case 'silence': return getStation('pangui')!.silence!.photo.id;
-    case 'songs': return getStation('pangui')!.songs!.background.id;
-    case 'recipe': return getStation('chori')!.recipe!.hero.id;
-    default: return closing.background.id;
-  }
-}
-
-function PageView({ spec, onStart, goTo, openGuide }: {
-  spec: PageSpec;
-  onStart: () => void;
-  goTo: (n: number) => void;
-  openGuide: () => void;
-}) {
+function PageView({ spec, playing, openGuide }: { spec: PageSpec; playing: boolean; openGuide: () => void }) {
+  const { scrollToIndex, scrollToPage } = useJourneyNav();
   switch (spec.kind) {
     case 'welcome':
       return (
-        <section className="screen screen--welcome" aria-labelledby="wt">
-          <PortadaVideo />
+        <div className="screen screen--welcome" aria-labelledby="wt">
+          <PortadaVideo playing={playing} />
           <TopBar plain label="Portada" right={<GuideButton onOpen={openGuide}>Ver mapa interactivo</GuideButton>} />
           <div className="welcome">
             <h1 id="wt" className="wordmark">
@@ -112,67 +75,60 @@ function PageView({ spec, onStart, goTo, openGuide }: {
             <p className="welcome__voice">Chachita te recibe en voz</p>
           </div>
           <div className="welcome__start">
-            <button type="button" className="start-btn" onClick={onStart}>
+            <button type="button" className="start-btn" onClick={() => scrollToIndex(1)}>
               Comenzar el viaje
               <Arrow dir="down" />
             </button>
           </div>
-        </section>
+        </div>
       );
 
-    case 'quote': {
-      const st = getStation(spec.station)!;
+    case 'quote':
       return (
-        <section className="screen" aria-label={spec.label}>
-          <div className="screen__content"><QuotePanel station={st} /></div>
+        <div className="screen" aria-label={spec.label}>
+          <div className="screen__content"><QuotePanel station={getStation(spec.station)!} /></div>
           <TopBar label={spec.label} right={<GuideButton onOpen={openGuide} />} />
           <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
-        </section>
+        </div>
       );
-    }
 
     case 'video':
       return (
-        <section className="screen" aria-label={spec.label}>
+        <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><VideoPanel video={spec.video} bar={spec.bar} /></div>
-          <TopBar
-            label={spec.label}
-            right={spec.closeTo && (
-              <button type="button" className="icon-btn icon-btn--bare" aria-label="Cerrar video" onClick={() => goTo(spec.closeTo!)}>✕</button>
-            )}
-          />
+          <TopBar label={spec.label} />
           {spec.tabs && <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>}
-        </section>
+        </div>
       );
 
     case 'gallery': {
       const gallery = getStation(spec.station)!.gallery!;
       return (
-        <section className="screen" aria-label={spec.label}>
+        <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><GalleryPanel gallery={gallery} /></div>
           <TopBar plain label={spec.label} />
           <footer className="page-foot">
             <PageTabs tabs={spec.tabs} />
             <p className="page-foot__note">{gallery.intro.toLowerCase()} · deslizar →</p>
           </footer>
-        </section>
+        </div>
       );
     }
 
     case 'recipe':
       return (
-        <section className="screen" aria-label={spec.label}>
+        <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><RecipePanel recipe={getStation('chori')!.recipe!} /></div>
           <TopBar label={spec.label} />
           <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
-        </section>
+        </div>
       );
 
     case 'transition': {
       const t = transitions[spec.index];
       const onPhoto = !!t.background;
       return (
-        <section className="screen screen--transition" style={{ background: t.color }} aria-label={`Transición ${t.number}: de ${t.from} a ${t.to}`}>
+        <div className="screen screen--transition" style={{ background: t.color }} aria-label={`Transición ${t.number}: de ${t.from} a ${t.to}`}>
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
           <TopBar plain={onPhoto} label={<>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
@@ -190,76 +146,69 @@ function PageView({ spec, onStart, goTo, openGuide }: {
               {transitions.map((_, i) => <li key={i} className={i === spec.index ? 'is-active' : ''} />)}
             </ol>
           )}
-        </section>
+        </div>
       );
     }
 
     case 'silence':
       return (
-        <section className="screen" aria-label={spec.label}>
+        <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><SilencePanel silence={getStation('pangui')!.silence!} /></div>
           <TopBar label={spec.label} />
-        </section>
+        </div>
       );
 
     case 'songs':
       return (
-        <section className="screen" aria-label={spec.label}>
+        <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><SongsPanel songs={getStation('pangui')!.songs!} /></div>
           <TopBar plain label={spec.label} />
           <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
-        </section>
+        </div>
       );
 
     case 'closing':
-      return <ClosingPage goTo={goTo} />;
+      return <ClosingPage onRestart={() => scrollToIndex(0)} onStation={(id) => scrollToPage(STATION_PAGE[id])} />;
   }
 }
 
-/** Video de fondo de la portada (Panguí). Silenciado para que el navegador permita la reproducción automática. */
-function PortadaVideo() {
-  const small = window.matchMedia('(max-width: 900px)').matches;
+/**
+ * Video de fondo de la portada (Panguí), silenciado para permitir la reproducción automática.
+ * Se pausa cuando la portada queda cubierta, y al volver continúa desde el mismo punto (no se reinicia).
+ */
+function PortadaVideo({ playing }: { playing: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (playing) void v.play().catch(() => {});
+    else v.pause();
+  }, [playing]);
   return (
     <div className="backdrop" aria-hidden="true" style={{ backgroundImage: 'url(/media/video/portada-poster.webp)' }}>
       <video
-          className="backdrop__video"
-          src={`/media/video/portada-${small ? 720 : 1080}.mp4`}
-          poster="/media/video/portada-poster.webp"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-        />
+        ref={ref}
+        className="backdrop__video"
+        src={`/media/video/portada-${small ? 720 : 1080}.mp4`}
+        poster="/media/video/portada-poster.webp"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+      />
       <div className="backdrop__tint" style={{ background: 'radial-gradient(ellipse at center, rgba(6,18,14,.08), rgba(6,18,14,.42))' }} />
     </div>
   );
 }
 
-function SoundOn() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 8v4h3l4 3V5L6 8Z" />
-      <path d="M13 7.5c1.2 1.4 1.2 3.6 0 5M15.5 5.5c2.3 2.6 2.3 6.4 0 9" />
-    </svg>
-  );
-}
-
-function SoundOff() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 8v4h3l4 3V5L6 8Z" />
-      <path d="m13 8 4 4m0-4-4 4" />
-    </svg>
-  );
-}
-
 const PIN_COLORS = ['#ffffff', '#5fc7a2', '#8fbf5a', '#8cb8ee'];
 
-function ClosingPage({ goTo }: { goTo: (n: number) => void }) {
+function ClosingPage({ onRestart, onStation }: { onRestart: () => void; onStation: (id: string) => void }) {
   const [soon, setSoon] = useState(false);
   return (
-    <section className="screen screen--closing" aria-labelledby="closing-title">
+    <div className="screen screen--closing" aria-labelledby="closing-title">
       <TopBar label="Cierre · Mapa 3D" right={<ChachitaTag />} />
       <div className="closing">
         <p className="closing__quote">volver a las raíces</p>
@@ -268,23 +217,24 @@ function ClosingPage({ goTo }: { goTo: (n: number) => void }) {
         <div className="closing__map">
           <div className="closing__lake" aria-hidden="true" />
           {stations.map((s, i) => (
-            <Link
+            <button
               key={s.id}
-              to={pagePath(STATION_PAGE[s.id])}
+              type="button"
               className={`closing__pin closing__pin--${i + 1}`}
               style={{ background: PIN_COLORS[i] }}
               aria-label={`Estación ${s.number}: ${s.name}, ${s.place}`}
+              onClick={() => onStation(s.id)}
             >
               <span />
-            </Link>
+            </button>
           ))}
         </div>
       </div>
       <div className="closing__actions">
         {soon && <p className="notice" role="status">Aportar historias llegará en una fase posterior.</p>}
-        <button type="button" className="btn btn--dark" onClick={() => goTo(1)}>↻ volver a empezar</button>
+        <button type="button" className="btn btn--dark" onClick={onRestart}>↻ volver a empezar</button>
         <button type="button" className="btn btn--light" onClick={() => setSoon(true)}>+ aportar tu historia</button>
       </div>
-    </section>
+    </div>
   );
 }
