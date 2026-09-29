@@ -11,6 +11,7 @@ npm install
 npm run media        # fotos e ilustraciones → public/media/*.webp + índice de medidas (desde ../Contenido)
 npm run media:video  # video de portada → public/media/video/ (desde ../Contenido)
 npm run media:audio  # olas de transición → public/media/audio/ (desde ../Contenido)
+npm run media:360    # video 360 del manglar → HLS en 3 calidades en public/media/360/ (varios minutos)
 npm run dev     # http://localhost:5173
 npm run build   # verificación de tipos + build de producción en dist/
 ```
@@ -44,6 +45,11 @@ Flechas, AvPág y espacio avanzan una página.
 - Galerías con las fotos completas (proporciones reales en `src/content/media-manifest.json`,
   generado con `npm run media:manifest`), flechas ← → para pasar de foto y botón "Ver galería
   completa" con control de tamaño.
+- **Experiencia 360 del manglar** (página 360 · Cantos → "Entrar al manglar 360°"): video 360 en
+  una esfera (three.js) con streaming HLS en 3 calidades (4K, 2880 y 1920; en celular hasta 2880).
+  Arrastrar para mirar, rueda o pellizco para acercar, flechas del teclado y, en celular, mover el
+  teléfono (giroscopio). Corre en bucle con su sonido. Se carga solo al abrirla
+  (`src/ui/components/Panorama360.tsx`).
 - La portada es el video
   `panguí_v1` (1080p/720p sin audio en `public/media/video/`), que se pausa al quedar
   cubierto y continúa desde el mismo punto al volver.

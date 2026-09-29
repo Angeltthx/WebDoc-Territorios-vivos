@@ -53,7 +53,12 @@ export interface Station {
   recipe?: { eyebrow: string; title: string; hero: Photo; steps: Photo[] };
   scrolly?: { scenes: { photo: Photo; text: string }[] };
   silence?: { title: string; hint: string; photo: Photo };
-  songs?: { background: Photo; panorama: { title: string; sub: string }; songs: { title: string; sub: string }[] };
+  songs?: {
+    background: Photo;
+    /** Experiencia 360: lista HLS y imagen equirrectangular de espera. */
+    panorama: { title: string; sub: string; src: string; poster: string; label: string };
+    songs: { title: string; sub: string }[];
+  };
   viche?: VideoAsset;
 }
 

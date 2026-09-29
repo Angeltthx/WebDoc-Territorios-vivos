@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState, type TouchEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type TouchEvent } from 'react';
 import type { Photo, Station, VideoAsset } from '../../domain/types';
 import { aspectOf, Backdrop, Img } from './Media';
 import { Arrow } from './Chrome';
+import { Portal } from './Portal';
+
+// La experiencia 360 (three.js + hls.js) solo se descarga cuando alguien la abre.
+const Panorama360 = lazy(() => import('./Panorama360'));
 
 export function QuotePanel({ station }: { station: Station }) {
   const { quote } = station;
@@ -98,15 +102,17 @@ export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['galler
           <GridIcon size="small" /> Ver galería completa <span>· {gallery.photos.length} fotos</span>
         </button>
       </div>
-      <GalleryGrid
-        photos={gallery.photos}
-        title={gallery.intro}
-        background={gallery.background}
-        open={grid}
-        onClose={() => setGrid(false)}
-        onPick={setOpen}
-      />
-      <Lightbox photos={gallery.photos} index={open} onChange={setOpen} />
+      <Portal>
+        <GalleryGrid
+          photos={gallery.photos}
+          title={gallery.intro}
+          background={gallery.background}
+          open={grid}
+          onClose={() => setGrid(false)}
+          onPick={setOpen}
+        />
+        <Lightbox photos={gallery.photos} index={open} onChange={setOpen} />
+      </Portal>
     </>
   );
 }
@@ -281,11 +287,30 @@ export function SilencePanel({ tide, title, hint, photo }: { tide: 'alta' | 'baj
 
 export function SongsPanel({ songs }: { songs: NonNullable<Station['songs']> }) {
   const [msg, setMsg] = useState<string | null>(null);
+  const [video360, setVideo360] = useState<HTMLVideoElement | null>(null);
+  const { panorama } = songs;
+
+  // El video se crea y se activa dentro del clic: así iPhone/Safari permiten reproducir con sonido.
+  const open360 = () => {
+    const v = document.createElement('video');
+    v.playsInline = true;
+    v.setAttribute('playsinline', '');
+    v.crossOrigin = 'anonymous';
+    v.preload = 'auto';
+    // Safari reproduce HLS de forma nativa: se asigna y reproduce aquí mismo, dentro del gesto.
+    // Los demás navegadores usan hls.js al abrir la experiencia (ya cuentan con el gesto del visitante).
+    if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = panorama.src;
+      void v.play().catch(() => {});
+    }
+    setVideo360(v);
+  };
+
   return (
     <>
       <Backdrop photo={songs.background} tint="rgba(10,24,18,.25)" />
       <div className="songs reveal">
-        <button type="button" className="glass-card" onClick={() => setMsg('El recorrido 360° se integrará cuando se entregue el material.')}>
+        <button type="button" className="glass-card glass-card--360" onClick={open360}>
           <span className="glass-card__icon" aria-hidden="true">◉</span>
           <strong>{songs.panorama.title}</strong>
           <span>{songs.panorama.sub}</span>
@@ -297,6 +322,13 @@ export function SongsPanel({ songs }: { songs: NonNullable<Station['songs']> }) 
         </button>
       </div>
       {msg && <p className="notice notice--float" role="status">{msg}</p>}
+      {video360 && (
+        <Portal>
+          <Suspense fallback={<div className="pano-boot" role="status">Entrando al manglar…</div>}>
+            <Panorama360 src={panorama.src} poster={panorama.poster} label={panorama.label} video={video360} onClose={() => setVideo360(null)} />
+          </Suspense>
+        </Portal>
+      )}
     </>
   );
 }

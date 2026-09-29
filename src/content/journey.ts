@@ -183,7 +183,13 @@ export const stations: Station[] = [
     },
     songs: {
       background: p('6i3a5069', 'El manglar reflejado en el agua, con garzas'),
-      panorama: { title: 'Entrar al manglar 360°', sub: 'el que ella limpió' },
+      panorama: {
+        title: 'Entrar al manglar 360°',
+        sub: 'el que ella limpió',
+        src: '/media/360/manglar/master.m3u8',
+        poster: '/media/360/manglar/poster.webp',
+        label: 'Estación 4 · Manglar 360°',
+      },
       songs: [
         { title: 'Llorilé', sub: 'Chachita canta' },
         { title: 'morenitanuquiseña', sub: 'Chachita canta' },
