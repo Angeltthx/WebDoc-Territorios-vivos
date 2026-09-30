@@ -145,6 +145,19 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .video__track span { display: block; height: 100%; background: #fff; border-radius: 3px; }
 .video__time { font-variant-numeric: tabular-nums; }
 
+/* Video de HISTORIA en streaming: a pantalla completa, sin filtro de color. */
+.story { position: absolute; inset: 0; background: #000; }
+.story__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+.story.is-started .story__video { object-fit: contain; cursor: pointer; }
+.story:fullscreen .story__video { object-fit: contain; }
+.story__title { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.75); font-size: 16px; letter-spacing: 0.04em; }
+.story__spinner { position: absolute; left: 50%; top: 50%; margin: -9px 0 0 -9px; }
+/* Los controles quedan sobre las pestañas de la estación y se ocultan mientras el video corre. */
+.story__controls { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 64px); transition: opacity 0.4s ease; }
+.story.is-idle { cursor: none; }
+.story.is-idle .story__controls { opacity: 0; pointer-events: none; }
+.story:fullscreen .story__controls { bottom: max(18px, env(safe-area-inset-bottom)); }
+
 /* ───────── Galería ───────── */
 .gallery { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 18px; padding: 70px 0 130px; }
 .gallery__track {

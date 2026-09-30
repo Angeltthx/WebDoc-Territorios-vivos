@@ -30,6 +30,8 @@ export interface VideoAsset {
   poster?: Photo;
   /** URL del stream cuando exista. Mientras falte, el reproductor muestra el estado pendiente. */
   src?: string;
+  /** Video en streaming HLS: id en public/media/historias/<id> (master.m3u8 + poster.webp). */
+  stream?: string;
   tint?: string;
 }
 

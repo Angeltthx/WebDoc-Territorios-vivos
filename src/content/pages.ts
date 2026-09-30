@@ -1,6 +1,7 @@
 // Las páginas del webdoc, en el orden del PDF de wireframes (v3) con los ajustes del cliente
 // (29/09/2026): "Cita" → "Pensamiento", "El corto" → "Historia" y sección "Video canción" en la estación 4;
-// (30/09/2026): transición en video después del intro y galería en la estación 4.
+// (30/09/2026): transición en video después del intro y galería en la estación 4;
+// videos de HISTORIA de las estaciones 1 a 3 en streaming (public/media/historias).
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { Photo, StationId, VideoAsset } from '../domain/types';
@@ -81,8 +82,7 @@ export const pages: PageSpec[] = [
     id: 'chori-historia',
     kind: 'video',
     label: 'Estación 1 · Historia',
-    video: { title: 'El latido', duration: '08:24', poster: p('6i3a4535', 'Un hombre navega en canoa', { focus: '55% 50%' }) },
-    bar: '00:00 / 08:24',
+    video: { title: 'El latido', stream: 'estacion-1' },
     tabs: chori('Historia'),
   },
   { id: 'chori-galeria', kind: 'gallery', station: 'chori', label: 'Estación 1 · Galería', tabs: chori('Galería') },
@@ -94,8 +94,7 @@ export const pages: PageSpec[] = [
     id: 'atrato-historia',
     kind: 'video',
     label: 'Estación 2 · Historia',
-    video: { title: 'Gente del río', duration: '11:20', poster: p('dji-0504', 'El malecón de Quibdó') },
-    bar: '00:00 / 11:20',
+    video: { title: 'Gente del río', stream: 'estacion-2' },
     tabs: atrato('Historia'),
   },
   { id: 'atrato-galeria', kind: 'gallery', station: 'atrato', label: 'Estación 2 · Galería', tabs: atrato('Galería') },
@@ -112,7 +111,7 @@ export const pages: PageSpec[] = [
     id: 'nuqui-historia',
     kind: 'video',
     label: 'Estación 3 · Historia',
-    video: { title: 'El baile de las olas', poster: p('6i3a3497-mejorado-nr', 'El grupo de danza reunido', { focus: '50% 40%' }) },
+    video: { title: 'El baile de las olas', stream: 'estacion-3' },
     tabs: nuqui('Historia'),
   },
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },

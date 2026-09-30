@@ -134,7 +134,7 @@ function PageView({ spec, playing, near, muted, openGuide }: {
     case 'video':
       return (
         <div className="screen" aria-label={spec.label}>
-          <div className="screen__content"><VideoPanel video={spec.video} bar={spec.bar} /></div>
+          <div className="screen__content"><VideoPanel video={spec.video} bar={spec.bar} active={playing} /></div>
           <TopBar label={spec.label} />
           {spec.tabs && <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>}
         </div>

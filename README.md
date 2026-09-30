@@ -13,6 +13,7 @@ npm run media:video  # video de portada → public/media/video/ (desde ../Conten
 npm run media:audio  # olas de transición → public/media/audio/ (desde ../Contenido)
 npm run media:360    # video 360 del manglar → HLS en 3 calidades en public/media/360/ (varios minutos)
 npm run media:transiciones  # videos de transición (Contenido/Transiciones) → 1080p y 720p en public/media/transiciones/
+npm run media:historias    # videos de HISTORIA de cada estación → HLS 1080/720/480 en public/media/historias/ (varios minutos)
 npm run dev     # http://localhost:5173
 npm run build   # verificación de tipos + build de producción en dist/
 ```
