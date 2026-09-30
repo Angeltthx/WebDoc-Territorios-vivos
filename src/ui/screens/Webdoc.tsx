@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getStation, stations, transitions } from '../../content/journey';
+import { getStation, stations, transitions, voices } from '../../content/journey';
 import { pages, type PageSpec } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
-import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted } from '../../application/sound';
+import { initAudioUnlock, isMuted, setAmbient, setMuted, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
   Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, STATION_PAGE, SiteMenu, SocialLinks,
@@ -23,21 +23,20 @@ export function Webdoc() {
   const [seen, setSeen] = useState(() => new Set([active]));
 
   const [muted, setMutedState] = useState(isMuted);
-  const first = useRef(true);
 
   useEffect(() => initAudioUnlock(), []);
 
   useEffect(() => {
     setSeen((s) => (s.has(active) ? s : new Set(s).add(active)));
     document.title = `Territorios Vivos · ${active + 1} / ${pages.length}`;
-    // Sonido de agua al cambiar de página (no al cargar) y ambiente de marea en su escena.
-    if (first.current) first.current = false;
-    else playTransition();
+    // Ambiente de marea en su escena y voz de Chachita en la portada, las transiciones y el Viche.
+    // Al cambiar de página no suena ningún efecto: cada video de transición trae su propio sonido.
     const spec = pages[active];
     setAmbient(spec.kind === 'silence' ? spec.tide : null);
+    setVoice(voiceOf(spec));
   }, [active]);
 
-  useEffect(() => () => setAmbient(null), []);
+  useEffect(() => () => { setAmbient(null); setVoice(null); }, []);
 
   const toggleSound = () => {
     setMuted(!muted);
@@ -60,7 +59,7 @@ export function Webdoc() {
               aria-hidden={i !== active ? true : undefined}
               inert={i !== active ? true : undefined}
             >
-              <PageView spec={spec} playing={i === active} openGuide={() => setGuideOpen(true)} />
+              <PageView spec={spec} playing={i === active} near={Math.abs(i - active) <= 1} muted={muted} openGuide={() => setGuideOpen(true)} />
             </section>
           );
         })}
@@ -84,7 +83,21 @@ export function Webdoc() {
   );
 }
 
-function PageView({ spec, playing, openGuide }: { spec: PageSpec; playing: boolean; openGuide: () => void }) {
+function voiceOf(spec: PageSpec): string | null {
+  if (spec.kind === 'welcome') return voices.welcome;
+  if (spec.kind === 'transition') return transitions[spec.index].voice ?? null;
+  if (spec.id === 'pangui-viche') return voices.viche;
+  return null;
+}
+
+function PageView({ spec, playing, near, muted, openGuide }: {
+  spec: PageSpec;
+  playing: boolean;
+  /** Página visible o vecina: sus videos se precargan. */
+  near: boolean;
+  muted: boolean;
+  openGuide: () => void;
+}) {
   const { scrollToIndex, scrollToPage } = useJourneyNav();
   switch (spec.kind) {
     case 'welcome':
@@ -152,14 +165,15 @@ function PageView({ spec, playing, openGuide }: { spec: PageSpec; playing: boole
 
     case 'transition': {
       const t = transitions[spec.index];
-      const onPhoto = !!t.background;
+      const onPhoto = !!(t.background || t.video);
       return (
         <div className="screen screen--transition" style={{ background: t.color }} aria-label={`Transición ${t.number}: de ${t.from} a ${t.to}`}>
+          {t.video && <TransitionVideo id={t.video} playing={playing} near={near} muted={muted} shade={t.lines.length > 0} />}
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
           <TopBar plain={onPhoto} label={<>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
           <div className="transition">
-            <TransitionSymbol kind={t.symbol} />
+            {!t.video && <TransitionSymbol kind={t.symbol} />}
             {t.lines.map((line, i) => (
               <p key={i} className={i === 0 ? 'transition__quote' : 'transition__line'} style={{ animationDelay: `${0.4 + i * 0.9}s` }}>
                 {i === 0 ? `"${line}"` : line}
@@ -226,6 +240,50 @@ function PortadaVideo({ playing }: { playing: boolean }) {
         preload="auto"
       />
       <div className="backdrop__tint" style={{ background: 'radial-gradient(ellipse at center, rgba(6,18,14,.08), rgba(6,18,14,.42))' }} />
+    </div>
+  );
+}
+
+/**
+ * Video de una transición, con su propio sonido. Empieza desde el inicio cada vez que se llega
+ * a la transición y se pausa al salir. Si el navegador no permite sonido todavía (sin gesto del
+ * visitante), se reproduce en silencio. Solo se descarga cuando la transición está cerca.
+ */
+function TransitionVideo({ id, playing, near, muted, shade }: { id: string; playing: boolean; near: boolean; muted: boolean; shade: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (!playing) {
+      v.pause();
+      return;
+    }
+    v.currentTime = 0;
+    v.muted = muted;
+    v.play().catch(() => {
+      v.muted = true;
+      void v.play().catch(() => {});
+    });
+  }, [playing]);
+  useEffect(() => {
+    const v = ref.current;
+    if (v && playing) v.muted = muted;
+  }, [muted, playing]);
+  const poster = `/media/transiciones/${id}-poster.webp`;
+  return (
+    <div className="backdrop" aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
+      <video
+        ref={ref}
+        className="backdrop__video"
+        src={`/media/transiciones/${id}-${small ? 720 : 1080}.mp4`}
+        poster={poster}
+        muted
+        loop
+        playsInline
+        preload={near ? 'auto' : 'none'}
+      />
+      {shade && <div className="backdrop__tint" style={{ background: 'radial-gradient(ellipse at center, rgba(6,18,14,.28), rgba(6,18,14,.05) 70%)' }} />}
     </div>
   );
 }
