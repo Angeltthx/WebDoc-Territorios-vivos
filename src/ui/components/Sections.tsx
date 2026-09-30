@@ -72,8 +72,9 @@ const fmt = (s: number) => {
 
 /**
  * Video de HISTORIA en streaming (HLS en 1080p, 720p y 480p según la conexión), a pantalla completa
- * y con sus colores originales. Empieza con el botón de reproducir; los controles se ocultan solos
- * mientras el video corre. Si el visitante sigue bajando, el video se pausa y al volver continúa
+ * y con sus colores originales. Empieza con el botón de reproducir. Mientras el video corre, las
+ * pestañas y el rótulo de la estación salen de la pantalla y los controles ocupan su lugar; tras unos
+ * segundos sin movimiento se oculta todo (modo cine). Al pausar, las pestañas regresan. Si el visitante sigue bajando, el video se pausa y al volver continúa
  * donde iba. hls.js solo se descarga al reproducir (Safari usa su reproductor nativo).
  */
 function StoryPlayer({ id, title, active }: { id: string; title: string; active: boolean }) {
@@ -117,7 +118,7 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
     if (v.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari: HLS nativo, asignado y reproducido dentro del mismo clic.
       if (!v.src) v.src = src;
-      void v.play().catch(() => setError(true));
+      void v.play().catch(() => {}); // interrumpido (pausa, salir de la página): no es un error
       return;
     }
     const { default: Hls } = await import('hls.js/light');
@@ -132,7 +133,7 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
       h.attachMedia(v);
       hls.current = h;
     }
-    void v.play().catch(() => setError(true));
+    void v.play().catch(() => {}); // interrumpido (pausa, salir de la página): no es un error
   };
 
   const toggle = () => {
@@ -165,7 +166,7 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
   return (
     <div
       ref={box}
-      className={`story${started ? ' is-started' : ''}${hide ? ' is-idle' : ''}`}
+      className={`story${started ? ' is-started' : ''}${started && playing ? ' is-playing' : ''}${hide ? ' is-idle' : ''}`}
       data-no-arrows
       onPointerMove={started ? wake : undefined}
     >
@@ -180,6 +181,7 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
         onPause={() => setPlaying(false)}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => { setWaiting(false); setError(false); }}
+        onError={() => setError(true)}
         onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
         onLoadedMetadata={(e) => setTime({ now: e.currentTarget.currentTime, total: e.currentTarget.duration })}
         onTimeUpdate={(e) => setTime({ now: e.currentTarget.currentTime, total: e.currentTarget.duration })}

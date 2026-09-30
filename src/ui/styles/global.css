@@ -152,11 +152,26 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .story:fullscreen .story__video { object-fit: contain; }
 .story__title { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.75); font-size: 16px; letter-spacing: 0.04em; }
 .story__spinner { position: absolute; left: 50%; top: 50%; margin: -9px 0 0 -9px; }
-/* Los controles quedan sobre las pestañas de la estación y se ocultan mientras el video corre. */
-.story__controls { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 64px); transition: opacity 0.4s ease; }
+/* Controles del video: en pausa quedan sobre las pestañas; al reproducir, las pestañas y el rótulo
+   salen de la pantalla y los controles bajan a su lugar. Sin movimiento, se oculta todo (modo cine). */
+.story .story__controls {
+  width: min(640px, calc(100vw - 150px)); /* libre de los botones laterales */
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 58px);
+  animation: controls-in 0.5s var(--ease) both;
+  transition: bottom 0.55s var(--ease), opacity 0.4s ease;
+}
+@keyframes controls-in { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.story.is-playing .story__controls, .story:fullscreen .story__controls { bottom: max(18px, env(safe-area-inset-bottom)); }
 .story.is-idle { cursor: none; }
 .story.is-idle .story__controls { opacity: 0; pointer-events: none; }
-.story:fullscreen .story__controls { bottom: max(18px, env(safe-area-inset-bottom)); }
+.screen .topbar, .screen .page-foot { transition: opacity 0.45s ease, transform 0.55s var(--ease); }
+.screen:has(.story.is-playing) .page-foot { opacity: 0; transform: translateY(100%); pointer-events: none; }
+.screen:has(.story.is-playing) .page-foot > * { pointer-events: none; }
+.screen:has(.story.is-playing) .topbar { opacity: 0; transform: translateY(-100%); }
+.screen:has(.story.is-playing) .topbar > * { pointer-events: none; }
+.dock, .menu-btn { transition: opacity 0.45s ease; }
+body:has(.stack-page.is-active .story.is-idle) .dock,
+body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-events: none; }
 
 /* ───────── Galería ───────── */
 .gallery { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 18px; padding: 70px 0 130px; }
@@ -508,6 +523,7 @@ h1, h2, p, blockquote, figure { margin: 0; }
   .quote { left: 20px; right: 20px; top: auto; bottom: 130px; transform: none; max-width: none; }
   .quote.reveal { animation-name: rise; }
   .video__bar { left: 20px; right: 20px; bottom: 120px; }
+  .story .story__controls { width: calc(100vw - 24px); gap: 4px; padding: 4px 6px; }
   .gallery { padding-bottom: 140px; }
   .gallery__track { padding: 6px 20px; }
   .gallery__card { height: min(46vh, 420px); max-width: 84vw; }
