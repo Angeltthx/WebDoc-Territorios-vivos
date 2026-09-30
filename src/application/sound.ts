@@ -1,6 +1,7 @@
 // Sonido del recorrido con grabaciones reales (public/media/audio, generadas desde Contenido/):
-// - Al cambiar de página ya no suena ninguna ola: cada video de transición trae su propio sonido
-//   (ajustes del cliente, 30/09/2026).
+// - playTransition(): una ola corta al cambiar de página (ola-1/2/3.mp3, alternándose).
+//   No suena al entrar a una transición con video: ese video trae su propio sonido (30/09/2026).
+//   Con ?ola=1, ?ola=2 u ?ola=3 en la dirección se fija una para compararlas.
 // - setVoice(id | null): la voz de Chachita de la página visible (chachita/<id>.mp3), una vez;
 //   al salir de la página se desvanece.
 // - setAmbient('alta' | 'baja' | null): ambiente de marea en bucle solo en su escena
@@ -12,6 +13,8 @@ export type Tide = 'alta' | 'baja';
 
 const KEY = 'tv:sound';
 const TIDES: Record<Tide, string> = { alta: '/media/audio/marea-alta.mp3', baja: '/media/audio/marea-baja.mp3' };
+const WAVES = ['/media/audio/ola-1.mp3', '/media/audio/ola-2.mp3', '/media/audio/ola-3.mp3'];
+const TRANSITION_VOLUME = 0.55;
 const VOICE_VOLUME = 1;
 const AMBIENT_VOLUME: Record<Tide, number> = { alta: 0.5, baja: 0.45 };
 /** Gestos que los navegadores aceptan para permitir audio. */
@@ -20,6 +23,8 @@ const GESTURES = ['pointerdown', 'click', 'touchend', 'keydown'] as const;
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let unlocked = false;
+let lastTransition = 0;
+let nextWave = 0;
 let wanted: Tide | null = null;
 let wantedVoice: string | null = null;
 let voice: { id: string; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
@@ -77,16 +82,45 @@ function load(url: string): Promise<AudioBuffer | null> {
   return p;
 }
 
-/** Activa el audio con el primer gesto del visitante. */
+/** Activa el audio con el primer gesto del visitante y precarga las olas. */
 export function initAudioUnlock() {
   const unlock = () => {
     unlocked = true;
     audio();
+    WAVES.forEach((url) => void load(url));
     if (wanted && !isMuted()) void startAmbient(wanted);
     if (wantedVoice && !isMuted()) void startVoice(wantedVoice);
     for (const type of GESTURES) window.removeEventListener(type, unlock, true);
   };
   for (const type of GESTURES) window.addEventListener(type, unlock, true);
+}
+
+/** Ola elegida con ?ola=N, o la siguiente de la rotación. */
+function pickWave(): string {
+  const fixed = Number(new URLSearchParams(window.location.search).get('ola'));
+  if (fixed >= 1 && fixed <= WAVES.length) return WAVES[fixed - 1];
+  const url = WAVES[nextWave];
+  nextWave = (nextWave + 1) % WAVES.length;
+  return url;
+}
+
+/** Una ola corta al cambiar de página. */
+export function playTransition() {
+  if (isMuted()) return;
+  const ac = audio();
+  if (!ac || !master) return;
+  const now = performance.now();
+  if (now - lastTransition < 1200) return; // desplazamientos rápidos: una sola ola
+  lastTransition = now;
+  void load(pickWave()).then((buffer) => {
+    if (!buffer || !master) return;
+    const src = ac.createBufferSource();
+    src.buffer = buffer;
+    const g = ac.createGain();
+    g.gain.value = TRANSITION_VOLUME;
+    src.connect(g).connect(master);
+    src.start();
+  });
 }
 
 async function startAmbient(tide: Tide) {

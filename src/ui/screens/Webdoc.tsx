@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getStation, stations, transitions, voices } from '../../content/journey';
 import { pages, type PageSpec } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
-import { initAudioUnlock, isMuted, setAmbient, setMuted, setVoice } from '../../application/sound';
+import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
   Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, STATION_PAGE, SiteMenu, SocialLinks,
@@ -23,15 +23,19 @@ export function Webdoc() {
   const [seen, setSeen] = useState(() => new Set([active]));
 
   const [muted, setMutedState] = useState(isMuted);
+  const first = useRef(true);
 
   useEffect(() => initAudioUnlock(), []);
 
   useEffect(() => {
     setSeen((s) => (s.has(active) ? s : new Set(s).add(active)));
     document.title = `Territorios Vivos · ${active + 1} / ${pages.length}`;
-    // Ambiente de marea en su escena y voz de Chachita en la portada, las transiciones y el Viche.
-    // Al cambiar de página no suena ningún efecto: cada video de transición trae su propio sonido.
+    // Ola corta al cambiar de página (no al cargar), salvo al entrar a una transición con video,
+    // que trae su propio sonido. Ambiente de marea en su escena y voz de Chachita en la portada,
+    // las transiciones y el Viche.
     const spec = pages[active];
+    if (first.current) first.current = false;
+    else if (!(spec.kind === 'transition' && transitions[spec.index].video)) playTransition();
     setAmbient(spec.kind === 'silence' ? spec.tide : null);
     setVoice(voiceOf(spec));
   }, [active]);
