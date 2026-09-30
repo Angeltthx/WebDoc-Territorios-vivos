@@ -1,5 +1,6 @@
 // Las páginas del webdoc, en el orden del PDF de wireframes (v3) con los ajustes del cliente
-// (29/09/2026): "Cita" → "Pensamiento", "El corto" → "Historia" y sección "Video canción" en la estación 4.
+// (29/09/2026): "Cita" → "Pensamiento", "El corto" → "Historia" y sección "Video canción" en la estación 4;
+// (30/09/2026): transición en video después del intro y galería en la estación 4.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { Photo, StationId, VideoAsset } from '../domain/types';
@@ -51,6 +52,7 @@ const pangui = (active: string): Tabs => ({
     { label: 'Marea alta', to: 'pangui-marea-alta' },
     { label: 'Marea baja', to: 'pangui-marea-baja' },
     { label: 'Historia', to: 'pangui-historia' },
+    { label: 'Galería', to: 'pangui-galeria' },
     { label: '360 · Cantos', to: 'pangui-cantos' },
     { label: 'Video canción', to: 'pangui-video-cancion' },
     { label: 'Viche', to: 'pangui-viche', warm: true },
@@ -72,6 +74,7 @@ export type PageSpec = PageBody & { id: string };
 
 export const pages: PageSpec[] = [
   { id: 'inicio', kind: 'welcome' },
+  { id: 'transicion-inicio', kind: 'transition', index: 0 },
 
   { id: 'chori-pensamiento', kind: 'quote', station: 'chori', label: 'Estación 1 · El latido', tabs: chori('Pensamiento') },
   {
@@ -84,7 +87,7 @@ export const pages: PageSpec[] = [
   },
   { id: 'chori-galeria', kind: 'gallery', station: 'chori', label: 'Estación 1 · Galería', tabs: chori('Galería') },
   { id: 'chori-receta', kind: 'recipe', label: 'Estación 1 · Receta', tabs: chori('Receta') },
-  { id: 'transicion-1', kind: 'transition', index: 0 },
+  { id: 'transicion-1', kind: 'transition', index: 1 },
 
   { id: 'atrato-pensamiento', kind: 'quote', station: 'atrato', label: 'Estación 2 · Gente del río', tabs: atrato('Pensamiento') },
   {
@@ -96,7 +99,7 @@ export const pages: PageSpec[] = [
     tabs: atrato('Historia'),
   },
   { id: 'atrato-galeria', kind: 'gallery', station: 'atrato', label: 'Estación 2 · Galería', tabs: atrato('Galería') },
-  { id: 'transicion-2', kind: 'transition', index: 1 },
+  { id: 'transicion-2', kind: 'transition', index: 2 },
 
   { id: 'nuqui-pensamiento', kind: 'quote', station: 'nuqui', label: 'Estación 3 · El baile de las olas', tabs: nuqui('Pensamiento') },
   {
@@ -113,7 +116,7 @@ export const pages: PageSpec[] = [
     tabs: nuqui('Historia'),
   },
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },
-  { id: 'transicion-3', kind: 'transition', index: 2 },
+  { id: 'transicion-3', kind: 'transition', index: 3 },
 
   // El silencio se divide en dos escenas, cada una con su propio sonido de marea.
   {
@@ -143,6 +146,7 @@ export const pages: PageSpec[] = [
     video: { title: 'Marea alta, marea baja', duration: '12:30', tint: '#58509a' },
     tabs: pangui('Historia'),
   },
+  { id: 'pangui-galeria', kind: 'gallery', station: 'pangui', label: 'Estación 4 · Galería', tabs: pangui('Galería') },
   { id: 'pangui-cantos', kind: 'songs', label: 'Estación 4 · 360 · Cantos', tabs: pangui('360 · Cantos') },
   {
     id: 'pangui-video-cancion',
@@ -158,7 +162,7 @@ export const pages: PageSpec[] = [
     video: { title: 'Viche curao, un regalo de la selva', tint: '#58509a' },
     tabs: pangui('Viche'),
   },
-  { id: 'transicion-4', kind: 'transition', index: 3 },
+  { id: 'transicion-4', kind: 'transition', index: 4 },
 
   { id: 'cierre', kind: 'closing' },
 ];

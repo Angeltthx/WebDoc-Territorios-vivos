@@ -1,6 +1,8 @@
 // Sonido del recorrido con grabaciones reales (public/media/audio, generadas desde Contenido/):
-// - playTransition(): una ola corta al cambiar de página (ola-1/2/3.mp3, alternándose).
-//   Con ?ola=1, ?ola=2 u ?ola=3 en la dirección se fija una para compararlas.
+// - Al cambiar de página ya no suena ninguna ola: cada video de transición trae su propio sonido
+//   (ajustes del cliente, 30/09/2026).
+// - setVoice(id | null): la voz de Chachita de la página visible (chachita/<id>.mp3), una vez;
+//   al salir de la página se desvanece.
 // - setAmbient('alta' | 'baja' | null): ambiente de marea en bucle solo en su escena
 //   (marea-alta.mp3 / marea-baja.mp3). Si el archivo no existe, la escena queda en silencio.
 // Los navegadores solo permiten audio tras un gesto del visitante (clic, toque o tecla);
@@ -9,9 +11,8 @@
 export type Tide = 'alta' | 'baja';
 
 const KEY = 'tv:sound';
-const WAVES = ['/media/audio/ola-1.mp3', '/media/audio/ola-2.mp3', '/media/audio/ola-3.mp3'];
 const TIDES: Record<Tide, string> = { alta: '/media/audio/marea-alta.mp3', baja: '/media/audio/marea-baja.mp3' };
-const TRANSITION_VOLUME = 0.55;
+const VOICE_VOLUME = 1;
 const AMBIENT_VOLUME: Record<Tide, number> = { alta: 0.5, baja: 0.45 };
 /** Gestos que los navegadores aceptan para permitir audio. */
 const GESTURES = ['pointerdown', 'click', 'touchend', 'keydown'] as const;
@@ -19,9 +20,9 @@ const GESTURES = ['pointerdown', 'click', 'touchend', 'keydown'] as const;
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let unlocked = false;
-let lastTransition = 0;
-let nextWave = 0;
 let wanted: Tide | null = null;
+let wantedVoice: string | null = null;
+let voice: { id: string; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
 let ambient: { tide: Tide; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
 
@@ -39,8 +40,13 @@ export function setMuted(muted: boolean) {
   } catch {
     /* sin almacenamiento: la preferencia dura solo esta visita */
   }
-  if (muted) stopAmbient();
-  else if (wanted) void startAmbient(wanted);
+  if (muted) {
+    stopAmbient();
+    stopVoice();
+  } else {
+    if (wanted) void startAmbient(wanted);
+    if (wantedVoice) void startVoice(wantedVoice);
+  }
 }
 
 function audio(): AudioContext | null {
@@ -71,44 +77,16 @@ function load(url: string): Promise<AudioBuffer | null> {
   return p;
 }
 
-/** Activa el audio con el primer gesto del visitante y precarga las olas. */
+/** Activa el audio con el primer gesto del visitante. */
 export function initAudioUnlock() {
   const unlock = () => {
     unlocked = true;
     audio();
-    WAVES.forEach((url) => void load(url));
     if (wanted && !isMuted()) void startAmbient(wanted);
+    if (wantedVoice && !isMuted()) void startVoice(wantedVoice);
     for (const type of GESTURES) window.removeEventListener(type, unlock, true);
   };
   for (const type of GESTURES) window.addEventListener(type, unlock, true);
-}
-
-/** Ola elegida con ?ola=N, o la siguiente de la rotación. */
-function pickWave(): string {
-  const fixed = Number(new URLSearchParams(window.location.search).get('ola'));
-  if (fixed >= 1 && fixed <= WAVES.length) return WAVES[fixed - 1];
-  const url = WAVES[nextWave];
-  nextWave = (nextWave + 1) % WAVES.length;
-  return url;
-}
-
-/** Una ola corta al cambiar de página. */
-export function playTransition() {
-  if (isMuted()) return;
-  const ac = audio();
-  if (!ac || !master) return;
-  const now = performance.now();
-  if (now - lastTransition < 1200) return; // desplazamientos rápidos: una sola ola
-  lastTransition = now;
-  void load(pickWave()).then((buffer) => {
-    if (!buffer || !master) return;
-    const src = ac.createBufferSource();
-    src.buffer = buffer;
-    const g = ac.createGain();
-    g.gain.value = TRANSITION_VOLUME;
-    src.connect(g).connect(master);
-    src.start();
-  });
 }
 
 async function startAmbient(tide: Tide) {
@@ -139,12 +117,7 @@ function stopAmbient() {
   if (!ambient || !ctx) return;
   const { out, src } = ambient;
   ambient = null;
-  const t = ctx.currentTime;
-  out.gain.cancelScheduledValues(t);
-  out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), t);
-  out.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
-  src?.stop(t + 1.3);
-  window.setTimeout(() => out.disconnect(), 1400);
+  fadeOut(out, src, 1.2);
 }
 
 /** Ambiente de marea de la escena visible; null lo apaga suavemente. */
@@ -152,4 +125,53 @@ export function setAmbient(tide: Tide | null) {
   wanted = tide;
   if (tide) void startAmbient(tide);
   else stopAmbient();
+}
+
+const voiceUrl = (id: string) => `/media/audio/chachita/${id}.mp3`;
+
+/** Suaviza la salida de un sonido y lo detiene. */
+function fadeOut(out: GainNode, src: AudioBufferSourceNode | null, seconds: number) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  out.gain.cancelScheduledValues(t);
+  out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), t);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+  src?.stop(t + seconds + 0.1);
+  window.setTimeout(() => out.disconnect(), (seconds + 0.2) * 1000);
+}
+
+async function startVoice(id: string) {
+  const ac = audio();
+  if (!ac || !master || isMuted()) return;
+  if (voice?.id === id) return;
+  stopVoice();
+  const out = ac.createGain();
+  out.gain.value = VOICE_VOLUME;
+  out.connect(master);
+  const current = { id, out, src: null as AudioBufferSourceNode | null };
+  voice = current;
+
+  const buffer = await load(voiceUrl(id));
+  if (!buffer || voice !== current) return;
+  const src = ac.createBufferSource();
+  src.buffer = buffer;
+  src.connect(out);
+  src.onended = () => { if (voice === current) voice = null; };
+  src.start();
+  current.src = src;
+}
+
+function stopVoice() {
+  if (!voice) return;
+  const { out, src } = voice;
+  voice = null;
+  fadeOut(out, src, 0.8);
+}
+
+/** Voz de Chachita de la página visible; null la desvanece. Suena una vez por visita a la página. */
+export function setVoice(id: string | null) {
+  if (id === wantedVoice) return;
+  wantedVoice = id;
+  if (id) void startVoice(id);
+  else stopVoice();
 }

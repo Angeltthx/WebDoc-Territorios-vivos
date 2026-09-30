@@ -12,6 +12,7 @@ npm run media        # fotos e ilustraciones → public/media/*.webp + índice d
 npm run media:video  # video de portada → public/media/video/ (desde ../Contenido)
 npm run media:audio  # olas de transición → public/media/audio/ (desde ../Contenido)
 npm run media:360    # video 360 del manglar → HLS en 3 calidades en public/media/360/ (varios minutos)
+npm run media:transiciones  # videos de transición (Contenido/Transiciones) → 1080p y 720p en public/media/transiciones/
 npm run dev     # http://localhost:5173
 npm run build   # verificación de tipos + build de producción en dist/
 ```

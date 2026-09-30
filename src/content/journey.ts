@@ -3,8 +3,52 @@
 // no se inventan recetas, créditos ni guiones.
 
 import type { Photo, Station, Transition } from '../domain/types';
+import galleries from './galleries.json';
 
 const p = (id: string, alt: string, extra: Partial<Photo> = {}): Photo => ({ id, alt, ...extra });
+
+// Galerías: la selección del cliente por estación (30/09/2026), en src/content/galleries.json,
+// generado por `npm run media` desde ../Contenido/Galerias/estacion-N.
+// Las fotos ya descritas conservan su texto; las demás llevan uno genérico hasta el inventario editorial.
+const DESCRIBED: Record<string, Pick<Photo, 'alt' | 'caption' | 'tag'>> = {
+  '6i3a3478': { alt: 'Orfelina Marmolejo abraza a una niña', caption: 'Orfelina Marmolejo' },
+  '6i3a3497-mejorado-nr': { alt: 'El grupo de danza reunido', caption: 'El grupo de danza' },
+  '6i3a3560': { alt: 'Una bailarina de amarillo sonríe', caption: 'Danza' },
+  '6i3a3563': { alt: 'Bailarinas con flores rojas en el cabello', caption: 'Flores rojas' },
+  '6i3a3782': { alt: 'Retrato de Lizandro Dumasa', caption: 'Lizandro Dumasa' },
+  '6i3a3790': { alt: 'Un hombre y un niño pilan en un mortero de madera', caption: 'Pilar en familia' },
+  '6i3a3815': { alt: 'Una mujer siembra en una huerta elevada de madera', caption: 'La huerta sobre el río' },
+  '6i3a3993-mejorado-nr': { alt: 'Una mujer embera junto a racimos de plátano', caption: 'Plátano y fuego' },
+  '6i3a4017': { alt: 'Una mujer prepara alimentos junto al fogón', caption: 'El fogón' },
+  '6i3a4281': { alt: 'Una mujer toca las ramas del manglar', caption: 'El manglar' },
+  '6i3a4376': { alt: 'Una cocinera en la playa', caption: 'Cocina de playa' },
+  '6i3a4466': { alt: 'El mar abierto con una lancha a lo lejos', caption: 'Mar abierto' },
+  '6i3a4535': { alt: 'Un pescador rema una canoa frente a una isla', caption: 'Nuquí' },
+  '6i3a5048': { alt: 'Un hombre sonríe con un racimo al hombro', caption: 'Cosecha' },
+  '6i3a5069': { alt: 'El manglar reflejado en el agua, con garzas', caption: 'Garzas en el manglar' },
+  '6i3a5166': { alt: 'Dos mujeres preparan viche en una olla', caption: 'Viche curao' },
+  '6i3a5513': { alt: 'Una mujer frente al mar al atardecer', caption: 'Atardecer' },
+  '6i3a5623': { alt: 'Retrato de una mujer con turbante frente al mar', caption: 'Frente al mar' },
+  '6i3a5631': { alt: 'Un niño abraza a su perro en la playa', caption: 'La playa' },
+  '6i3a5673': { alt: 'Harold Vergara junto a las canoas', caption: 'Harold Vergara' },
+  '6i3a5677': { alt: 'Harold Vergara sentado sobre una canoa azul', caption: 'Harold Vergara' },
+  'dji-0181': { alt: 'Comunidad embera entre la selva, vista desde el aire', caption: 'Chorí desde el aire', tag: 'dron' },
+  'dji-0498': { alt: 'El río Atrato bajo un cielo de nubes', caption: 'El río grande', tag: 'dron' },
+  'dji-0504': { alt: 'El malecón de Quibdó sobre el Atrato', caption: 'Quibdó', tag: 'dron' },
+  'humpback-whale-s-tail-peeking-out-of-the-sea-in-summer': { alt: 'La cola de una ballena jorobada sobre el mar', caption: 'Ballena jorobada' },
+  'ovidio-hinestroza-choncai-la-marea': { alt: 'Ovidio Hinestroza en su tienda de frutas', caption: 'Ovidio Hinestroza · Choncai La Marea' },
+};
+
+const PLACES: Record<string, string> = {
+  'estacion-1': 'Chorí', 'estacion-2': 'Atrato', 'estacion-3': 'Nuquí', 'estacion-4': 'Panguí',
+};
+
+const gallery = (key: keyof typeof galleries): Photo[] =>
+  galleries[key].map((id, i) => {
+    const d = DESCRIBED[id.replace(/-\d{1,2}$/, '')];
+    const drone = id.startsWith('dji-');
+    return { id, alt: d?.alt ?? `${PLACES[key]} · fotografía ${i + 1}${drone ? ', vista desde el aire' : ''}`, caption: d?.caption, tag: d?.tag ?? (drone ? 'dron' : undefined) };
+  });
 
 export const stations: Station[] = [
   {
@@ -21,8 +65,8 @@ export const stations: Station[] = [
       portrait: p('6i3a3782', 'Retrato de Lizandro Dumasa', { focus: '62% 35%' }),
     },
     sections: [
-      { kind: 'cita', label: 'Cita' },
-      { kind: 'corto', label: 'El corto' },
+      { kind: 'pensamiento', label: 'Pensamiento' },
+      { kind: 'historia', label: 'Historia' },
       { kind: 'galeria', label: 'Galería' },
       { kind: 'receta', label: 'Receta' },
     ],
@@ -34,35 +78,7 @@ export const stations: Station[] = [
     gallery: {
       intro: 'La comunidad embera dóbida',
       background: p('dji-0181-2', 'Comunidad embera entre la selva, vista desde el aire'),
-      // Prueba: todas las fotografías de Contenido/ (29/09/2026). Se reemplazará por la selección final.
-      photos: [
-        p('6i3a3790-1', 'Un hombre y un niño pilan en un mortero de madera', { caption: 'Pilar en familia' }),
-        p('6i3a3815-2', 'Una mujer siembra en una huerta elevada de madera', { caption: 'La huerta sobre el río' }),
-        p('6i3a4017-1', 'Una mujer prepara alimentos junto al fogón', { caption: 'El fogón' }),
-        p('6i3a3993-mejorado-nr-4', 'Una mujer embera junto a racimos de plátano', { caption: 'Plátano y fuego' }),
-        p('6i3a3782', 'Retrato de Lizandro Dumasa', { caption: 'Lizandro Dumasa' }),
-        p('dji-0181-2', 'Comunidad embera entre la selva, vista desde el aire', { caption: 'Chorí desde el aire', tag: 'dron' }),
-        p('dji-0498', 'El río Atrato bajo un cielo de nubes', { caption: 'El río grande', tag: 'dron' }),
-        p('dji-0504', 'El malecón de Quibdó sobre el Atrato', { caption: 'Quibdó', tag: 'dron' }),
-        p('6i3a5673', 'Harold Vergara junto a las canoas', { caption: 'Harold Vergara' }),
-        p('6i3a5677', 'Harold Vergara sentado sobre una canoa azul', { caption: 'Harold Vergara' }),
-        p('ovidio-hinestroza-choncai-la-marea', 'Ovidio Hinestroza en su tienda de frutas', { caption: 'Ovidio Hinestroza · Choncai La Marea' }),
-        p('6i3a3478', 'Orfelina Marmolejo abraza a una niña', { caption: 'Orfelina Marmolejo' }),
-        p('6i3a3497-mejorado-nr', 'El grupo de danza reunido', { caption: 'El grupo de danza' }),
-        p('6i3a3560', 'Una bailarina de amarillo sonríe', { caption: 'Danza' }),
-        p('6i3a3563', 'Bailarinas con flores rojas en el cabello', { caption: 'Flores rojas' }),
-        p('6i3a4376-1', 'Una cocinera en la playa', { caption: 'Cocina de playa' }),
-        p('6i3a4535', 'Un pescador rema una canoa frente a una isla', { caption: 'Nuquí' }),
-        p('6i3a4466-1', 'El mar abierto con una lancha a lo lejos', { caption: 'Mar abierto' }),
-        p('6i3a5631-1', 'Un niño abraza a su perro en la playa', { caption: 'La playa' }),
-        p('6i3a5048', 'Un hombre sonríe con un racimo al hombro', { caption: 'Cosecha' }),
-        p('humpback-whale-s-tail-peeking-out-of-the-sea-in-summer', 'La cola de una ballena jorobada sobre el mar', { caption: 'Ballena jorobada' }),
-        p('6i3a4281', 'Una mujer toca las ramas del manglar', { caption: 'El manglar' }),
-        p('6i3a5069', 'El manglar reflejado en el agua, con garzas', { caption: 'Garzas en el manglar' }),
-        p('6i3a5166-2', 'Dos mujeres preparan viche en una olla', { caption: 'Viche curao' }),
-        p('6i3a5513', 'Una mujer frente al mar al atardecer', { caption: 'Atardecer' }),
-        p('6i3a5623-1', 'Retrato de una mujer con turbante frente al mar', { caption: 'Frente al mar' }),
-      ],
+      photos: gallery('estacion-1'),
     },
     recipe: {
       eyebrow: 'Gastronomía embera',
@@ -88,8 +104,8 @@ export const stations: Station[] = [
       portrait: p('6i3a5673', 'Retrato de Harold Vergara junto a las canoas', { focus: '50% 35%' }),
     },
     sections: [
-      { kind: 'cita', label: 'Cita' },
-      { kind: 'corto', label: 'El corto' },
+      { kind: 'pensamiento', label: 'Pensamiento' },
+      { kind: 'historia', label: 'Historia' },
       { kind: 'galeria', label: 'Galería' },
     ],
     video: {
@@ -100,12 +116,7 @@ export const stations: Station[] = [
     gallery: {
       intro: 'Quibdó desde el aire y las calles',
       background: p('dji-0504', 'Quibdó y el río Atrato desde el aire'),
-      photos: [
-        p('6i3a5677', 'Harold Vergara sentado sobre una canoa azul', { caption: 'Harold Vergara' }),
-        p('dji-0498', 'El Atrato bajo un cielo de nubes', { caption: 'El río grande', tag: 'dron' }),
-        p('dji-0504', 'El malecón de Quibdó sobre el Atrato', { caption: 'Quibdó', tag: 'dron' }),
-        p('ovidio-hinestroza-choncai-la-marea', 'Ovidio Hinestroza en su tienda de frutas', { caption: 'Ovidio Hinestroza · Choncai La Marea' }),
-      ],
+      photos: gallery('estacion-2'),
     },
   },
   {
@@ -123,8 +134,8 @@ export const stations: Station[] = [
     },
     sections: [
       { kind: 'scrolly', label: 'Scrolly' },
-      { kind: 'cita', label: 'Cita' },
-      { kind: 'corto', label: 'El corto' },
+      { kind: 'pensamiento', label: 'Pensamiento' },
+      { kind: 'historia', label: 'Historia' },
       { kind: 'galeria', label: 'Galería' },
     ],
     video: {
@@ -142,14 +153,7 @@ export const stations: Station[] = [
     gallery: {
       intro: 'Danza y comunidad',
       background: p('6i3a3563', 'Bailarinas con flores rojas en el cabello'),
-      photos: [
-        p('6i3a3560', 'Una bailarina de amarillo sonríe', { caption: 'Danza' }),
-        p('6i3a3563', 'Bailarinas con flores rojas en el cabello', { caption: 'Flores rojas' }),
-        p('6i3a3497-mejorado-nr', 'El grupo de danza reunido', { caption: 'El grupo' }),
-        p('6i3a4376-1', 'Una cocinera en la playa', { caption: 'Cocina de playa' }),
-        p('6i3a5631-1', 'Un niño abraza a su perro en la playa', { caption: 'La playa' }),
-        p('6i3a5048', 'Un hombre sonríe con un racimo al hombro', { caption: 'Cosecha' }),
-      ],
+      photos: gallery('estacion-3'),
     },
   },
   {
@@ -167,7 +171,8 @@ export const stations: Station[] = [
     },
     sections: [
       { kind: 'silencio', label: 'Silencio' },
-      { kind: 'corto', label: 'El corto' },
+      { kind: 'historia', label: 'Historia' },
+      { kind: 'galeria', label: 'Galería' },
       { kind: 'cantos', label: '360 · Cantos' },
       { kind: 'viche', label: 'Viche' },
     ],
@@ -180,6 +185,11 @@ export const stations: Station[] = [
       title: 'Marea alta, marea baja',
       duration: '12:30',
       tint: '#58509a',
+    },
+    gallery: {
+      intro: 'Marea alta, marea baja',
+      background: p('6i3a5069', 'El manglar reflejado en el agua, con garzas'),
+      photos: gallery('estacion-4'),
     },
     songs: {
       background: p('6i3a5069', 'El manglar reflejado en el agua, con garzas'),
@@ -203,35 +213,49 @@ export const stations: Station[] = [
   },
 ];
 
+// Transiciones con los videos del cliente (Contenido/Transiciones, 29/09/2026) y la voz de Chachita
+// (Contenido/Chachita). Cada video trae su propio sonido; por eso el recorrido ya no agrega olas al pasar.
+// `video: 'tN'` → public/media/transiciones/tN-{1080,720}.mp4; `voice` → public/media/audio/chachita/<voice>.mp3.
 export const transitions: Transition[] = [
   {
     number: 1,
+    from: 'Inicio',
+    to: 'Chorí',
+    symbol: 'wave',
+    // Texto de la transición del intro: pendiente (está en el Canva del cliente).
+    lines: [],
+    video: 't1',
+    voice: 'estacion-1',
+  },
+  {
+    number: 2,
     from: 'Chorí',
     to: 'Atrato',
     symbol: 'wave',
     lines: ['…y otras aguas imponentes bajan por el río grande, el Atrato'],
-    background: p('dji-0504', 'El malecón de Quibdó y el Atrato'),
-    tint: 'rgba(10,25,30,.45)',
+    video: 't2',
+    voice: 'y',
   },
   {
-    number: 2,
+    number: 3,
     from: 'Atrato',
     to: 'Nuquí',
     symbol: 'rain',
     lines: ['…el agua sube al cielo y vuelve a caer, en Nuquí', 'bajo la lluvia, los pies descalzos aprenden a bailar'],
-    hint: 'sigue bajando',
-    color: '#3a8ade',
+    video: 't3',
+    voice: 'estacion-3',
   },
   {
-    number: 3,
+    number: 4,
     from: 'Nuquí',
     to: 'Panguí',
     symbol: 'meet',
     lines: ['…donde el agua dulce y la salada se encuentran, mi manglar'],
-    color: '#3a8ade',
+    video: 't4',
+    voice: 'z',
   },
   {
-    number: 4,
+    number: 5,
     from: 'Panguí',
     to: 'Mar',
     symbol: 'sea',
@@ -240,6 +264,9 @@ export const transitions: Transition[] = [
     tint: 'rgba(22,70,48,.45)',
   },
 ];
+
+/** Voz de Chachita en la portada y antes del Viche. */
+export const voices = { welcome: 'intro', viche: 'x' };
 
 export const welcome = {
   background: p('6i3a4535', 'Un pescador rema una canoa frente a una isla del Pacífico', { focus: '50% 60%' }),

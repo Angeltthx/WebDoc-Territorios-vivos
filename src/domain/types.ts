@@ -3,8 +3,8 @@
 export type StationId = 'chori' | 'atrato' | 'nuqui' | 'pangui';
 
 export type SectionKind =
-  | 'cita'
-  | 'corto'
+  | 'pensamiento'
+  | 'historia'
   | 'galeria'
   | 'receta'
   | 'scrolly'
@@ -72,5 +72,9 @@ export interface Transition {
   background?: Photo;
   color?: string;
   tint?: string;
+  /** Video de fondo (id en public/media/transiciones) con su propio sonido. */
+  video?: string;
+  /** Voz de Chachita (id en public/media/audio/chachita). */
+  voice?: string;
 }
 
