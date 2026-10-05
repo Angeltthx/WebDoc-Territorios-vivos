@@ -66,6 +66,8 @@ export interface Station {
 
 export interface Transition {
   number: number;
+  /** Rótulo propio en la barra superior (si no, "Transición N · desde → hacia"). */
+  label?: string;
   from: string;
   to: string;
   symbol: 'wave' | 'rain' | 'meet' | 'sea';

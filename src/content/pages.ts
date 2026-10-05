@@ -1,7 +1,8 @@
 // Las páginas del webdoc, en el orden del PDF de wireframes (v3) con los ajustes del cliente
 // (29/09/2026): "Cita" → "Pensamiento", "El corto" → "Historia" y sección "Video canción" en la estación 4;
 // (30/09/2026): transición en video después del intro y galería en la estación 4;
-// videos de HISTORIA de las estaciones 1 a 3 en streaming (public/media/historias).
+// videos de HISTORIA de las estaciones 1 a 3 en streaming (public/media/historias);
+// (05/10/2026): video del intro después de la portada, cierre en video y Video canción en streaming.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { Photo, StationId, VideoAsset } from '../domain/types';
@@ -75,7 +76,8 @@ export type PageSpec = PageBody & { id: string };
 
 export const pages: PageSpec[] = [
   { id: 'inicio', kind: 'welcome' },
-  { id: 'transicion-inicio', kind: 'transition', index: 0 },
+  { id: 'intro', kind: 'transition', index: 0 },
+  { id: 'transicion-inicio', kind: 'transition', index: 1 },
 
   { id: 'chori-pensamiento', kind: 'quote', station: 'chori', label: 'Estación 1 · El latido', tabs: chori('Pensamiento') },
   {
@@ -87,7 +89,7 @@ export const pages: PageSpec[] = [
   },
   { id: 'chori-galeria', kind: 'gallery', station: 'chori', label: 'Estación 1 · Galería', tabs: chori('Galería') },
   { id: 'chori-receta', kind: 'recipe', label: 'Estación 1 · Receta', tabs: chori('Receta') },
-  { id: 'transicion-1', kind: 'transition', index: 1 },
+  { id: 'transicion-1', kind: 'transition', index: 2 },
 
   { id: 'atrato-pensamiento', kind: 'quote', station: 'atrato', label: 'Estación 2 · Gente del río', tabs: atrato('Pensamiento') },
   {
@@ -98,7 +100,7 @@ export const pages: PageSpec[] = [
     tabs: atrato('Historia'),
   },
   { id: 'atrato-galeria', kind: 'gallery', station: 'atrato', label: 'Estación 2 · Galería', tabs: atrato('Galería') },
-  { id: 'transicion-2', kind: 'transition', index: 2 },
+  { id: 'transicion-2', kind: 'transition', index: 3 },
 
   { id: 'nuqui-pensamiento', kind: 'quote', station: 'nuqui', label: 'Estación 3 · El baile de las olas', tabs: nuqui('Pensamiento') },
   {
@@ -115,7 +117,7 @@ export const pages: PageSpec[] = [
     tabs: nuqui('Historia'),
   },
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },
-  { id: 'transicion-3', kind: 'transition', index: 3 },
+  { id: 'transicion-3', kind: 'transition', index: 4 },
 
   // El silencio se divide en dos escenas, cada una con su propio sonido de marea.
   {
@@ -151,7 +153,7 @@ export const pages: PageSpec[] = [
     id: 'pangui-video-cancion',
     kind: 'video',
     label: 'Estación 4 · Video canción',
-    video: { title: 'Video canción', tint: '#3f6b5c' },
+    video: { title: 'Marea alta, marea baja · Video canción', stream: 'cancion-marea' },
     tabs: pangui('Video canción'),
   },
   {
@@ -161,7 +163,7 @@ export const pages: PageSpec[] = [
     video: { title: 'Viche curao, un regalo de la selva', tint: '#58509a' },
     tabs: pangui('Viche'),
   },
-  { id: 'transicion-4', kind: 'transition', index: 4 },
+  { id: 'transicion-4', kind: 'transition', index: 5 },
 
   { id: 'cierre', kind: 'closing' },
 ];

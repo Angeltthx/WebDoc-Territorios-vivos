@@ -17,6 +17,8 @@ const VIDEOS = {
   'estacion-1': { file: 'ESTACION1.mp4', poster: 8 },
   'estacion-2': { file: 'Tráiler Gente de río.mp4', poster: 8 },
   'estacion-3': { file: 'El baile de las olas.mp4', poster: 8 },
+  // Video canción de la estación 4 (05/10/2026).
+  'cancion-marea': { file: 'Marea alta, marea baja_1.mp4', poster: 8 },
 };
 
 const RENDITIONS = [

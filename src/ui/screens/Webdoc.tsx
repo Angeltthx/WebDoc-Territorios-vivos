@@ -31,8 +31,8 @@ export function Webdoc() {
     setSeen((s) => (s.has(active) ? s : new Set(s).add(active)));
     document.title = `Territorios Vivos · ${active + 1} / ${pages.length}`;
     // Ola corta al cambiar de página (no al cargar), salvo al entrar a una transición con video,
-    // que trae su propio sonido. Ambiente de marea en su escena y voz de Chachita en la portada,
-    // las transiciones y el Viche.
+    // que trae su propio sonido (con la voz de Chachita). Ambiente de marea en su escena y voz de
+    // Chachita antes del Viche.
     const spec = pages[active];
     if (first.current) first.current = false;
     else if (!(spec.kind === 'transition' && transitions[spec.index].video)) playTransition();
@@ -88,7 +88,6 @@ export function Webdoc() {
 }
 
 function voiceOf(spec: PageSpec): string | null {
-  if (spec.kind === 'welcome') return voices.welcome;
   if (spec.kind === 'transition') return transitions[spec.index].voice ?? null;
   if (spec.id === 'pangui-viche') return voices.viche;
   return null;
@@ -171,11 +170,11 @@ function PageView({ spec, playing, near, muted, openGuide }: {
       const t = transitions[spec.index];
       const onPhoto = !!(t.background || t.video);
       return (
-        <div className="screen screen--transition" style={{ background: t.color }} aria-label={`Transición ${t.number}: de ${t.from} a ${t.to}`}>
+        <div className="screen screen--transition" style={{ background: t.color }} aria-label={t.label ?? `Transición ${t.number}: de ${t.from} a ${t.to}`}>
           {t.video && <TransitionVideo id={t.video} playing={playing} near={near} muted={muted} shade={t.lines.length > 0} />}
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
-          <TopBar plain={onPhoto} label={<>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
+          <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
           <div className="transition">
             {!t.video && <TransitionSymbol kind={t.symbol} />}
             {t.lines.map((line, i) => (

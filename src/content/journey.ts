@@ -213,10 +213,20 @@ export const stations: Station[] = [
   },
 ];
 
-// Transiciones con los videos del cliente (Contenido/Transiciones, 29/09/2026) y la voz de Chachita
-// (Contenido/Chachita). Cada video trae su propio sonido; por eso el recorrido ya no agrega olas al pasar.
-// `video: 'tN'` → public/media/transiciones/tN-{1080,720}.mp4; `voice` → public/media/audio/chachita/<voice>.mp3.
+// Transiciones con los videos del cliente (Contenido/Transiciones). Desde el 05/10/2026 cada video trae
+// la voz de Chachita integrada y sincronizada, por eso ya no se superpone `voice` (salvo en la
+// transición 2, que no se actualizó); tampoco se agregan olas.
+// `video: 'tN'` → public/media/transiciones/tN-{1080,720}.mp4 (también 'intro' y 'cierre').
 export const transitions: Transition[] = [
+  {
+    number: 0,
+    label: 'Intro · Chachita te recibe',
+    from: 'Portada',
+    to: 'Panguí',
+    symbol: 'wave',
+    lines: [],
+    video: 'intro',
+  },
   {
     number: 1,
     from: 'Inicio',
@@ -225,7 +235,6 @@ export const transitions: Transition[] = [
     // Texto de la transición del intro: pendiente (está en el Canva del cliente).
     lines: [],
     video: 't1',
-    voice: 'estacion-1',
   },
   {
     number: 2,
@@ -234,6 +243,7 @@ export const transitions: Transition[] = [
     symbol: 'wave',
     lines: ['…y otras aguas imponentes bajan por el río grande, el Atrato'],
     video: 't2',
+    // El video de la transición 2 llegó sin cambios el 05/10/2026 (sin voz integrada): se conserva la voz aparte.
     voice: 'y',
   },
   {
@@ -243,7 +253,6 @@ export const transitions: Transition[] = [
     symbol: 'rain',
     lines: ['…el agua sube al cielo y vuelve a caer, en Nuquí', 'bajo la lluvia, los pies descalzos aprenden a bailar'],
     video: 't3',
-    voice: 'estacion-3',
   },
   {
     number: 4,
@@ -252,7 +261,6 @@ export const transitions: Transition[] = [
     symbol: 'meet',
     lines: ['…donde el agua dulce y la salada se encuentran, mi manglar'],
     video: 't4',
-    voice: 'z',
   },
   {
     number: 5,
@@ -260,13 +268,12 @@ export const transitions: Transition[] = [
     to: 'Mar',
     symbol: 'sea',
     lines: ['…volver a las raíces. El agua se eleva y vuelve a empezar'],
-    background: p('6i3a5513', 'Una mujer frente al mar al atardecer', { focus: '60% 60%' }),
-    tint: 'rgba(22,70,48,.45)',
+    video: 'cierre',
   },
 ];
 
-/** Voz de Chachita en la portada y antes del Viche. */
-export const voices = { welcome: 'intro', viche: 'x' };
+/** Voz de Chachita antes del Viche (la del intro ya viene en su video). */
+export const voices = { viche: 'x' };
 
 export const welcome = {
   background: p('6i3a4535', 'Un pescador rema una canoa frente a una isla del Pacífico', { focus: '50% 60%' }),
