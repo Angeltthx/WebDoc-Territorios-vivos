@@ -247,6 +247,10 @@ function PortadaVideo({ playing }: { playing: boolean }) {
   );
 }
 
+/** Versión de los videos de transición: los archivos conservan su nombre y /media se guarda en caché
+ *  un año, así que al recibir videos nuevos se cambia este valor para que el navegador los vuelva a pedir. */
+const TRANSITIONS_VERSION = '2026-10-05';
+
 /**
  * Video de una transición, con su propio sonido. Empieza desde el inicio cada vez que se llega
  * a la transición y se pausa al salir. Si el navegador no permite sonido todavía (sin gesto del
@@ -273,13 +277,13 @@ function TransitionVideo({ id, playing, near, muted, shade }: { id: string; play
     const v = ref.current;
     if (v && playing) v.muted = muted;
   }, [muted, playing]);
-  const poster = `/media/transiciones/${id}-poster.webp`;
+  const poster = `/media/transiciones/${id}-poster.webp?v=${TRANSITIONS_VERSION}`;
   return (
     <div className="backdrop" aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
       <video
         ref={ref}
         className="backdrop__video"
-        src={`/media/transiciones/${id}-${small ? 720 : 1080}.mp4`}
+        src={`/media/transiciones/${id}-${small ? 720 : 1080}.mp4?v=${TRANSITIONS_VERSION}`}
         poster={poster}
         muted
         loop
