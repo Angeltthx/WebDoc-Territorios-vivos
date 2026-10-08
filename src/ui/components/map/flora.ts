@@ -210,7 +210,7 @@ export function buildFlora(rand: () => number) {
 /** Bruma que se enreda en la serranía, típica de la selva húmeda del Chocó. */
 export function buildMist(rand: () => number) {
   const group = new Group();
-  const mat = new MeshBasicMaterial({ color: '#f4fafc', transparent: true, opacity: 0.3, depthWrite: false });
+  const mat = new MeshBasicMaterial({ color: '#ffe0cc', transparent: true, opacity: 0.3, depthWrite: false });
   const mist: { m: Group; speed: number; base: number }[] = [];
   for (let tries = 0; mist.length < 18 && tries < 2000; tries++) {
     const { x, z } = randomPoint(rand);

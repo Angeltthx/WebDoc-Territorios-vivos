@@ -28,9 +28,16 @@ import {
 const DIST = { min: 300, max: 1700, start: DIVE.mapDist };
 const PITCH = { min: 5, max: 38, start: 10 };
 
-const SUN_DIR = new Vector3(1, 0.21, 0.26).normalize();
-const HORIZON = new Color('#dcf1ec');
-const ZENITH = new Color('#4aa6c8');
+// Atardecer: el sol bajo sobre el Pacífico, a espaldas de la cámara (que mira hacia la costa, +x). Alumbra de frente
+// la costa con luz naranja; el cielo que se ve es el del lado contrario al sol: durazno en el horizonte, una franja
+// rosada encima y azul violeta arriba.
+const SUN_DIR = new Vector3(-1, 0.4, 0.22).normalize();
+const HORIZON = new Color('#f7a46c');
+const GLOW = new Color('#ffb14e');
+const BELT = new Color('#f4a296');
+const ZENITH = new Color('#7a73a8');
+const HAZE = new Color('#eea27c');
+const SUN_LIGHT = new Color('#ff9f5a');
 const ARRIVAL_POS = toScene(ARRIVAL.lat, ARRIVAL.lon);
 
 /** Neblina a ras del mar: lo lejano (la cordillera, la costa al norte y al sur) se pierde en el azul del horizonte. */
@@ -356,7 +363,7 @@ function buildSea(region: RegionUniforms) {
         vec3 R = reflect(-V, N);
         R.y = abs(R.y);
         float sd = max(dot(R, uSun), 0.0);
-        vec3 sky = mix(uHorizon, uZenith, pow(R.y, 0.5)) + vec3(1.0, 0.93, 0.75) * pow(sd, 12.0) * 0.22;
+        vec3 sky = mix(uHorizon, uZenith, pow(R.y, 0.5)) + vec3(1.0, 0.62, 0.3) * pow(sd, 12.0) * 0.3;
 
         // Color del agua: azul verdoso mar adentro, turquesa cerca de la orilla, claro sobre la arena, verdoso en los ríos.
         float nearShore = 1.0 - smoothstep(0.0, 500.0, off);
@@ -367,10 +374,12 @@ function buildSea(region: RegionUniforms) {
         body = mix(body, srgb(vec3(0.19, 0.44, 0.38)), smoothstep(-8.0, -50.0, off));
         // La luz atraviesa las olas que dan al sol.
         body += srgb(vec3(0.10, 0.32, 0.28)) * max(dot(N.xz, uSun.xz), 0.0) * 0.6;
+        // Luz de la tarde: el agua se entibia un poco.
+        body *= vec3(1.0, 0.9, 0.84);
 
         vec3 col = mix(body, sky, fres);
         // Brillo del sol sobre las olas.
-        col += vec3(1.0, 0.95, 0.82) * (pow(sd, 500.0) * 2.2 + pow(sd, 50.0) * 0.12);
+        col += vec3(1.0, 0.7, 0.4) * (pow(sd, 500.0) * 2.2 + pow(sd, 50.0) * 0.12);
 
         // Espuma: la orilla y las olas que llegan a la playa.
         float n = vnoise(vSea.xz * 0.11 + vec2(uTime * 0.06, 0.0));
@@ -380,8 +389,8 @@ function buildSea(region: RegionUniforms) {
         float foam = max(band * 0.75, edge) * smoothstep(-6.0, 0.0, off);
         foam *= 0.55 + 0.45 * smoothstep(0.3, 0.7, vnoise(vSea.xz * 0.35 - uTime * 0.1));
         foam *= 1.0 - smoothstep(4.0, 16.0, foot);
-        col = mix(col, srgb(vec3(0.94, 0.98, 0.96)), foam * 0.9);
-        col = mix(col, srgb(vec3(0.95, 0.985, 0.98)), splashFoam * 0.92);
+        col = mix(col, srgb(vec3(1.0, 0.9, 0.82)), foam * 0.9);
+        col = mix(col, srgb(vec3(1.0, 0.92, 0.85)), splashFoam * 0.92);
 
         // Desde muy alto: el dibujo del planeta.
         col = mix(col, regionArt(vSea), uRegionMix);
@@ -398,7 +407,10 @@ function buildSea(region: RegionUniforms) {
   return { sea, uniforms };
 }
 
-/** Cielo azul en degradado con el sol y su halo. Sigue a la cámara, así nunca se ve su borde. */
+/**
+ * Cielo de atardecer: hacia el sol, el horizonte arde en naranja; del lado contrario es durazno, con la franja rosada
+ * que queda encima del horizonte al ponerse el sol, y arriba azul violeta. Sigue a la cámara, así nunca se ve su borde.
+ */
 function buildSky() {
   const mat = new ShaderMaterial({
     side: BackSide,
@@ -407,6 +419,8 @@ function buildSky() {
     uniforms: {
       uSun: { value: SUN_DIR },
       uHorizon: { value: HORIZON },
+      uGlow: { value: GLOW },
+      uBelt: { value: BELT },
       uZenith: { value: ZENITH },
     },
     vertexShader: `varying vec3 vDir;
@@ -414,13 +428,18 @@ function buildSky() {
         vDir = normalize(position);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
-    fragmentShader: `uniform vec3 uSun; uniform vec3 uHorizon; uniform vec3 uZenith; varying vec3 vDir;
+    fragmentShader: `uniform vec3 uSun; uniform vec3 uHorizon; uniform vec3 uGlow; uniform vec3 uBelt; uniform vec3 uZenith;
+      varying vec3 vDir;
       void main() {
         vec3 d = normalize(vDir);
-        vec3 col = mix(uHorizon, uZenith, pow(clamp(d.y, 0.0, 1.0), 0.5));
+        float h = clamp(d.y, 0.0, 1.0);
+        float toward = dot(normalize(d.xz + 1e-5), normalize(uSun.xz)) * 0.5 + 0.5;
+        vec3 horizon = mix(uHorizon, uGlow, pow(toward, 3.0));
+        vec3 col = mix(horizon, uZenith, pow(h, 0.45));
+        col = mix(col, uBelt, exp(-pow((h - 0.13) / 0.09, 2.0)) * (1.0 - toward) * 0.3);
         float s = max(dot(d, uSun), 0.0);
-        col += vec3(1.0, 0.93, 0.75) * (pow(s, 12.0) * 0.22 + pow(s, 160.0) * 0.7);
-        col = mix(col, vec3(1.0, 0.99, 0.92), smoothstep(0.9988, 0.9991, s));
+        col += vec3(1.0, 0.6, 0.28) * (pow(s, 8.0) * 0.35 + pow(s, 160.0) * 0.8);
+        col = mix(col, vec3(1.0, 0.86, 0.6), smoothstep(0.9988, 0.9991, s));
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }`,
@@ -433,7 +452,7 @@ function buildSky() {
 /** Nubes redondeadas que se mueven despacio. */
 function buildClouds(rand: () => number) {
   const group = new Group();
-  const mat = new MeshStandardMaterial({ color: '#ffffff', emissive: '#dfeefa', emissiveIntensity: 0.55, flatShading: true, roughness: 1, transparent: true });
+  const mat = new MeshStandardMaterial({ color: '#ffe2cc', emissive: '#f0957c', emissiveIntensity: 0.5, flatShading: true, roughness: 1, transparent: true });
   const geo = new IcosahedronGeometry(1, 1);
   for (let i = 0; i < 10; i++) {
     const cloud = new Group();
@@ -520,7 +539,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   host.appendChild(labels.domElement);
 
   const scene = new Scene();
-  const fog = new Fog(HORIZON, FOG.near, FOG.far);
+  const fog = new Fog(HAZE, FOG.near, FOG.far);
   scene.fog = fog;
   const camera = new PerspectiveCamera(52, 1, 5, 60000);
 
@@ -542,10 +561,10 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   /** Lo que solo se ve de cerca: desde muy alto se esconde (no se alcanza a ver y ensuciaría el dibujo del planeta). */
   const details = [rocks, flora, places.group, fauna.group];
 
-  // Luz de ilustración: pareja y suave, con poca sombra.
-  scene.add(new HemisphereLight('#eaf7f3', '#3a5a40', 2.1));
-  const key = new DirectionalLight('#fff4de', 1.25);
-  key.position.set(-0.55, 1, 0.3).multiplyScalar(1000);
+  // Luz de la tarde: el sol naranja de frente sobre la costa y, en las caras que no le dan, el cielo rosado y violeta.
+  scene.add(new HemisphereLight('#ffcfa8', '#55405a', 1.8));
+  const key = new DirectionalLight(SUN_LIGHT, 2.9);
+  key.position.copy(SUN_DIR).multiplyScalar(1000);
   scene.add(key);
 
   // Marcadores: alfiler rosado para los sitios, rótulo blanco para los pueblos.

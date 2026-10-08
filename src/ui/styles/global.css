@@ -566,7 +566,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .map-screen {
   --p-cream: #fdf6e3; --p-ink: #1f4a35; --p-line: #173628; --p-pink: #e2456f; --p-sky: #6b97cd; --p-navy: #3e6197;
   --p-drop: 0 3px 0 rgba(15, 40, 30, 0.38);
-  position: fixed; inset: 0; overflow: hidden; background: #cfe8f0;
+  position: fixed; inset: 0; overflow: hidden; background: #f0b08c;
 }
 .map-stage { position: absolute; inset: 0; touch-action: none; cursor: grab; }
 .map-stage:active { cursor: grabbing; }
@@ -609,8 +609,8 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .map-screen::before, .map-screen::after {
   content: ''; position: absolute; z-index: 4; left: 0; right: 0; pointer-events: none; transition: opacity 0.9s ease;
 }
-.map-screen::before { top: 0; height: 130px; background: linear-gradient(rgba(6, 30, 34, 0.42), rgba(6, 30, 34, 0.12) 60%, transparent); }
-.map-screen::after { bottom: 0; height: 120px; background: linear-gradient(transparent, rgba(6, 30, 34, 0.45)); opacity: 0; }
+.map-screen::before { top: 0; height: 130px; background: linear-gradient(rgba(40, 22, 40, 0.4), rgba(40, 22, 40, 0.12) 60%, transparent); }
+.map-screen::after { bottom: 0; height: 120px; background: linear-gradient(transparent, rgba(20, 24, 44, 0.45)); opacity: 0; }
 .map-screen.is-map::after { opacity: 1; }
 .map-screen .topbar .ghost-link span { font-size: 14px; }
 
@@ -637,7 +637,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 /* Aviso mientras se arma la escena (tarda unos segundos la primera vez). */
 .map-loading {
   position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; margin: 0;
-  background: linear-gradient(#3d8ed8, #d4ecf2 55%, #2b8a8f 56%, #1b6f8a);
+  background: linear-gradient(#5b68a2, #f19aa8 38%, #f2ae8a 55%, #2f6f80 56%, #1d4d68);
   font: italic 500 clamp(18px, 2.4vw, 26px) var(--serif); color: #fff; text-shadow: 0 2px 14px rgba(0, 40, 60, 0.4);
   transition: opacity 0.8s ease, visibility 0.8s;
 }
