@@ -448,7 +448,7 @@ export function isFree(x: number, z: number, minInland = 8) {
     const r = p.kind === 'town' ? 125 : p.id === 'kipara-te' ? 110 : 50;
     if (Math.abs(x - p.pos.x) < r && Math.abs(z - p.pos.z) < r && Math.hypot(x - p.pos.x, z - p.pos.z) < r) return false;
   }
-  for (const p of nature) if (Math.hypot(x - p.pos.x, z - p.pos.z) < 30) return false;
+  for (const p of nature) if (Math.hypot(x - p.pos.x, z - p.pos.z) < 45) return false;
   return true;
 }
 

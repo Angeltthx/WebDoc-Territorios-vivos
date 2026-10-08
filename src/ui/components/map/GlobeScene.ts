@@ -3,7 +3,7 @@
 // viaje al mapa de la costa (ver dive.ts).
 
 import {
-  AdditiveBlending, BackSide, Group, MathUtils, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Quaternion,
+  AdditiveBlending, BackSide, BufferGeometry, Float32BufferAttribute, Group, MathUtils, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Points, Quaternion,
   Raycaster, SRGBColorSpace, Scene, ShaderMaterial, SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
@@ -28,6 +28,75 @@ function vecToLatLon(v: Vector3) {
   let lon = Math.atan2(n.z, -n.x) / DEG - 180;
   if (lon < -180) lon += 360;
   return { lat, lon };
+}
+
+// ───────── Estrellas ─────────
+
+/**
+ * El espacio detrás del planeta: estrellas que titilan, de tamaños y tonos distintos (unas azuladas, otras cálidas),
+ * más apretadas en una franja como la Vía Láctea. Quedan lejos y quietas: el planeta gira delante de ellas.
+ */
+function buildStars(pixelRatio: number) {
+  const rand = (() => {
+    let s = 7;
+    return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+  })();
+  const pos: number[] = [];
+  const size: number[] = [];
+  const color: number[] = [];
+  const phase: number[] = [];
+  const band = new Vector3(0.35, 1, 0.2).normalize();
+  const v = new Vector3();
+  const add = (dir: Vector3, s: number) => {
+    v.copy(dir).normalize().multiplyScalar(40);
+    pos.push(v.x, v.y, v.z);
+    size.push(s);
+    const tone = rand();
+    // Blancas casi todas; algunas azuladas y otras cálidas.
+    if (tone < 0.18) color.push(0.75, 0.85, 1);
+    else if (tone < 0.3) color.push(1, 0.88, 0.7);
+    else color.push(1, 1, 1);
+    phase.push(rand() * 100);
+  };
+  const randomDir = () => v.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).clone();
+  for (let i = 0; i < 1700; i++) {
+    const r = rand();
+    add(randomDir(), r < 0.92 ? 0.8 + rand() * 1.2 : 2.2 + rand() * 1.8);
+  }
+  // Franja de la Vía Láctea: muchas estrellas pequeñas cerca de un gran círculo.
+  const a = new Vector3(1, 0, 0).cross(band).normalize();
+  const b = band.clone().cross(a).normalize();
+  for (let i = 0; i < 1100; i++) {
+    const t = rand() * Math.PI * 2;
+    const off = (rand() + rand() + rand() - 1.5) * 0.22;
+    add(a.clone().multiplyScalar(Math.cos(t)).addScaledVector(b, Math.sin(t)).addScaledVector(band, off), 0.6 + rand() * 0.9);
+  }
+  const geo = new BufferGeometry();
+  geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  geo.setAttribute('size', new Float32BufferAttribute(size, 1));
+  geo.setAttribute('color', new Float32BufferAttribute(color, 3));
+  geo.setAttribute('phase', new Float32BufferAttribute(phase, 1));
+  const mat = new ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    uniforms: { uTime: { value: 0 }, uPixel: { value: pixelRatio } },
+    vertexShader: `attribute float size; attribute float phase; attribute vec3 color;
+      uniform float uTime; uniform float uPixel; varying vec3 vColor; varying float vGlow;
+      void main() {
+        vColor = color;
+        vGlow = 0.65 + 0.35 * sin(uTime * (0.8 + fract(phase) * 2.2) + phase);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * uPixel * 2.2;
+      }`,
+    fragmentShader: `varying vec3 vColor; varying float vGlow;
+      void main() {
+        float d = length(gl_PointCoord - 0.5);
+        float a = smoothstep(0.5, 0.0, d);
+        gl_FragColor = vec4(vColor * a * a * vGlow, 1.0);
+      }`,
+  });
+  return { points: new Points(geo, mat), uniforms: mat.uniforms };
 }
 
 // ───────── Escena ─────────
@@ -70,7 +139,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
   host.appendChild(labels.domElement);
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(36, 1, 0.001, 100);
+  const camera = new PerspectiveCamera(36, 1, 0.001, 200);
   const globe = new Group();
   scene.add(globe);
 
@@ -104,6 +173,9 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     }),
   );
   scene.add(halo);
+  const stars = buildStars(renderer.getPixelRatio());
+  stars.points.renderOrder = -1;
+  scene.add(stars.points);
 
   // Marcador del Chocó: el alfiler rosado del afiche, clavado justo en la costa de Nuquí (la punta del alfiler es el
   // punto de anclaje), con el rótulo encima. No cambia de tamaño: solo late un aro alrededor de la punta.
@@ -274,6 +346,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     if (!state.active) return;
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.1);
+    stars.uniforms.uTime.value = timer.getElapsed();
 
     if (state.diving) {
       // Gira hasta Nuquí y baja por la curva compartida con el mapa (ver dive.ts).

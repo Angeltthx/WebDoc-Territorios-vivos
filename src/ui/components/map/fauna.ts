@@ -7,12 +7,16 @@
 
 import { type BufferGeometry, Group, MathUtils, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three';
 import type { Animal, AnimalKit } from './animals';
+import { SplashPool } from './splash';
 import { BALL, BLADE, CONE, ORB, merge, paint, part, pole, solid, sticker } from './kit';
 import {
   RAIL, RIVER_MOUTHS, S, doorTo, facing, heightAt, nature, offshore, offshoreRaw, placeNear, placed, railAt, riverReach, shore, smoothstep,
 } from './terrain';
 
 const TAU = Math.PI * 2;
+
+/** Avisa al mar que algo cayó al agua en (x, z): tamaño del salpicón (unidades) y fuerza (0–1). */
+export type OnSplash = (x: number, z: number, size: number, strength: number) => void;
 
 export interface Living {
   group: Object3D;
@@ -109,7 +113,7 @@ function whaleBody() {
   return solid(g);
 }
 
-function buildWhales(spray: Spray, rand: () => number): Living {
+function buildWhales(spray: Spray, splashes: SplashPool, onSplash: OnSplash, rand: () => number): Living {
   const base = byId('ballena').pos.clone();
   const group = new Group();
   const mother = new Group();
@@ -149,7 +153,7 @@ function buildWhales(spray: Spray, rand: () => number): Living {
     calf.position.set(base.x - 26 + 6 * Math.sin(t * 0.3), -4.5 + 2.2 * Math.sin(t * 0.9), base.z + 30 + 20 * Math.sin(t * 0.12));
     calf.rotation.set(-0.08 * Math.cos(t * 0.9), 0.35, 0);
   };
-  return swappable(group, update, (kit) => (kit.ballena ? whalePod(kit.ballena, spray, rand) : null));
+  return swappable(group, update, (kit) => (kit.ballena ? whalePod(kit.ballena, spray, splashes, onSplash, rand) : null));
 }
 
 /**
@@ -157,7 +161,7 @@ function buildWhales(spray: Spray, rand: () => number): Living {
  * más al sur. Nadan en círculos amplios con el lomo afuera, soplan y, cada tanto, una salta con el salto del
  * animador: sale casi entera, gira en el aire y cae de espaldas, con un salpicón al salir y otro al caer.
  */
-function whalePod(make: (length: number) => Animal, spray: Spray, rand: () => number): Living {
+function whalePod(make: (length: number) => Animal, spray: Spray, splashes: SplashPool, onSplash: OnSplash, rand: () => number): Living {
   const group = new Group();
   const town = (id: string) => placed.find((p) => p.id === id)!;
   const main = byId('ballena').pos;
@@ -180,6 +184,13 @@ function whalePod(make: (length: number) => Animal, spray: Spray, rand: () => nu
     a: make(46), length: 46, c: main, r: 0, flat: 1, ang: 0, dir: 1, speed: 0, follow: whales[0],
     breaching: -1, elapsed: 0, nextBreach: 40 + rand() * 20, nextBlow: 3,
   });
+  // La cadera de cada ballena: ahí rompe el agua (el salto la lleva hacia adelante).
+  const hipsOf = (a: Animal) => {
+    let hips: Object3D = a.root;
+    a.root.traverse((o) => { if (/Hips$/.test(o.name)) hips = o; });
+    return hips;
+  };
+  const hips = new Map(whales.map((w) => [w, hipsOf(w.a)]));
   for (const w of whales) {
     w.a.play('Swin', { speed: 0.8 + rand() * 0.3 });
     w.a.mixer.setTime(rand() * 3);
@@ -195,8 +206,11 @@ function whalePod(make: (length: number) => Animal, spray: Spray, rand: () => nu
         w.elapsed += dt;
         for (const sp of w.a.splashes) {
           if (before < sp.at && w.elapsed >= sp.at) {
-            head.set(0, 0, w.length * 0.15).applyEuler(w.a.root.rotation).add(w.a.root.position).setY(1);
-            spray.emit(head, Math.round(30 + 40 * sp.strength), { spread: w.length * 0.45 * sp.strength, up: 30 + 30 * sp.strength, size: 2.5 + 3 * sp.strength });
+            // Salpicón grande donde cae (o donde sale), y el mar reacciona: anillos, espuma y olas que se abren.
+            hips.get(w)!.getWorldPosition(head);
+            splashes.burst(head, w.length * (0.75 + 0.55 * sp.strength), sp.strength);
+            onSplash(head.x, head.z, w.length, sp.strength);
+            spray.emit(head.setY(2), Math.round(10 + 20 * sp.strength), { spread: w.length * 0.3, up: 40 + 25 * sp.strength, size: 2 + 2 * sp.strength });
           }
         }
         if (w.elapsed > jump) {
@@ -402,6 +416,8 @@ function buildPava(): Living {
   const group = new Group();
   group.position.set(p.x, heightAt(p.x, p.z) - 1, p.z);
   group.rotation.y = doorTo(sea); // la rama apunta al mar
+  // Un árbol alto que sobresale de la selva, con la pava grande en la rama que da al mar: se ve desde la lancha.
+  group.scale.setScalar(2.3);
   group.add(
     solid([
       pole('#8f7a63', [0, 0, 0], [0, 40, 0], 2.6),
@@ -482,6 +498,8 @@ function buildFrog(): Living {
   const group = new Group();
   group.position.set(p.x, heightAt(p.x, p.z) - 0.5, p.z);
   group.rotation.y = doorTo(sea);
+  // Hojas y ranas grandes (como en el afiche), en el borde de la selva, para que se vean desde el mar.
+  group.scale.setScalar(3.2);
   group.add(frogLeaf());
   const frog = new Group();
   const g: BufferGeometry[] = [
@@ -905,19 +923,21 @@ function buildButterflies(rand: () => number): Living {
 
 /** Altura de cada rótulo de naturaleza sobre el terreno o el agua. */
 export const NATURE_LABEL_HEIGHT: Record<string, number> = {
-  ballena: 70, tortuga: 22, cangrejo: 26, pava: 58, rana: 30, manglar: 30, cacao: 34,
+  ballena: 70, tortuga: 22, cangrejo: 26, pava: 125, rana: 70, manglar: 30, cacao: 34,
 };
 
-export function buildFauna(rand: () => number): Living {
+export function buildFauna(rand: () => number, onSplash: OnSplash = () => {}): Living {
   const spray = new Spray(200);
-  const parts: Living[] = [buildWhales(spray, rand), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand, spray), buildButterflies(rand)];
+  const splashes = new SplashPool();
+  const parts: Living[] = [buildWhales(spray, splashes, onSplash, rand), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand, spray), buildButterflies(rand)];
   const group = new Group();
-  group.add(spray.group, buildCacao(rand), buildPosterMangrove(), ...parts.map((p) => p.group));
+  group.add(spray.group, splashes.group, buildCacao(rand), buildPosterMangrove(), ...parts.map((p) => p.group));
   return {
     group,
     update: (t, dt) => {
       for (const p of parts) p.update(t, dt);
       spray.update(dt);
+      splashes.update(dt);
     },
     swap: (kit) => {
       for (const p of parts) p.swap?.(kit);

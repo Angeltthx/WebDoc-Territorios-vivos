@@ -230,6 +230,8 @@ function buildSea(region: RegionUniforms) {
     uShoreFar: { value: shoreTexture(far) },
     uOriginFar: { value: new Vector2(far.x0, far.z0) },
     uSizeFar: { value: new Vector2(far.cols * far.cell, far.rows * far.cell) },
+    // Los últimos salpicones grandes (x, z, momento, tamaño), para que el mar reaccione donde cae la ballena.
+    uSplash: { value: Array.from({ length: 4 }, () => new Vector4(0, 0, -100, 0)) },
     uSun: { value: SUN_DIR },
     uHorizon: { value: HORIZON },
     uZenith: { value: ZENITH },
@@ -270,6 +272,7 @@ function buildSea(region: RegionUniforms) {
     fragmentShader: `#include <common>
       #include <fog_pars_fragment>
       ${coastGlsl}${GLSL_COMMON}${REGION_GLSL}
+      uniform vec4 uSplash[4];
       uniform vec3 uSun;
       uniform vec3 uHorizon;
       uniform vec3 uZenith;
@@ -324,6 +327,29 @@ function buildSea(region: RegionUniforms) {
         float foot = length(fwidth(vSea.xz));
         // Más calma en los ríos y al fondo de las ensenadas.
         vec2 g = waveSlope(vSea.xz, uTime, foot) * mix(0.3, 1.0, smoothstep(-20.0, 200.0, off));
+        // Donde cayó algo grande: tres frentes de ola que se abren en anillo (inclinan el agua y la blanquean) y una
+        // mancha de espuma en el centro que se deshace despacio.
+        float splashFoam = 0.0;
+        for (int i = 0; i < 4; i++) {
+          vec4 sp = uSplash[i];
+          float age = uTime - sp.z;
+          if (sp.w <= 0.0 || age < 0.0 || age > 10.0) continue;
+          vec2 dv = vSea.xz - sp.xy;
+          float d = length(dv);
+          float R = sp.w;
+          for (int j = 0; j < 3; j++) {
+            float fj = float(j);
+            float a = age - fj * 0.55;
+            if (a < 0.0) continue;
+            float w = R * 0.05 + a * 1.4;
+            float x = (d - R * (0.25 + a * 0.42)) / w;
+            float k = exp(-x * x) * exp(-a * 0.45) * (1.0 - fj * 0.25);
+            g += (dv / max(d, 0.001)) * k * 0.5 * sin(x * 2.5);
+            splashFoam += k * 0.8;
+          }
+          splashFoam += (1.0 - smoothstep(R * 0.12, R * (0.5 + age * 0.14), d)) * exp(-age * 0.38);
+        }
+        splashFoam = clamp(splashFoam, 0.0, 1.0) * (0.55 + 0.45 * vnoise(vSea.xz * 0.22 + uTime * 0.3));
         vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
         vec3 V = normalize(cameraPosition - vSea);
         float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
@@ -355,6 +381,7 @@ function buildSea(region: RegionUniforms) {
         foam *= 0.55 + 0.45 * smoothstep(0.3, 0.7, vnoise(vSea.xz * 0.35 - uTime * 0.1));
         foam *= 1.0 - smoothstep(4.0, 16.0, foot);
         col = mix(col, srgb(vec3(0.94, 0.98, 0.96)), foam * 0.9);
+        col = mix(col, srgb(vec3(0.95, 0.985, 0.98)), splashFoam * 0.92);
 
         // Desde muy alto: el dibujo del planeta.
         col = mix(col, regionArt(vSea), uRegionMix);
@@ -504,7 +531,11 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   const clouds = buildClouds(rand);
   const mist = buildMist(rand);
   const places = buildPlaces(rand);
-  const fauna = buildFauna(rand);
+  // Cuando la ballena rompe el agua, el mar lo registra (ver `uSplash`).
+  let splashSlot = 0;
+  const fauna = buildFauna(rand, (x, z, size, strength) => {
+    uniforms.uSplash.value[splashSlot++ % 4].set(x, z, uniforms.uTime.value, size * (0.55 + 0.45 * strength));
+  });
   const rocks = buildRocks(rand);
   const flora = buildFlora(rand);
   scene.add(sky, sea, buildLand(region), buildFarLand(region), rocks, flora, clouds.group, mist.group, places.group, fauna.group);

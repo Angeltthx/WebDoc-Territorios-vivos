@@ -61,8 +61,8 @@ export const MAP_NATURE: MapPlace[] = [
   { id: 'ballena', name: 'Ballena jorobada', kind: 'nature', at: { town: 'jurubida', along: 3.2, inland: -2.4 }, scientific: 'Megaptera novaeangliae' },
   { id: 'cangrejo', name: 'Cangrejo fantasma rojo', kind: 'nature', at: { town: 'tribuga', along: 0.9, inland: 0.04 }, scientific: 'Ocypode gaudichaudii' },
   { id: 'tortuga', name: 'Tortuga golfina', kind: 'nature', at: { town: 'nuqui', along: -0.9, inland: -1.6 }, scientific: 'Lepidochelys olivacea' },
-  { id: 'pava', name: 'Pava del Baudó', kind: 'nature', at: { town: 'nuqui', along: -1.6, inland: 3.6 }, scientific: 'Penelope ortoni' },
-  { id: 'rana', name: 'Rana arlequín', kind: 'nature', at: { town: 'pangui', along: 0.9, inland: 1.6 }, scientific: 'Oophaga solanensis' },
+  { id: 'pava', name: 'Pava del Baudó', kind: 'nature', at: { town: 'nuqui', along: -1.9, inland: 0.3 }, scientific: 'Penelope ortoni' },
+  { id: 'rana', name: 'Rana arlequín', kind: 'nature', at: { town: 'pangui', along: 1.05, inland: 0.2 }, scientific: 'Oophaga solanensis' },
   { id: 'manglar', name: 'Manglar', kind: 'nature', at: { town: 'coqui', along: -1.6, inland: 0.1 } },
   { id: 'cacao', name: 'Cacao', kind: 'nature', at: { town: 'coqui', along: 0.2, inland: 1.1 } },
 ];

@@ -660,17 +660,13 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 /* ───────── Planeta de entrada del mapa (arte del afiche) ───────── */
 .globe-stage {
   position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: grab;
-  /* Cielo nocturno turquesa con destellos como los asteriscos del afiche. */
+  /* El espacio: casi negro, con un resplandor tenue detrás del planeta y nebulosas muy suaves. Las estrellas se
+     dibujan en el lienzo (titilan); aquí quedan solo los dos destellos del afiche. */
   background:
-    radial-gradient(circle at 50% 55%, rgba(53, 174, 172, 0.25), transparent 55%),
-    radial-gradient(1.5px 1.5px at 12% 22%, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 83% 18%, #fff 50%, transparent 51%),
-    radial-gradient(2px 2px at 70% 78%, #fdf6e3 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 22% 80%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 45% 12%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 92% 52%, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 6% 58%, #fff 50%, transparent 51%),
-    linear-gradient(#0c3440, #082730 60%, #061d25);
+    radial-gradient(circle at 50% 52%, rgba(40, 110, 130, 0.22), transparent 42%),
+    radial-gradient(ellipse 60% 40% at 18% 22%, rgba(88, 62, 140, 0.16), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 80%, rgba(30, 90, 120, 0.14), transparent 70%),
+    linear-gradient(#03060c, #040912 55%, #020409);
   transition: opacity 0.9s ease-in-out, visibility 0.9s;
 }
 .globe-stage::before, .globe-stage::after {
