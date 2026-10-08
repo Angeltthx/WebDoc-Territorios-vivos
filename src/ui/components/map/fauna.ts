@@ -417,7 +417,7 @@ function buildPava(): Living {
   group.position.set(p.x, heightAt(p.x, p.z) - 1, p.z);
   group.rotation.y = doorTo(sea); // la rama apunta al mar
   // Un árbol alto que sobresale de la selva, con la pava grande en la rama que da al mar: se ve desde la lancha.
-  group.scale.setScalar(2.3);
+  group.scale.setScalar(1.5);
   group.add(
     solid([
       pole('#8f7a63', [0, 0, 0], [0, 40, 0], 2.6),
@@ -458,7 +458,7 @@ function buildPava(): Living {
   const living = swappable(new Group(), update, (kit) => {
     if (!kit.pava) return null;
     // La pava del modelo, en la misma rama: casi siempre quieta mirando alrededor y, cada tanto, canta.
-    const a = kit.pava(24);
+    const a = kit.pava(20);
     a.root.position.copy(bird.position);
     a.root.rotation.y = bird.rotation.y;
     bird.visible = false;
@@ -499,7 +499,7 @@ function buildFrog(): Living {
   group.position.set(p.x, heightAt(p.x, p.z) - 0.5, p.z);
   group.rotation.y = doorTo(sea);
   // Hojas y ranas grandes (como en el afiche), en el borde de la selva, para que se vean desde el mar.
-  group.scale.setScalar(3.2);
+  group.scale.setScalar(1.9);
   group.add(frogLeaf());
   const frog = new Group();
   const g: BufferGeometry[] = [
@@ -540,7 +540,7 @@ function buildFrog(): Living {
       { at: frog.position.clone(), yaw: frog.rotation.y, holder: group },
       { at: new Vector3(-5.1, 7, 0), yaw: -Math.PI / 2, holder: second },
     ].map(({ at, yaw, holder }, i) => {
-      const a = make(15);
+      const a = make(12);
       a.root.position.copy(at).setY(at.y - 0.4);
       a.root.rotation.y = yaw;
       holder.add(a.root);
@@ -923,7 +923,7 @@ function buildButterflies(rand: () => number): Living {
 
 /** Altura de cada rótulo de naturaleza sobre el terreno o el agua. */
 export const NATURE_LABEL_HEIGHT: Record<string, number> = {
-  ballena: 70, tortuga: 22, cangrejo: 26, pava: 125, rana: 70, manglar: 30, cacao: 34,
+  ballena: 70, tortuga: 22, cangrejo: 26, pava: 86, rana: 44, manglar: 30, cacao: 34,
 };
 
 export function buildFauna(rand: () => number, onSplash: OnSplash = () => {}): Living {

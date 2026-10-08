@@ -30,46 +30,96 @@ function vecToLatLon(v: Vector3) {
   return { lat, lon };
 }
 
-// ───────── Estrellas ─────────
+// ───────── El espacio ─────────
+
+const NOISE3 = `
+  float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+  float noise3(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
+      mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y),
+      f.z);
+  }
+  float fbm3(vec3 p) {
+    float s = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 5; i++) { s += a * noise3(p); p *= 2.03; a *= 0.5; }
+    return s;
+  }`;
+
+/** Plano de la Vía Láctea (su normal): la franja cruza el cielo en diagonal detrás del planeta. */
+const GALAXY = new Vector3(0.35, 1, 0.2).normalize();
 
 /**
- * El espacio detrás del planeta: estrellas que titilan, de tamaños y tonos distintos (unas azuladas, otras cálidas),
- * más apretadas en una franja como la Vía Láctea. Quedan lejos y quietas: el planeta gira delante de ellas.
+ * La Vía Láctea y nebulosas muy tenues, pintadas por dentro de una esfera lejana: una franja de luz lechosa con
+ * nubes de polvo oscuras en el medio y manchas de color apenas visibles en el resto del cielo.
+ */
+function buildGalaxy() {
+  return new Mesh(
+    new SphereGeometry(60, 64, 32),
+    new ShaderMaterial({
+      side: BackSide,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      uniforms: { uBand: { value: GALAXY } },
+      vertexShader: `varying vec3 vDir;
+        void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform vec3 uBand; varying vec3 vDir;
+        ${NOISE3}
+        void main() {
+          vec3 d = normalize(vDir);
+          float b = dot(d, uBand);
+          float n = fbm3(d * 4.0);
+          float wide = exp(-b * b / 0.05) * (0.35 + 0.65 * n);
+          float core = exp(-b * b / 0.008) * smoothstep(0.35, 0.8, fbm3(d * 6.0 + 2.0));
+          float dust = smoothstep(0.45, 0.72, fbm3(d * 7.0 + 10.0)) * exp(-b * b / 0.004);
+          vec3 col = mix(vec3(0.16, 0.2, 0.34), vec3(0.62, 0.58, 0.66), fbm3(d * 9.0 + 3.0)) * wide * 0.3;
+          col += vec3(0.85, 0.8, 0.72) * core * 0.18;
+          col *= 1.0 - dust * 0.85;
+          col += vec3(0.32, 0.12, 0.42) * smoothstep(0.58, 0.95, fbm3(d * 2.2 + 7.0)) * 0.07;
+          col += vec3(0.06, 0.22, 0.28) * smoothstep(0.6, 0.95, fbm3(d * 2.8 + 21.0)) * 0.07;
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+    }),
+  );
+}
+
+/**
+ * Estrellas: muchas débiles y pocas brillantes (como en el cielo de verdad), con su color según la temperatura
+ * —azuladas, blancas, amarillas, naranjas—, más apretadas a lo largo de la Vía Láctea. Las más brillantes tienen
+ * un destello en cruz. Titilan apenas.
  */
 function buildStars(pixelRatio: number) {
-  const rand = (() => {
-    let s = 7;
-    return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
-  })();
+  let seed = 7;
+  const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const pos: number[] = [];
   const size: number[] = [];
   const color: number[] = [];
   const phase: number[] = [];
-  const band = new Vector3(0.35, 1, 0.2).normalize();
   const v = new Vector3();
+  const tint = (t: number): [number, number, number] =>
+    t < 0.08 ? [0.66, 0.78, 1] : t < 0.3 ? [0.86, 0.91, 1] : t < 0.75 ? [1, 1, 1] : t < 0.92 ? [1, 0.93, 0.8] : [1, 0.8, 0.62];
   const add = (dir: Vector3, s: number) => {
-    v.copy(dir).normalize().multiplyScalar(40);
+    v.copy(dir).normalize().multiplyScalar(50);
     pos.push(v.x, v.y, v.z);
     size.push(s);
-    const tone = rand();
-    // Blancas casi todas; algunas azuladas y otras cálidas.
-    if (tone < 0.18) color.push(0.75, 0.85, 1);
-    else if (tone < 0.3) color.push(1, 0.88, 0.7);
-    else color.push(1, 1, 1);
+    color.push(...tint(rand()));
     phase.push(rand() * 100);
   };
-  const randomDir = () => v.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).clone();
-  for (let i = 0; i < 1700; i++) {
-    const r = rand();
-    add(randomDir(), r < 0.92 ? 0.8 + rand() * 1.2 : 2.2 + rand() * 1.8);
-  }
-  // Franja de la Vía Láctea: muchas estrellas pequeñas cerca de un gran círculo.
-  const a = new Vector3(1, 0, 0).cross(band).normalize();
-  const b = band.clone().cross(a).normalize();
-  for (let i = 0; i < 1100; i++) {
+  // Brillo: casi todas tenues y unas pocas muy brillantes.
+  const magnitude = () => 0.45 + 4.2 * rand() ** 9 + 0.6 * rand() ** 2;
+  for (let i = 0; i < 7000; i++) add(v.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).clone(), magnitude());
+  const a = new Vector3(1, 0, 0).cross(GALAXY).normalize();
+  const b = GALAXY.clone().cross(a).normalize();
+  for (let i = 0; i < 6000; i++) {
     const t = rand() * Math.PI * 2;
-    const off = (rand() + rand() + rand() - 1.5) * 0.22;
-    add(a.clone().multiplyScalar(Math.cos(t)).addScaledVector(b, Math.sin(t)).addScaledVector(band, off), 0.6 + rand() * 0.9);
+    const off = (rand() + rand() + rand() + rand() - 2) * 0.16;
+    const dir = a.clone().multiplyScalar(Math.cos(t)).addScaledVector(b, Math.sin(t)).addScaledVector(GALAXY, off);
+    add(dir, 0.35 + 0.9 * rand() ** 4);
   }
   const geo = new BufferGeometry();
   geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
@@ -82,18 +132,25 @@ function buildStars(pixelRatio: number) {
     blending: AdditiveBlending,
     uniforms: { uTime: { value: 0 }, uPixel: { value: pixelRatio } },
     vertexShader: `attribute float size; attribute float phase; attribute vec3 color;
-      uniform float uTime; uniform float uPixel; varying vec3 vColor; varying float vGlow;
+      uniform float uTime; uniform float uPixel;
+      varying vec3 vColor; varying float vSize;
       void main() {
-        vColor = color;
-        vGlow = 0.65 + 0.35 * sin(uTime * (0.8 + fract(phase) * 2.2) + phase);
+        float twinkle = 0.82 + 0.18 * sin(uTime * (0.7 + fract(phase) * 2.5) + phase);
+        vColor = color * twinkle * min(1.0, 0.35 + size * 0.45);
+        vSize = size;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * uPixel * 2.2;
+        gl_PointSize = (size > 2.4 ? size * 4.0 : size * 2.0 + 1.0) * uPixel;
       }`,
-    fragmentShader: `varying vec3 vColor; varying float vGlow;
+    fragmentShader: `varying vec3 vColor; varying float vSize;
       void main() {
-        float d = length(gl_PointCoord - 0.5);
-        float a = smoothstep(0.5, 0.0, d);
-        gl_FragColor = vec4(vColor * a * a * vGlow, 1.0);
+        vec2 p = gl_PointCoord - 0.5;
+        float d = length(p);
+        float big = step(2.4, vSize);
+        // Núcleo nítido con un halo suave; las brillantes, además, un destello en cruz.
+        float core = smoothstep(mix(0.5, 0.16, big), 0.0, d);
+        float halo = big * exp(-d * 9.0) * 0.5;
+        float spikes = big * (exp(-abs(p.x) * 60.0) + exp(-abs(p.y) * 60.0)) * smoothstep(0.5, 0.0, d) * 0.55;
+        gl_FragColor = vec4(vColor * (core * core + halo + spikes), 1.0);
       }`,
   });
   return { points: new Points(geo, mat), uniforms: mat.uniforms };
@@ -173,9 +230,12 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     }),
   );
   scene.add(halo);
+  // El cielo gira con el planeta al arrastrarlo, como si la cámara le diera la vuelta.
   const stars = buildStars(renderer.getPixelRatio());
+  const galaxy = buildGalaxy();
+  galaxy.renderOrder = -2;
   stars.points.renderOrder = -1;
-  scene.add(stars.points);
+  globe.add(galaxy, stars.points);
 
   // Marcador del Chocó: el alfiler rosado del afiche, clavado justo en la costa de Nuquí (la punta del alfiler es el
   // punto de anclaje), con el rótulo encima. No cambia de tamaño: solo late un aro alrededor de la punta.
@@ -219,10 +279,18 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
   const restQ = faceQ(6, -68, 0);
   /** Final del giro: la costa de Nuquí de frente y tierra adentro hacia arriba, como la primera vista del mapa. */
   const arrivalQ = faceQ(ARRIVAL.lat, ARRIVAL.lon, ARRIVAL.bearing);
+  /** Distancia de reposo de la cámara y lo más lejos que se puede alejar (en radios del planeta). */
   const REST_DIST = 3.4;
+  const FAR_DIST = 7.5;
   const state = {
-    dist: 3.4,
+    dist: REST_DIST,
+    /** Distancia a la que va la cámara (rueda o pellizco). */
+    goalDist: REST_DIST,
+    /** Arrastre aún por aplicar (px): el planeta lo sigue con un poco de suavidad. */
+    pending: new Vector2(0, 0),
+    /** Velocidad del arrastre (px/s), para la inercia al soltar. */
     spin: new Vector2(0, 0),
+    lastMove: 0,
     diving: false,
     diveStart: 0,
     fromQ: new Quaternion(),
@@ -276,10 +344,17 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       pinch = Math.hypot(a.x - b.x, a.y - b.y);
+      pinchDist = state.goalDist;
     }
+    state.spin.set(0, 0);
   };
+  let pinchDist = REST_DIST;
+  const atRest = () => state.goalDist <= REST_DIST * 1.01;
+  // Giro por píxel arrastrado: como si se agarrara la superficie (un píxel = lo que mide un píxel sobre el planeta
+  // en la pantalla), un poco menos para que se sienta delicado. Así es igual de suave cerca o lejos.
   const rotateBy = (dx: number, dy: number) => {
-    const k = 0.005 * (state.dist - R * 0.9);
+    const radiusPx = (host.clientHeight / 2 / Math.tan(MathUtils.degToRad(camera.fov / 2))) * (R / Math.sqrt(state.dist ** 2 - R ** 2));
+    const k = 0.7 / Math.max(radiusPx, 50);
     const qy = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), dx * k);
     const qx = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), dy * k);
     globe.quaternion.premultiply(qy).premultiply(qx);
@@ -300,21 +375,37 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinch && d > pinch * 1.15) dive();
+      if (!pinch) return;
+      // Pellizcar acerca o aleja el planeta; al abrir los dedos ya de cerca, se viaja al Chocó.
+      if (d > pinch * 1.15 && atRest()) dive();
+      else state.goalDist = MathUtils.clamp(pinchDist * (pinch / d), REST_DIST, FAR_DIST);
       return;
     }
-    rotateBy(dx, dy);
-    state.spin.set(dx, dy);
+    state.pending.x += dx;
+    state.pending.y += dy;
+    const now = performance.now();
+    const gap = Math.max((now - state.lastMove) / 1000, 0.008);
+    state.lastMove = now;
+    state.spin.lerp(new Vector2(dx / gap, dy / gap), 0.35);
   };
   const onUp = (e: PointerEvent) => {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinch = 0;
+    // Si se quedó quieto antes de soltar, no sigue girando.
+    if (performance.now() - state.lastMove > 90) state.spin.set(0, 0);
     if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6 && pickChoco(e.clientX, e.clientY)) dive();
     downAt = null;
   };
+  // La rueda (o el pellizco del panel táctil) aleja el planeta; al acercarlo hasta su distancia de siempre y
+  // seguir, se viaja al Chocó.
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    if (e.deltaY < 0) dive();
+    if (state.diving || state.ascent) return;
+    if (e.deltaY < 0 && atRest()) {
+      dive();
+      return;
+    }
+    state.goalDist = MathUtils.clamp(state.goalDist * Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), REST_DIST, FAR_DIST);
   };
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
@@ -367,17 +458,20 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
       globe.quaternion.slerpQuaternions(arrivalQ, restQ, MathUtils.smootherstep(t, 0.2, ASCENT.globe + 0.5));
       if (t > ASCENT.globe + 0.5) state.ascent = 0;
     } else {
-      // Solo se mueve si lo arrastran (con algo de inercia); al volver del mapa regresa a la vista de reposo.
-      if (pointers.size === 0 && state.spin.lengthSq() > 0.01) {
-        state.spin.multiplyScalar(Math.exp(-dt * 4));
-        rotateBy(state.spin.x * dt * 6, state.spin.y * dt * 6);
+      // Solo se mueve si lo arrastran: sigue al dedo con suavidad y, al soltarlo, se desliza un poco y se detiene.
+      const follow = 1 - Math.exp(-dt * 12);
+      rotateBy(state.pending.x * follow, state.pending.y * follow);
+      state.pending.multiplyScalar(1 - follow);
+      if (pointers.size === 0 && state.spin.lengthSq() > 1) {
+        rotateBy(state.spin.x * dt * 0.2, state.spin.y * dt * 0.2);
+        state.spin.multiplyScalar(Math.exp(-dt * 2.6));
       }
       if (state.returning >= 0) {
         state.returning += dt;
         globe.quaternion.slerp(restQ, 1 - Math.exp(-dt * 2.2));
         if (state.returning > 4) state.returning = -1;
       }
-      state.dist += (REST_DIST - state.dist) * (1 - Math.exp(-dt * 1.4));
+      state.dist += (state.goalDist - state.dist) * (1 - Math.exp(-dt * 3));
     }
     camera.position.set(0, 0, state.dist);
     camera.lookAt(0, 0, 0);
@@ -406,6 +500,8 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
       state.returning = -1;
       state.spin.set(0, 0);
       state.ascent = performance.now();
+      state.goalDist = REST_DIST;
+      state.pending.set(0, 0);
       state.dist = R + DIVE.handoffKm / EARTH_KM;
       globe.quaternion.copy(arrivalQ);
       host.classList.remove('is-diving');
