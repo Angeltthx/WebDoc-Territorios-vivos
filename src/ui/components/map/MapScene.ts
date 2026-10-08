@@ -14,6 +14,7 @@ import {
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import type { MapPlace } from '../../../content/map';
 import { buildFauna, NATURE_LABEL_HEIGHT } from './fauna';
+import { sticker } from './kit';
 import { buildFlora, buildMist } from './flora';
 import { buildPlaces } from './places';
 import {
@@ -24,8 +25,8 @@ const DIST = { min: 300, max: 1700, start: 950 };
 const PITCH = { min: 5, max: 38, start: 10 };
 
 const SUN_DIR = new Vector3(1, 0.21, 0.26).normalize();
-const HORIZON = new Color('#d4ecf2');
-const ZENITH = new Color('#3d8ed8');
+const HORIZON = new Color('#dcf1ec');
+const ZENITH = new Color('#4aa6c8');
 /** Punto de vista inicial aproximado (frente a Nuquí), para dejar el sol despejado. */
 const START_VIEW = (() => {
   const nuqui = placed.find((p) => p.id === 'nuqui')!;
@@ -34,14 +35,50 @@ const START_VIEW = (() => {
 
 // ───────── Construcción de la escena ─────────
 
+const GLSL_COMMON = `
+    vec3 srgb(vec3 c) { return pow(c, vec3(2.2)); }
+    float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vnoise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), u.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), u.x), u.y);
+    }`;
+
+/** Patrón de hojas del afiche, dibujado en el suelo según la posición (se apaga de lejos para no titilar). */
+const LAND_GLSL = `${GLSL_COMMON}
+  float leafAt(vec2 p, float sx, float sy, float seed) {
+    vec2 cell = floor(p);
+    vec2 f = fract(p) - 0.5;
+    float a = hash2(cell + seed) * 6.2831;
+    vec2 j = (vec2(hash2(cell + seed + 3.1), hash2(cell + seed + 7.7)) - 0.5) * 0.45;
+    vec2 d = mat2(cos(a), -sin(a), sin(a), cos(a)) * (f + j);
+    return 1.0 - smoothstep(0.85, 1.0, length(d / vec2(sx, sy)));
+  }
+  vec3 posterJungle(vec3 base, vec2 xz, float jungle) {
+    vec2 p = xz / 7.0;
+    float fade = 1.0 - smoothstep(0.12, 0.35, max(fwidth(p.x), fwidth(p.y)));
+    float dark = leafAt(p, 0.42, 0.12, 0.0);
+    float light = leafAt(xz / 10.0 + 0.37, 0.38, 0.1, 11.0);
+    vec2 pb = xz / 60.0;
+    float blob = step(0.86, hash2(floor(pb) + 41.0)) * leafAt(pb, 0.32, 0.18, 23.0);
+    float fadeB = 1.0 - smoothstep(0.2, 0.5, max(fwidth(pb.x), fwidth(pb.y)));
+    vec3 c = base;
+    c = mix(c, c * 0.62, dark * jungle * fade);
+    c = mix(c, srgb(vec3(0.20, 0.45, 0.29)), light * jungle * fade * 0.85);
+    c = mix(c, srgb(vec3(0.42, 0.66, 0.29)), blob * jungle * fadeB);
+    return c;
+  }`;
+
 const LAND_COLORS = {
-  sand: new Color('#efdcab'),
+  sand: new Color('#ead9aa'),
   bank: new Color('#cdbb86'),
   rock: new Color('#7d8a6e'),
-  low: new Color('#8cc466'),
-  mid: new Color('#4f9850'),
-  high: new Color('#2f7347'),
-  peak: new Color('#376a52'),
+  // Verdes de la selva del afiche.
+  low: new Color('#356f45'),
+  mid: new Color('#2a5f3d'),
+  high: new Color('#235236'),
+  peak: new Color('#1f4a32'),
   seabed: new Color('#6fc7bd'),
 };
 
@@ -74,7 +111,19 @@ function buildLand() {
   }
   geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  return new Mesh(geo, new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }));
+  const mat = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 });
+  // Dibujo del afiche sobre la selva: hojas oscuras, hojas claras y manchas verde claro.
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLand;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLand = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vLand;${LAND_GLSL}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float jungle = smoothstep(0.004, 0.02, vColor.g - vColor.r * 1.3);
+        diffuseColor.rgb = posterJungle(diffuseColor.rgb, vLand.xz, jungle);`);
+  };
+  return new Mesh(geo, mat);
 }
 
 /** Mar con olas suaves, agua clara cerca de la orilla, espuma en la playa y ríos en calma. */
@@ -105,7 +154,7 @@ function buildSea() {
       float d = texture2D(uShore, clamp(uv, 0.0, 1.0)).r * 1020.0 - 100.0;
       return uv.x < 0.0 ? d - uv.x * uSize.x : d;
     }`;
-  const mat = new MeshStandardMaterial({ color: '#1b6f8a', flatShading: true, roughness: 0.32, metalness: 0.05 });
+  const mat = new MeshStandardMaterial({ color: '#1b6f8a', flatShading: true, roughness: 0.75, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -120,17 +169,27 @@ function buildSea() {
         vSea = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${coastGlsl}`)
+      .replace('#include <common>', `#include <common>\n${coastGlsl}${GLSL_COMMON}`)
       .replace(
         'vec4 diffuseColor = vec4( diffuse, opacity );',
         `float off = seaOff(vSea);
-        vec3 sea = mix(vec3(0.07, 0.36, 0.50), vec3(0.20, 0.66, 0.68), 1.0 - smoothstep(0.0, 520.0, off));
-        float swirl = sin(vSea.x * 0.018 + sin(vSea.z * 0.009 + uTime * 0.15) * 3.0 + uTime * 0.25);
-        sea += smoothstep(0.9, 1.0, swirl) * 0.03;
-        float foam = (1.0 - smoothstep(0.0, 24.0, off + sin(vSea.z * 0.06 + uTime * 1.6) * 5.0)) * smoothstep(-12.0, 0.0, off);
-        sea = mix(sea, vec3(0.93, 0.97, 0.95), foam * 0.85);
-        // Ríos: agua verdosa y quieta.
-        sea = mix(sea, vec3(0.24, 0.52, 0.48), smoothstep(-10.0, -60.0, off));
+        // Turquesa del afiche: más claro junto a la orilla.
+        float near = 1.0 - smoothstep(0.0, 420.0, off);
+        vec3 sea = mix(srgb(vec3(0.090, 0.486, 0.533)), srgb(vec3(0.122, 0.561, 0.592)), smoothstep(2600.0, 700.0, off));
+        sea = mix(sea, srgb(vec3(0.208, 0.682, 0.675)), near);
+        // Remolinos: trazos curvos oscuros (y algunos claros), como los del afiche.
+        vec2 q = vSea.xz * 0.0032;
+        vec2 warp = vec2(vnoise(q * 1.7 + uTime * 0.015), vnoise(q * 1.7 + 5.2 - uTime * 0.015));
+        float n = vnoise(q + warp * 1.7) * 7.0;
+        float stroke = (1.0 - smoothstep(0.06, 0.06 + fwidth(n) * 1.5, abs(fract(n) - 0.5))) * step(0.35, fract(n * 0.37 + 0.2));
+        float n2 = vnoise(q * 2.4 + warp * 2.2 + 9.0) * 9.0;
+        float lightStroke = (1.0 - smoothstep(0.02, 0.02 + fwidth(n2) * 1.5, abs(fract(n2) - 0.5))) * step(0.55, fract(n2 * 0.11));
+        sea = mix(sea, srgb(vec3(0.07, 0.40, 0.45)), stroke * 0.7 * (1.0 - near * 0.4));
+        sea = mix(sea, srgb(vec3(0.42, 0.80, 0.78)), lightStroke * 0.12);
+        float foam = (1.0 - smoothstep(0.0, 22.0, off + sin(vSea.z * 0.06 + uTime * 1.6) * 5.0)) * smoothstep(-12.0, 0.0, off);
+        sea = mix(sea, srgb(vec3(0.85, 0.95, 0.93)), foam * 0.9);
+        // Ríos: agua verde turquesa y quieta.
+        sea = mix(sea, srgb(vec3(0.25, 0.58, 0.55)), smoothstep(-10.0, -60.0, off));
         vec4 diffuseColor = vec4(sea, opacity);`,
       );
   };
@@ -227,15 +286,19 @@ function buildRocks(rand: () => number) {
 export interface MapSceneHandle {
   focus: (id: string) => void;
   select: (id: string | null) => void;
+  /** Pausa o reanuda la escena; al reanudar, la cámara entra desde lo alto, como si bajara del planeta. */
+  setActive: (active: boolean) => void;
   dispose: () => void;
 }
 
 export interface MapSceneOptions {
   onSelect: (place: MapPlace | null) => void;
   onInteract: () => void;
+  /** Empieza en pausa (detrás del planeta de la entrada). */
+  paused?: boolean;
 }
 
-export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapSceneOptions): MapSceneHandle {
+export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false }: MapSceneOptions): MapSceneHandle {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = SRGBColorSpace;
@@ -258,8 +321,9 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
   const fauna = buildFauna(rand);
   scene.add(sky, sea, buildLand(), buildRocks(rand), buildFlora(rand), clouds.group, mist.group, places.group, fauna.group);
 
-  scene.add(new HemisphereLight('#d2ecff', '#4a6a44', 1.25));
-  const key = new DirectionalLight('#fff1d6', 2.3);
+  // Luz de ilustración: pareja y suave, con poca sombra.
+  scene.add(new HemisphereLight('#eaf7f3', '#3a5a40', 2.1));
+  const key = new DirectionalLight('#fff4de', 1.25);
   key.position.set(-0.55, 1, 0.3).multiplyScalar(1000);
   scene.add(key);
 
@@ -295,6 +359,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
     const pin = new Group();
     if (place.kind === 'site') {
       pin.add(new Mesh(pinHead, pinMat), new Mesh(pinTip, pinMat));
+      sticker(pin, 1.1);
       pin.position.copy(place.pos).setY(pinBase(place));
       label.position.set(0, 12, 0);
     } else if (place.kind === 'town') {
@@ -449,8 +514,10 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
   const tmp = new Vector3();
   const bob = new Quaternion();
   let frame = 0;
+  let active = !paused;
   const loop = () => {
     frame = requestAnimationFrame(loop);
+    if (!active) return;
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.1);
     const t = timer.getElapsed();
@@ -513,10 +580,23 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
   const rank = (p: (typeof pins)[number]) =>
     p.place.kind === 'town' ? 0 : p.place.id === selected ? 1 : (p.place.kind === 'site' ? 2 : 3) + p.pin.position.distanceTo(camera.position) / 1e4;
   loop();
+  // En pausa no se dibuja, pero se dejan listos los sombreadores para que la entrada no se trabe.
+  if (paused) {
+    placeCamera();
+    renderer.compile(scene, camera);
+  }
 
   return {
     focus,
     select,
+    setActive: (on) => {
+      if (on && !active) {
+        view.dist = 2600;
+        view.pitch = 42;
+        timer.reset();
+      }
+      active = on;
+    },
     dispose: () => {
       cancelAnimationFrame(frame);
       ro.disconnect();

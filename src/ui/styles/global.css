@@ -647,3 +647,84 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   .map-hint { top: 64px; font-size: 11px; }
   .map-label--site { font-size: 10px; }
 }
+
+/* ───────── Planeta de entrada del mapa (arte del afiche) ───────── */
+.globe-stage {
+  position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: grab;
+  /* Cielo nocturno turquesa con destellos como los asteriscos del afiche. */
+  background:
+    radial-gradient(circle at 50% 55%, rgba(53, 174, 172, 0.25), transparent 55%),
+    radial-gradient(1.5px 1.5px at 12% 22%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 83% 18%, #fff 50%, transparent 51%),
+    radial-gradient(2px 2px at 70% 78%, #fdf6e3 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 22% 80%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 45% 12%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 92% 52%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 6% 58%, #fff 50%, transparent 51%),
+    linear-gradient(#0c3440, #082730 60%, #061d25);
+  transition: opacity 1.1s ease, visibility 1.1s;
+}
+.globe-stage::before, .globe-stage::after {
+  content: '✳'; position: absolute; color: #fdf6e3; opacity: 0.8; pointer-events: none;
+  animation: twinkle 3.2s ease-in-out infinite;
+}
+.globe-stage::before { left: 16%; top: 30%; font-size: 22px; }
+.globe-stage::after { right: 14%; top: 62%; font-size: 16px; animation-delay: 1.4s; }
+@keyframes twinkle { 50% { opacity: 0.25; transform: scale(0.8) rotate(20deg); } }
+.globe-stage canvas { display: block; }
+.globe-stage.is-diving { cursor: default; }
+.map-screen.is-map .globe-stage { opacity: 0; visibility: hidden; pointer-events: none; }
+.map-screen.is-loading .globe-stage { opacity: 0; }
+.globe-labels { position: absolute; inset: 0; pointer-events: none; }
+/* Los rótulos de la costa aparecen cuando el planeta ya se fue. */
+.map-labels { transition: opacity 0.8s ease 0.6s; }
+.map-screen:not(.is-map) .map-labels { opacity: 0; transition-delay: 0s; }
+
+.globe-label {
+  white-space: nowrap; border: 0; pointer-events: none; transition: opacity 0.4s;
+  font: 700 12px var(--serif); letter-spacing: 0.14em; text-transform: uppercase;
+}
+.globe-label--choco {
+  pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 5px 14px; border-radius: 999px; background: #fdf6e3; color: #1f4a35;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); margin-bottom: 26px;
+  scale: var(--pulse, 1); transition: scale 0.2s, background 0.2s;
+}
+.globe-label--choco.is-hover, .globe-label--choco:hover { background: #e2456f; color: #fff; }
+/* Alfiler rosado del afiche, debajo del rótulo. */
+.globe-pin {
+  position: absolute; left: 50%; top: 100%; width: 14px; height: 14px; margin: 6px 0 0 -7px;
+  border-radius: 50% 50% 50% 0; background: #e2456f; border: 2px solid #fff; rotate: -45deg;
+}
+.globe-label--country { color: #fdf6e3; font-size: 15px; letter-spacing: 0.3em; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+.globe-label--sea { color: #d9f2ee; font: italic 400 15px var(--serif); letter-spacing: 0.04em; text-transform: none; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.globe-label--town { padding: 3px 9px; border-radius: 999px; background: #fdf6e3; color: #1f4a35; font-size: 10px; }
+
+.globe-title {
+  position: absolute; z-index: 3; left: var(--gutter); bottom: calc(var(--gutter) + 8px); pointer-events: none;
+  transition: opacity 0.8s ease, transform 0.8s var(--ease);
+}
+.map-screen.is-diving .globe-title, .map-screen.is-map .globe-title, .map-screen.is-loading .globe-title { opacity: 0; transform: translateY(16px); }
+.globe-title__hint {
+  margin-top: 10px; display: inline-block; padding: 7px 14px; border-radius: 999px;
+  background: rgba(15, 35, 28, 0.6); backdrop-filter: blur(8px); font-size: 12px; letter-spacing: 0.08em;
+}
+
+/* Título del afiche: "Nuquí" en letras gruesas con franjas verde, crema y naranja; "Chocó" en letra pincel. */
+.poster-title { display: flex; flex-direction: column; line-height: 0.85; }
+.poster-title__big {
+  font: 700 clamp(64px, 11vw, 150px) 'Fredoka', var(--sans); letter-spacing: 0.01em;
+  background: linear-gradient(#b9d97c 0 34%, #fdf6e3 34% 52%, #f2a46a 52% 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)
+    drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
+}
+.poster-title__script {
+  margin: -0.15em 0 0 0.6em; font: 400 clamp(40px, 6.5vw, 92px) 'Kaushan Script', cursive; color: #fff;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 640px) {
+  .globe-title { left: 16px; bottom: 16px; }
+  .globe-label--country { font-size: 12px; }
+}

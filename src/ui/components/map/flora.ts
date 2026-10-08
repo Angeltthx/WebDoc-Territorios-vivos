@@ -3,7 +3,7 @@
 // Cada especie es una sola malla repetida (InstancedMesh), así cientos de plantas cuestan poco.
 
 import { type BufferGeometry, Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D, Vector3 } from 'three';
-import { BALL, BLADE, ORB, merge, paint, part, pole } from './kit';
+import { BALL, BLADE, BOX, ORB, merge, paint, part, pole } from './kit';
 import { RIVER_MOUTHS, heightAt, isFree, nature, placed, randomPoint, riverReach, shore } from './terrain';
 
 const TAU = Math.PI * 2;
@@ -17,7 +17,7 @@ function palmGeo() {
   const top: [number, number, number] = [4.2, 18.2, 0];
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * TAU;
-    g.push(part(BLADE, i % 2 ? '#3f8f45' : '#4f9f4a', { p: top, r: [0.35 + (i % 3) * 0.12, a, 0], s: [1.3, 0.22, 6.5], o: 'YXZ' }));
+    g.push(part(BLADE, i % 2 ? '#2f6b45' : '#3d7f4c', { p: top, r: [0.35 + (i % 3) * 0.12, a, 0], s: [1.3, 0.22, 6.5], o: 'YXZ' }));
   }
   for (let i = 0; i < 3; i++) g.push(part(ORB, '#7a5a2e', { p: [4.2 + Math.cos(i * 2.1) * 0.9, 17.2, Math.sin(i * 2.1) * 0.9], s: 0.9 }));
   return merge(g);
@@ -27,7 +27,7 @@ function bananaGeo() {
   const g: BufferGeometry[] = [pole('#7fa84a', [0, 0, 0], [0, 6.5, 0], 1.1)];
   for (let i = 0; i < 7; i++) {
     const a = (i / 7) * TAU + i * 0.3;
-    g.push(part(BLADE, i % 2 ? '#6cbf5a' : '#5aae4c', { p: [0, 6.5, 0], r: [-0.55 + (i % 3) * 0.45, a, 0], s: [2.1, 0.25, 4.6], o: 'YXZ' }));
+    g.push(part(BLADE, i % 2 ? '#6aa84a' : '#5a9a45', { p: [0, 6.5, 0], r: [-0.55 + (i % 3) * 0.45, a, 0], s: [2.1, 0.25, 4.6], o: 'YXZ' }));
   }
   return merge(g);
 }
@@ -35,8 +35,8 @@ function bananaGeo() {
 function roundTreeGeo() {
   return merge([
     pole('#7a5a3c', [0, 0, 0], [0, 11, 0], 1.6),
-    part(BALL, '#5aa653', { p: [0, 16, 0], s: [9, 8, 9] }),
-    part(BALL, '#66b25a', { p: [4, 13, 3], s: [5.5, 5, 5.5] }),
+    part(BALL, '#2f6b45', { p: [0, 16, 0], s: [9, 8, 9] }),
+    part(BALL, '#3d7f4c', { p: [4, 13, 3], s: [5.5, 5, 5.5] }),
   ]);
 }
 
@@ -46,7 +46,7 @@ function ceibaGeo() {
     const a = (i / 4) * TAU + 0.4;
     g.push(pole('#86705a', [Math.cos(a) * 5, 0, Math.sin(a) * 5], [0, 7, 0], 1));
   }
-  g.push(part(BALL, '#3f8b4c', { p: [0, 36, 0], s: [19, 5.5, 19] }), part(BALL, '#4a9852', { p: [3, 40, -2], s: [12, 4.5, 12] }));
+  g.push(part(BALL, '#2a5f3d', { p: [0, 36, 0], s: [19, 5.5, 19] }), part(BALL, '#3d7f4c', { p: [3, 40, -2], s: [12, 4.5, 12] }));
   return merge(g);
 }
 
@@ -60,15 +60,38 @@ function mangroveGeo() {
   return merge(g);
 }
 
+/** Flor de cinco pétalos con el centro amarillo, como las del afiche, mirando hacia arriba. */
+function petals(g: BufferGeometry[], color: string, x: number, y: number, z: number, r: number) {
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * TAU;
+    g.push(part(ORB, color, { p: [x + Math.cos(a) * r * 0.75, y, z + Math.sin(a) * r * 0.75], r: [0, -a, 0], s: [r * 0.7, r * 0.18, r * 0.45] }));
+  }
+  g.push(part(ORB, '#f7cf3d', { p: [x, y + r * 0.12, z], s: r * 0.32 }));
+}
+
 function flowerShrubGeo(flower: string) {
-  const g: BufferGeometry[] = [part(BALL, '#4d9a4a', { p: [0, 2.2, 0], s: [3.8, 2.8, 3.8] })];
-  for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * TAU;
-    const up = 0.3 + (i % 3) * 0.25;
-    g.push(part(ORB, flower, { p: [Math.cos(a) * 3.2, 2.4 + up * 2.6, Math.sin(a) * 3.2], s: [1.2, 0.5, 1.2] }));
-    g.push(part(ORB, '#f7e27a', { p: [Math.cos(a) * 3.4, 2.7 + up * 2.6, Math.sin(a) * 3.4], s: 0.35 }));
+  const g: BufferGeometry[] = [part(BALL, '#2f6b45', { p: [0, 2.2, 0], s: [4.2, 2.8, 4.2] })];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * TAU + 0.4;
+    petals(g, flower, Math.cos(a) * 2.6, 4.3 + (i % 2) * 0.6, Math.sin(a) * 2.6, 2.1);
+  }
+  petals(g, flower, 0, 5.4, 0, 2.4);
+  return merge(g);
+}
+
+/** Helecho: hojas largas y bajas que salen del centro (las del afiche). */
+function fernGeo() {
+  const g: BufferGeometry[] = [];
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * TAU + (i % 2) * 0.2;
+    g.push(part(BLADE, i % 2 ? '#2f6b45' : '#3d7f4c', { p: [0, 0.6, 0], r: [-0.35 - (i % 3) * 0.12, a, 0], s: [1.2, 0.15, 5.5], o: 'YXZ' }));
   }
   return merge(g);
+}
+
+/** Hoja grande verde claro tendida en el suelo (las manchas claras del afiche). */
+function bigLeafGeo() {
+  return merge([part(ORB, '#6aa84a', { p: [0, 0.6, 0], s: [7, 0.5, 4.6] }), part(BOX, '#4f8f3c', { p: [0, 1, 0], s: [12, 0.3, 0.4] })]);
 }
 
 type Sampler = () => { x: number; z: number; s: number } | null;
@@ -155,8 +178,18 @@ export function buildFlora(rand: () => number) {
   }));
 
   // Matas con flores rosadas y naranjas cerca de la costa.
-  for (const color of ['#ef86bd', '#f6a03c', '#e9547f']) {
-    group.add(scatter(flowerShrubGeo(color), 130, rand, () => {
+  // Helechos y hojas grandes en la llanura.
+  group.add(scatter(fernGeo(), 900, rand, () => {
+    const p = rand() < 0.5 ? nearAnchor(30, 260) : inBand(25, 900);
+    return p && isFree(p.x, p.z, 14) ? { x: p.x, z: p.z, s: 1.6 + rand() * 1.4 } : null;
+  }, 0.2));
+  group.add(scatter(bigLeafGeo(), 260, rand, () => {
+    const p = inBand(30, 700);
+    return p && isFree(p.x, p.z, 14) ? { x: p.x, z: p.z, s: 1 + rand() * 0.8 } : null;
+  }, 0.15));
+
+  for (const color of ['#ef86bd', '#f39a5a', '#f2b6c9']) {
+    group.add(scatter(flowerShrubGeo(color), 150, rand, () => {
       const p = rand() < 0.6 ? nearAnchor(30, 180) : inBand(20, 320);
       return p && isFree(p.x, p.z, 14) ? { x: p.x, z: p.z, s: 0.9 + rand() * 0.6 } : null;
     }, 0.1));

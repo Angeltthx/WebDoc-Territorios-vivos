@@ -3,9 +3,9 @@
 
 import {
   BoxGeometry, type BufferGeometry, Color, type ColorRepresentation, ConeGeometry, CylinderGeometry, Euler, Float32BufferAttribute,
-  type EulerOrder, Group, IcosahedronGeometry, Matrix4, Mesh, MeshStandardMaterial, Quaternion, SphereGeometry, Vector3,
+  BackSide, BufferGeometry as Geometry, type EulerOrder, Group, IcosahedronGeometry, MeshBasicMaterial, type Object3D, Matrix4, Mesh, MeshStandardMaterial, Quaternion, SphereGeometry, Vector3,
 } from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 type V3 = [number, number, number];
 
@@ -36,6 +36,42 @@ export const merge = (parts: BufferGeometry[]) => mergeGeometries(parts)!;
 export const paint = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
 
 export const solid = (parts: BufferGeometry[]) => new Mesh(merge(parts), paint);
+
+// ───────── Borde blanco tipo calcomanía ─────────
+// Las ilustraciones del afiche tienen un contorno blanco. Se imita con una copia de la figura, un poco
+// más gruesa, pintada de blanco y vista por dentro (técnica de "casco invertido").
+
+const outlineMats = new Map<number, MeshBasicMaterial>();
+function outlineMat(width: number) {
+  let m = outlineMats.get(width);
+  if (!m) {
+    m = new MeshBasicMaterial({ color: '#fffdf6', side: BackSide });
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+transformed += normalize(objectNormal) * ${width.toFixed(3)};`);
+    };
+    outlineMats.set(width, m);
+  }
+  return m;
+}
+
+/** Agrega el borde blanco a todas las mallas de una figura (incluidas las partes que se mueven). */
+export function sticker(root: Object3D, width = 0.45) {
+  const meshes: Mesh[] = [];
+  root.traverse((o) => {
+    if ((o as Mesh).isMesh && !o.userData.outline) meshes.push(o as Mesh);
+  });
+  for (const mesh of meshes) {
+    const g = new Geometry();
+    g.setAttribute('position', mesh.geometry.attributes.position);
+    const smooth = mergeVertices(g, 1e-3);
+    smooth.computeVertexNormals();
+    const hull = new Mesh(smooth, outlineMat(width));
+    hull.userData.outline = true;
+    mesh.add(hull);
+  }
+  return root;
+}
 
 // Formas base reutilizables.
 export const BALL = new IcosahedronGeometry(1, 1);

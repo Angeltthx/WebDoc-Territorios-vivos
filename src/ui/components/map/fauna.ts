@@ -3,7 +3,7 @@
 // Las figuras son más grandes que en la realidad, como las ilustraciones del afiche, para que se distingan.
 
 import { type BufferGeometry, Group, MathUtils, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three';
-import { BALL, BLADE, CONE, ORB, merge, paint, part, pole, solid } from './kit';
+import { BALL, BLADE, CONE, ORB, merge, paint, part, pole, solid, sticker } from './kit';
 import { RAIL, RIVER_MOUTHS, doorTo, facing, heightAt, nature, offshoreRaw, placed, railAt, riverReach, shore, smoothstep } from './terrain';
 
 const TAU = Math.PI * 2;
@@ -64,6 +64,11 @@ function whaleBody() {
     part(ORB, '#dfe8ef', { p: [0, -2.6, 1.5], s: [6.4, 4.6, 25] }),
     part(CONE, dark, { p: [0, 0.6, -31], r: [-Math.PI / 2, 0, 0], s: [4.2, 18, 3.4] }),
   ];
+  // manchas claras del costado, como en la ilustración del afiche
+  for (let i = 0; i < 14; i++) {
+    const side = i % 2 ? 1 : -1;
+    g.push(part(ORB, '#e8eef4', { p: [side * (5.6 + (i % 3) * 0.6), -1 + (i % 4) * 0.9, -6 + i * 1.6], s: 0.55 }));
+  }
   // tubérculos de la cabeza
   for (let i = 0; i < 6; i++) g.push(part(ORB, '#1f2c45', { p: [(i % 2 ? 1 : -1) * 1.6, 5.4, 15 + i * 2], s: 0.8 }));
   // aletas pectorales largas y claras, y la cola
@@ -78,9 +83,9 @@ function buildWhales(spray: Spray): Living {
   const base = byId('ballena').pos.clone();
   const group = new Group();
   const mother = new Group();
-  mother.add(whaleBody());
+  mother.add(sticker(whaleBody(), 0.6));
   const calf = new Group();
-  calf.add(whaleBody());
+  calf.add(sticker(whaleBody(), 0.6));
   calf.scale.setScalar(0.5);
   group.add(mother, calf);
   // Lancha de avistamiento, a distancia respetuosa.
@@ -145,6 +150,7 @@ function buildTurtle(): Living {
     turtle.add(f);
     flippers.push(f);
   }
+  sticker(turtle, 0.4);
   turtle.scale.setScalar(1.4);
   const update = (t: number) => {
     const a = t * 0.12;
@@ -174,7 +180,7 @@ function buildCrab(): Living {
     }
   }
   const crab = new Group();
-  crab.add(solid(g));
+  crab.add(sticker(solid(g), 0.35));
   crab.scale.setScalar(1.5);
   const update = (t: number) => {
     const k = Math.sin(t * 0.5) * 28;
@@ -222,6 +228,7 @@ function buildPava(): Living {
     part(ORB, '#f0e6d8', { p: [-1.2, 0.4, 1], s: 0.45 }),
   ]));
   bird.add(head);
+  sticker(bird, 0.3);
   bird.position.set(-13, 29.5, 1.6);
   bird.rotation.y = -Math.PI / 2 + 0.4;
   bird.scale.setScalar(1.25);
@@ -260,7 +267,7 @@ function buildFrog(): Living {
     g.push(part(ORB, '#2a1a14', { p: [side * 3.6, 1.6, -1.8], s: [1.6, 1.3, 3.6] }), part(ORB, '#e8452c', { p: [side * 3.9, 2.4, -1.4], s: 0.7 }));
     g.push(pole('#2a1a14', [side * 2.6, 2.2, 3], [side * 3.2, 0, 4.4], 0.6));
   }
-  frog.add(solid(g));
+  frog.add(sticker(solid(g), 0.3));
   frog.scale.setScalar(1.6);
   frog.position.set(-6, 8.2, 0);
   frog.rotation.y = -Math.PI / 2;
@@ -294,6 +301,31 @@ function buildCacao(rand: () => number) {
     group.add(tree);
   }
   return group;
+}
+
+// ───────── Manglar del afiche ─────────
+
+/** El manglar del afiche: ramas coral anaranjadas que se abren como un abanico. */
+function buildPosterMangrove() {
+  const p = byId('manglar').pos;
+  const g: BufferGeometry[] = [];
+  const branch = (from: Vector3, dir: Vector3, len: number, r: number, depth: number) => {
+    const to = from.clone().addScaledVector(dir, len);
+    g.push(pole(depth % 2 ? '#e0603a' : '#ea7448', [from.x, from.y, from.z], [to.x, to.y, to.z], r));
+    if (depth === 0) {
+      g.push(part(ORB, '#f08a5a', { p: [to.x, to.y, to.z], s: r * 1.6 }));
+      return;
+    }
+    for (const turn of [-0.55, 0.5]) {
+      const d = dir.clone().applyAxisAngle(new Vector3(0, 0, 1), turn).applyAxisAngle(new Vector3(0, 1, 0), turn * 0.8).normalize();
+      branch(to, d, len * 0.72, r * 0.7, depth - 1);
+    }
+  };
+  branch(new Vector3(0, 0, 0), new Vector3(0, 1, 0), 9, 1.3, 4);
+  const tree = solid(g);
+  tree.position.set(p.x, Math.max(heightAt(p.x, p.z), 0) - 0.5, p.z);
+  tree.scale.setScalar(1.4);
+  return tree;
 }
 
 // ───────── Aves ─────────
@@ -600,7 +632,7 @@ export function buildFauna(rand: () => number): Living {
   const spray = new Spray(90);
   const parts: Living[] = [buildWhales(spray), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand, spray), buildButterflies(rand)];
   const group = new Group();
-  group.add(spray.group, buildCacao(rand), ...parts.map((p) => p.group));
+  group.add(spray.group, buildCacao(rand), buildPosterMangrove(), ...parts.map((p) => p.group));
   return {
     group,
     update: (t, dt) => {

@@ -3,7 +3,7 @@
 // También las embarcaciones: lanchas que van y vienen entre pueblos y champas (canoas) de pescadores.
 
 import { type BufferGeometry, Group, Mesh, MeshBasicMaterial, Object3D, Vector3 } from 'three';
-import { BOX, CONE, CYL, ORB, merge, paint, part, person, pole, solid, stiltHouse } from './kit';
+import { BOX, CONE, CYL, ORB, merge, paint, part, person, pole, solid, stiltHouse, sticker } from './kit';
 import type { Living } from './fauna';
 import type { TownId } from '../../../content/map';
 import { RAIL, doorTo, heightAt, offshore, placeNear, placed, railAt, riverReach, shore } from './terrain';
@@ -222,6 +222,7 @@ function site(id: string): Built {
       base.position.y += 2;
       drummer.group.position.set(6, 0, -6);
       drum.position.set(3.6, 0, -6);
+      for (const who of [woman.group, man.group, drummer.group]) sticker(who, 0.3);
       base.add(woman.group, man.group, drummer.group, drum);
       group.add(base);
       update = (t) => {
@@ -247,6 +248,14 @@ function site(id: string): Built {
         skirt: { color: '#2f56a6', flare: 3.4, trim: '#f3efe6' },
         head: { kind: 'wrap', colors: ['#f39a2c', '#f7c548', '#e2456f'] },
       });
+      // Vestido azul de pepas blancas, como en el afiche.
+      chachita.group.add(solid(Array.from({ length: 18 }, (_, i) => {
+        const a = (i / 18) * Math.PI * 2 * 2.5;
+        const y = 1.2 + (i % 6) * 1.1;
+        const r = 3.4 * (1 - (y - 0.5) / 7.4) + 0.12;
+        return part(ORB, '#f3efe6', { p: [Math.cos(a) * r, y, Math.sin(a) * r], s: 0.32 });
+      })));
+      sticker(chachita.group, 0.3);
       chachita.group.scale.setScalar(1.3);
       at(chachita.group, -10, -4, FACE_SEA);
       group.add(chachita.group);
