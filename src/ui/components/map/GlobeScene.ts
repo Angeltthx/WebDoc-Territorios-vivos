@@ -8,7 +8,7 @@ import {
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ASCENT, DIVE, diveAltitude, fovs, type Handoff } from './dive';
-import { ARRIVAL, arrivalBearing } from './terrain';
+import { ARRIVAL } from './terrain';
 import { DUSK_GLSL, REGION, isChoco, posterTexture, regionCanvas, worldCanvas } from './posterArt';
 
 const R = 1;
@@ -161,8 +161,7 @@ function buildStars(pixelRatio: number) {
 /**
  * El sol de la tarde visto desde el espacio: se está poniendo en Nuquí, bajo (4,5°) sobre el Pacífico hacia el
  * oeste (algo al sur), como el ocaso real de allí en octubre. Nuquí queda justo en la franja del atardecer, con la misma luz naranja
- * que en la costa, y al girar el planeta se ve el sol. (En la costa la cámara mira en diagonal y el sol se corre hacia
- * el mar abierto que queda en el cuadro; desde aquí arriba no se nota.)
+ * que en la costa (allá el sol queda a espaldas de la cámara), y al girar el planeta se ve el sol escondiéndose detrás.
  */
 const SUN_GLOBE = (() => {
   const out = latLonToVec(ARRIVAL.lat, ARRIVAL.lon).normalize();
@@ -497,8 +496,6 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     aspect = w / Math.max(h, 1);
     camera.aspect = aspect;
     camera.fov = fovs(aspect).globe;
-    // La costa encuadra según la forma de la pantalla: el planeta entrega la vista con ese mismo rumbo.
-    arrivalQ.copy(faceQ(ARRIVAL.lat, ARRIVAL.lon, arrivalBearing(aspect)));
     camera.updateProjectionMatrix();
   };
   const ro = new ResizeObserver(resize);

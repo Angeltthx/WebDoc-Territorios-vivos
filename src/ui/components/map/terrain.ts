@@ -334,42 +334,23 @@ export const nature = MAP_NATURE.map(toPlaced);
  * (radianes desde el norte, hacia el este). El planeta termina su viaje mirando ese punto desde arriba, con ese rumbo
  * hacia arriba en la pantalla, igual que la primera imagen del mapa.
  */
-/**
- * La cámara no mira la costa de frente sino en diagonal, desde el noroeste y hacia el sur, a lo largo de la costa:
- * así, a la derecha del cuadro queda el mar abierto con el sol de la tarde y su reflejo, y a la izquierda la costa.
- * Ángulo (alrededor del eje vertical) entre "hacia el mar" y la dirección desde el punto mirado hacia la cámara.
- */
-export const VIEW_YAW = MathUtils.degToRad(-42);
 const UP = new Vector3(0, 1, 0);
-/** Dirección horizontal desde el punto mirado hacia la cámara, en un punto de la costa con dirección al mar `sea`. */
-export const viewOffset = (sea: Vector3, out = new Vector3()) => out.copy(sea).applyAxisAngle(UP, VIEW_YAW);
 /**
- * En pantallas angostas (celular en vertical) la cámara, desde el mismo sitio, mira un poco más a la derecha, hacia el
- * mar abierto: así el sol y su reflejo siguen dentro del cuadro. Ángulo de ese giro de la mirada.
- */
-export const viewTurn = (aspect: number) => MathUtils.degToRad(-17) * MathUtils.clamp((1.25 - aspect) / 0.7, 0, 1);
-/** Rumbo de la vista sobre Nuquí (hacia arriba en la pantalla cuando se mira desde lo alto), para la posta del planeta. */
-export function arrivalBearing(aspect = 16 / 9) {
-  const off = viewOffset(railAt(placed.find((p) => p.id === 'nuqui')!.s).sea).applyAxisAngle(UP, viewTurn(aspect));
-  return Math.atan2(-off.x, off.z);
-}
-
-/**
- * Dirección hacia el sol de la tarde (en la escena: x este, y arriba, z sur). Se fija desde la vista inicial frente a
- * Nuquí: bajo y a la derecha del cuadro, sobre el mar abierto. El planeta usa la misma, para que la luz coincida.
+ * Dirección hacia el sol de la tarde (en la escena: x este, y arriba, z sur): bajo sobre el Pacífico, a espaldas de la
+ * cámara (que mira la costa de frente desde el mar), un poco corrido hacia el sur. Alumbra la costa de frente.
  */
 export const SUN_DIR = (() => {
   const nuqui = placed.find((p) => p.id === 'nuqui')!;
-  const look = viewOffset(railAt(nuqui.s).sea).negate();
-  const side = look.applyAxisAngle(UP, MathUtils.degToRad(-27)); // a la derecha de la vista
-  const elev = MathUtils.degToRad(4.5);
-  return new Vector3(side.x * Math.cos(elev), Math.sin(elev), side.z * Math.cos(elev)).normalize();
+  const toSea = railAt(nuqui.s).sea.clone().applyAxisAngle(UP, MathUtils.degToRad(-18));
+  const elev = MathUtils.degToRad(9);
+  return new Vector3(toSea.x * Math.cos(elev), Math.sin(elev), toSea.z * Math.cos(elev)).normalize();
 })();
+
 export const ARRIVAL = (() => {
   const s = placed.find((p) => p.id === 'nuqui')!.s;
   const r = railAt(s);
   const t = r.pos.clone().addScaledVector(r.sea, -170);
-  return { s, ...sceneToLatLon(t.x, t.z), bearing: arrivalBearing() };
+  return { s, ...sceneToLatLon(t.x, t.z), bearing: Math.atan2(-r.sea.x, r.sea.z) };
 })();
 
 // ───────── Ríos ─────────
