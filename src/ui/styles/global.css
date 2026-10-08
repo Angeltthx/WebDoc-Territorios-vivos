@@ -558,3 +558,69 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ───────── Mapa 3D de prueba (/mapa) ─────────
+   Rótulos como los del afiche: pueblos en píldora blanca con letra serif verde; sitios en etiqueta rosada. */
+.map-screen { position: fixed; inset: 0; overflow: hidden; background: #cfe8f0; }
+.map-stage { position: absolute; inset: 0; touch-action: none; cursor: grab; }
+.map-stage:active { cursor: grabbing; }
+.map-stage canvas { display: block; }
+.map-labels { position: absolute; inset: 0; pointer-events: none; }
+.map-label {
+  pointer-events: auto; border: 0; white-space: nowrap; line-height: 1.15;
+  box-shadow: 0 3px 12px rgba(10, 40, 40, 0.25); transition: opacity 0.3s, translate 0.25s var(--ease), scale 0.25s var(--ease), background 0.25s;
+}
+.map-label--town {
+  padding: 5px 14px; border-radius: 999px; background: #fffdf4; color: #1f4a35;
+  font: 700 clamp(12px, 1.3vw, 16px) var(--serif); letter-spacing: 0.14em; text-transform: uppercase;
+}
+.map-label--site {
+  margin-top: calc(var(--lift, 0px) * -1); padding: 4px 8px; border-radius: 4px; background: #e2456f; color: #fff;
+  font: 600 11px var(--serif); letter-spacing: 0.02em;
+}
+/* Línea que une el rótulo con su alfiler cuando sube para no pisar a otro. */
+.map-label--site::after {
+  content: ''; position: absolute; left: 50%; top: 100%; width: 1.5px; height: var(--lift, 0px);
+  background: #e2456f; pointer-events: none;
+}
+/* El renderizador de rótulos ocupa `transform`; el realce usa `translate` y `scale`. */
+.map-label:hover, .map-label.is-selected { translate: 0 -3px; scale: 1.06; }
+.map-label--site.is-selected { background: #b8264e; }
+.map-label--town.is-selected { background: var(--gold); }
+
+.map-screen .topbar .chip { background: rgba(15, 35, 28, 0.6); }
+.map-screen .topbar .ghost-link { min-height: 0; padding: 6px 12px; border-radius: 7px; background: rgba(15, 35, 28, 0.6); backdrop-filter: blur(8px); text-shadow: none; }
+
+.map-card {
+  position: absolute; z-index: 6; left: var(--gutter); bottom: 86px; width: min(340px, calc(100vw - 32px));
+  padding: 18px 20px 16px; border-radius: 12px; background: rgba(15, 35, 28, 0.82); backdrop-filter: blur(10px);
+  animation: rise 0.4s var(--ease) both;
+}
+.map-card__title { margin-top: 6px; font: 700 22px/1.2 var(--serif); }
+.map-card__handle { display: inline-block; margin-top: 8px; color: #f6b8c9; text-decoration: none; font-size: 14px; }
+.map-card__handle:hover { text-decoration: underline; }
+.map-card__close {
+  position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; border: 0; border-radius: 50%;
+  background: none; font-size: 22px; line-height: 1;
+}
+.map-card__close:hover { background: rgba(255, 255, 255, 0.12); }
+
+.map-hint {
+  position: absolute; z-index: 4; left: 50%; top: 72px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
+  padding: 7px 14px; border-radius: 999px; background: rgba(15, 35, 28, 0.6); backdrop-filter: blur(8px);
+  font-size: 12px; text-align: center; pointer-events: none; transition: opacity 0.6s ease;
+}
+.map-hint.is-hidden { opacity: 0; }
+
+.map-towns {
+  position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; justify-content: center;
+  padding: 18px var(--gutter) max(14px, env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, rgba(8, 40, 50, 0.55));
+}
+.map-towns .tab { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); }
+
+@media (max-width: 640px) {
+  .map-card { bottom: 70px; }
+  .map-hint { top: 64px; font-size: 11px; }
+  .map-label--site { font-size: 10px; }
+}
