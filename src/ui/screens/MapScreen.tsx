@@ -24,6 +24,15 @@ export default function MapScreen() {
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
 
+  // Página de prueba: que los buscadores no la indexen.
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, []);
+
   useEffect(() => {
     // Armar las escenas toma un momento: primero se pinta el aviso de carga y luego se construyen.
     // La costa queda lista (en pausa) detrás del planeta, para que la llegada sea inmediata.

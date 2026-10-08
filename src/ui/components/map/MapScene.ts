@@ -380,6 +380,15 @@ function buildSea(region: RegionUniforms) {
         vec3 col = mix(body, sky, fres);
         // Brillo del sol sobre las olas.
         col += vec3(1.0, 0.7, 0.4) * (pow(sd, 500.0) * 2.2 + pow(sd, 50.0) * 0.12);
+        // El sol está a espaldas de quien mira: no hay camino de luz, pero el mar picado lo devuelve igual. Las caras
+        // de las olas que miran al sol (y a la cámara) se encienden de dorado, y algunas facetas centellean.
+        vec3 Nc = normalize(vec3(-g.x * 8.0, 1.0, -g.y * 8.0));
+        float near = 1.0 - smoothstep(3.0, 12.0, foot);
+        float face = max(dot(Nc, uSun), 0.0);
+        col += srgb(vec3(1.0, 0.5, 0.22)) * pow(face, 3.0) * 0.3 * near;
+        float glit = pow(max(dot(Nc, normalize(uSun + V)), 0.0), 70.0);
+        glit *= smoothstep(0.35, 0.8, vnoise(vSea.xz * 0.5 + vec2(uTime * 0.9, -uTime * 0.6)));
+        col += vec3(1.0, 0.68, 0.34) * glit * 3.2 * near;
 
         // Espuma: la orilla y las olas que llegan a la playa.
         float n = vnoise(vSea.xz * 0.11 + vec2(uTime * 0.06, 0.0));
