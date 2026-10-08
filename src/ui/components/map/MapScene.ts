@@ -6,8 +6,8 @@
 // y el sur (Coquí) a la derecha, como en el afiche. Ver `terrain.ts` para las coordenadas.
 
 import {
-  BackSide, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute, FloatType,
-  Fog, Group, HemisphereLight, IcosahedronGeometry, MathUtils, Mesh, MeshStandardMaterial, NearestFilter, Object3D,
+  BackSide, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
+  Fog, Group, HemisphereLight, IcosahedronGeometry, MathUtils, Mesh, MeshStandardMaterial, LinearFilter, Object3D, UnsignedByteType,
   PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster, RedFormat, SRGBColorSpace, Scene, ShaderMaterial,
   SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer,
 } from 'three';
@@ -17,7 +17,7 @@ import { buildFauna, NATURE_LABEL_HEIGHT } from './fauna';
 import { buildFlora, buildMist } from './flora';
 import { buildPlaces } from './places';
 import {
-  COAST_SOFT, GRID, HEIGHTS, K, Z_LIMIT, coastAt, coastX, nature, placed, rng, smoothstep, valueNoise, zOf, type PlacedPlace,
+  GRID, HEIGHTS, RAIL, SHORE_FIELD, nature, placeNear, placed, railAt, rng, shore, smoothstep, valueNoise, type PlacedPlace,
 } from './terrain';
 
 const DIST = { min: 300, max: 1700, start: 950 };
@@ -27,13 +27,17 @@ const SUN_DIR = new Vector3(1, 0.21, 0.26).normalize();
 const HORIZON = new Color('#d4ecf2');
 const ZENITH = new Color('#3d8ed8');
 /** Punto de vista inicial aproximado (frente a Nuquí), para dejar el sol despejado. */
-const START_VIEW = new Vector3(-1300, 200, -500);
+const START_VIEW = (() => {
+  const nuqui = placed.find((p) => p.id === 'nuqui')!;
+  return nuqui.pos.clone().addScaledVector(nuqui.sea, 900).setY(170);
+})();
 
 // ───────── Construcción de la escena ─────────
 
 const LAND_COLORS = {
   sand: new Color('#efdcab'),
   bank: new Color('#cdbb86'),
+  rock: new Color('#7d8a6e'),
   low: new Color('#8cc466'),
   mid: new Color('#4f9850'),
   high: new Color('#2f7347'),
@@ -54,10 +58,11 @@ function buildLand() {
     const z = pos.getZ(i);
     const h = HEIGHTS[i];
     pos.setY(i, h);
-    const d = x - coastX(z);
+    const d = shore(x, z);
     if (d < 0 || h < -0.5) c.copy(LAND_COLORS.seabed);
     else if (h < 2.2 && d > 60) c.copy(LAND_COLORS.bank);
-    else if (d < 34 + valueNoise(z * 0.02, 3) * 10) c.copy(LAND_COLORS.sand);
+    else if (d < 34 + valueNoise(z * 0.02, 3) * 10 && h < 6) c.copy(LAND_COLORS.sand);
+    else if (d < 70 && h > 8) c.lerpColors(LAND_COLORS.rock, LAND_COLORS.mid, smoothstep(d, 20, 70)); // acantilados de las puntas
     else {
       const t = MathUtils.clamp(h / 300, 0, 1);
       if (t < 0.12) c.lerpColors(LAND_COLORS.low, LAND_COLORS.mid, t / 0.12);
@@ -74,27 +79,32 @@ function buildLand() {
 
 /** Mar con olas suaves, agua clara cerca de la orilla, espuma en la playa y ríos en calma. */
 function buildSea() {
-  // Tabla de la costa por z, para que el sombreador sepa a qué distancia de la orilla está cada punto.
-  const W = 4096;
-  const zMin = -6000;
-  const zMax = 6000;
-  const data = new Float32Array(W);
-  for (let i = 0; i < W; i++) data[i] = coastX(zMin + ((zMax - zMin) * i) / (W - 1));
-  const coastTex = new DataTexture(data, W, 1, RedFormat, FloatType);
-  coastTex.minFilter = coastTex.magFilter = NearestFilter;
-  coastTex.needsUpdate = true;
+  // Distancia a la orilla en una textura (un byte por celda), para que el sombreador sepa dónde hay
+  // agua clara, espuma o río. 0 = 100 unidades tierra adentro; 255 = 920 mar adentro.
+  const { data, cols, rows, cell, x0, z0 } = SHORE_FIELD;
+  const bytes = new Uint8Array(cols * rows);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = MathUtils.clamp(Math.round(((-data[i] + 100) / 1020) * 255), 0, 255);
+  const shoreTex = new DataTexture(bytes, cols, rows, RedFormat, UnsignedByteType);
+  shoreTex.minFilter = shoreTex.magFilter = LinearFilter;
+  shoreTex.needsUpdate = true;
 
   const uniforms = {
     uTime: { value: 0 },
-    uCoast: { value: coastTex },
-    uZRange: { value: new Vector2(zMin, zMax) },
+    uShore: { value: shoreTex },
+    uOrigin: { value: new Vector2(x0, z0) },
+    uSize: { value: new Vector2(cols * cell, rows * cell) },
   };
   // Distancia mar adentro desde la orilla (negativa tierra adentro, es decir, en los ríos).
   const coastGlsl = `uniform float uTime;
-    uniform sampler2D uCoast;
-    uniform vec2 uZRange;
+    uniform sampler2D uShore;
+    uniform vec2 uOrigin;
+    uniform vec2 uSize;
     varying vec3 vSea;
-    float seaOff(vec3 w) { return texture2D(uCoast, vec2((w.z - uZRange.x) / (uZRange.y - uZRange.x), 0.5)).r - w.x; }`;
+    float seaOff(vec3 w) {
+      vec2 uv = (w.xz - uOrigin) / uSize;
+      float d = texture2D(uShore, clamp(uv, 0.0, 1.0)).r * 1020.0 - 100.0;
+      return uv.x < 0.0 ? d - uv.x * uSize.x : d;
+    }`;
   const mat = new MeshStandardMaterial({ color: '#1b6f8a', flatShading: true, roughness: 0.32, metalness: 0.05 });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -124,10 +134,10 @@ function buildSea() {
         vec4 diffuseColor = vec4(sea, opacity);`,
       );
   };
-  const geo = new PlaneGeometry(14000, 14000, 280, 280);
+  const geo = new PlaneGeometry(16000, 16000, 320, 320);
   const sea = new Mesh(geo, mat);
   sea.rotation.x = -Math.PI / 2;
-  sea.position.set(-1800, 0, -400);
+  sea.position.set(-1500, 0, -300);
   return { sea, uniforms };
 }
 
@@ -178,7 +188,7 @@ function buildClouds(rand: () => number) {
       m.position.set((j - puffs / 2) * 90 + rand() * 30, rand() * 25, rand() * 60);
       cloud.add(m);
     }
-    cloud.position.set(-1500 + rand() * 5500, 650 + rand() * 450, -3800 + rand() * 6000);
+    cloud.position.set(-2500 + rand() * 6500, 650 + rand() * 450, -3500 + rand() * 6000);
     // Ninguna nube delante del sol.
     const fromView = cloud.position.clone().sub(START_VIEW).normalize();
     if (fromView.dot(SUN_DIR) > 0.96) cloud.position.z += 2400;
@@ -196,10 +206,10 @@ function buildRocks(rand: () => number) {
   const group = new Group();
   const rockMat = new MeshStandardMaterial({ color: '#7c8a80', flatShading: true, roughness: 1 });
   const topMat = new MeshStandardMaterial({ color: '#4f9a52', flatShading: true });
-  const spots = [[560, 120], [610, 90], [700, 160], [820, 140], [985, 110], [1150, 150]];
-  for (const [py, off] of spots) {
-    const z = zOf(py) + (rand() - 0.5) * 60;
-    const x = coastX(z) - off * K * 0.6;
+  // Frente al golfo de Tribugá, a Nuquí, a Panguí y a la entrada de la ensenada de Coquí.
+  const spots = [['tribuga', 0.6, -0.9], ['tribuga', 1.6, -0.6], ['nuqui', -1.7, -0.8], ['nuqui', 1.8, -0.7], ['pangui', 0.7, -0.6], ['coqui', -2.4, -0.4]] as const;
+  for (const [town, along, inland] of spots) {
+    const { x, z } = placeNear(town, along + (rand() - 0.5) * 0.3, inland).pos;
     const s = 10 + rand() * 12;
     const rock = new Mesh(new DodecahedronGeometry(s, 0), rockMat);
     rock.scale.set(1, 1.3 + rand() * 0.5, 1);
@@ -299,26 +309,23 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
   }
 
   // ───────── Cámara: siempre en el mar, mirando hacia la costa ─────────
-  const view = { z: 0, dist: 1500, pitch: 22 };
-  const goal = { z: 0, dist: DIST.start, pitch: PITCH.start };
+  const startS = placed.find((p) => p.id === 'nuqui')!.s;
+  const view = { s: startS, dist: 1500, pitch: 22 };
+  const goal = { s: startS, dist: DIST.start, pitch: PITCH.start };
   const target = new Vector3();
-  const normal = new Vector3();
 
   const placeCamera = () => {
-    const tx = coastAt(COAST_SOFT, view.z) + 160;
-    target.set(tx, 30, view.z);
-    const slope = (coastAt(COAST_SOFT, view.z + 160) - coastAt(COAST_SOFT, view.z - 160)) / 320;
-    const yaw = MathUtils.clamp(Math.atan(slope), -0.55, 0.55);
-    normal.set(-Math.cos(yaw), 0, Math.sin(yaw));
+    const r = railAt(view.s);
+    target.copy(r.pos).addScaledVector(r.sea, -170).setY(25);
     const p = MathUtils.degToRad(view.pitch);
-    camera.position.copy(target).addScaledVector(normal, view.dist * Math.cos(p));
+    camera.position.copy(target).addScaledVector(r.sea, view.dist * Math.cos(p));
     camera.position.y += view.dist * Math.sin(p);
     camera.lookAt(target);
     sky.position.copy(camera.position);
   };
 
   const clampGoal = () => {
-    goal.z = MathUtils.clamp(goal.z, Z_LIMIT.min, Z_LIMIT.max);
+    goal.s = MathUtils.clamp(goal.s, RAIL.min, RAIL.max);
     goal.dist = MathUtils.clamp(goal.dist, DIST.min, DIST.max);
     goal.pitch = MathUtils.clamp(goal.pitch, PITCH.min, PITCH.max);
   };
@@ -356,7 +363,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
       if (pinchStart > 0) goal.dist = pinchDist * (pinchStart / d);
     } else {
       // Arrastrar a los lados recorre la costa; arriba y abajo cambia la inclinación de la mirada.
-      goal.z -= dx * worldPerPixel() * 1.15;
+      goal.s -= dx * worldPerPixel() * 1.15;
       goal.pitch += dy * 0.12;
     }
     clampGoal();
@@ -377,7 +384,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
     const step = { ArrowLeft: [-260, 1], ArrowRight: [260, 1], ArrowUp: [0, 0.85], ArrowDown: [0, 1.18] }[e.key];
     if (step) {
       e.preventDefault();
-      goal.z += step[0];
+      goal.s += step[0];
       goal.dist *= step[1];
       clampGoal();
       onInteract();
@@ -409,7 +416,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
     for (const p of pins) p.el.classList.toggle('is-selected', p.place.id === id);
     const place = [...placed, ...nature].find((p) => p.id === id) ?? null;
     if (place) {
-      goal.z = place.pos.z;
+      goal.s = place.s;
       goal.dist = Math.min(goal.dist, place.kind === 'town' ? 760 : 560);
       clampGoal();
     }
@@ -418,7 +425,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
   function focus(id: string) {
     const place = placed.find((p) => p.id === id);
     if (!place) return;
-    goal.z = place.pos.z;
+    goal.s = place.s;
     goal.dist = 820;
     clampGoal();
   }
@@ -448,7 +455,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
     const dt = Math.min(timer.getDelta(), 0.1);
     const t = timer.getElapsed();
     const ease = 1 - Math.exp(-dt * 3.2);
-    view.z += (goal.z - view.z) * ease;
+    view.s += (goal.s - view.s) * ease;
     view.dist += (goal.dist - view.dist) * ease;
     view.pitch += (goal.pitch - view.pitch) * ease;
     placeCamera();
@@ -521,7 +528,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
         if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
         else mat?.dispose();
       });
-      uniforms.uCoast.value.dispose();
+      uniforms.uShore.value.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       labels.domElement.remove();

@@ -4,8 +4,7 @@
 
 import { type BufferGeometry, Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D, Vector3 } from 'three';
 import { BALL, BLADE, ORB, merge, paint, part, pole } from './kit';
-import { MAP_RIVERS } from '../../../content/map';
-import { Z_LIMIT, coastX, fromPoster, heightAt, isFree, nature, placed, riverReach } from './terrain';
+import { RIVER_MOUTHS, heightAt, isFree, nature, placed, randomPoint, riverReach, shore } from './terrain';
 
 const TAU = Math.PI * 2;
 
@@ -80,7 +79,7 @@ function scatter(geo: BufferGeometry, count: number, rand: () => number, sample:
   const dummy = new Object3D();
   const c = new Color();
   let n = 0;
-  for (let tries = 0; n < count && tries < count * 12; tries++) {
+  for (let tries = 0; n < count && tries < count * 200; tries++) {
     const at = sample();
     if (!at) continue;
     dummy.position.set(at.x, heightAt(at.x, at.z) - 0.6, at.z);
@@ -98,70 +97,68 @@ function scatter(geo: BufferGeometry, count: number, rand: () => number, sample:
 
 export function buildFlora(rand: () => number) {
   const group = new Group();
-  const zMin = Z_LIMIT.min - 1800;
-  const zSpan = Z_LIMIT.max - Z_LIMIT.min + 2900;
-  const randZ = () => zMin + rand() * zSpan;
-  const anchors = [...placed.map((p) => p.pos), ...nature.filter((p) => p.inland > 0).map((p) => p.pos)];
+  const anchors = [...placed.map((p) => p.pos), ...nature.filter((p) => p.at.inland > 0).map((p) => p.pos)];
   const nearAnchor = (min: number, max: number) => {
     const a = anchors[Math.floor(rand() * anchors.length)];
     const ang = rand() * TAU;
     const r = min + rand() * (max - min);
     return { x: a.x + Math.cos(ang) * r, z: a.z + Math.sin(ang) * r };
   };
+  /** Punto al azar a una distancia de la orilla entre `min` y `max`. */
+  const inBand = (min: number, max: number) => {
+    const p = randomPoint(rand);
+    const d = shore(p.x, p.z);
+    return d >= min && d <= max ? { ...p, d } : null;
+  };
 
   // Palmas de coco a lo largo de toda la playa.
-  group.add(scatter(palmGeo(), 320, rand, () => {
-    const z = randZ();
-    const x = coastX(z) + 8 + rand() * 60;
-    return isFree(x, z) ? { x, z, s: 0.85 + rand() * 0.45 } : null;
+  group.add(scatter(palmGeo(), 420, rand, () => {
+    const p = inBand(8, 70);
+    return p && isFree(p.x, p.z) ? { x: p.x, z: p.z, s: 0.85 + rand() * 0.45 } : null;
   }));
 
   // Plataneras alrededor de los pueblos, las posadas y en la llanura.
-  group.add(scatter(bananaGeo(), 200, rand, () => {
-    const { x, z } = rand() < 0.7 ? nearAnchor(40, 220) : { z: randZ(), x: 0 };
-    const xx = x || coastX(z) + 40 + rand() * 380;
-    const d = xx - coastX(z);
-    return d > 30 && d < 520 && isFree(xx, z) ? { x: xx, z, s: 0.9 + rand() * 0.5 } : null;
+  group.add(scatter(bananaGeo(), 240, rand, () => {
+    const p = rand() < 0.7 ? nearAnchor(40, 220) : inBand(30, 520);
+    if (!p) return null;
+    const d = shore(p.x, p.z);
+    return d > 25 && d < 600 && isFree(p.x, p.z) ? { x: p.x, z: p.z, s: 0.9 + rand() * 0.5 } : null;
   }));
 
-  // Selva: árboles redondos en las lomas; crecen con la distancia para que la serranía se lea tupida.
-  group.add(scatter(roundTreeGeo(), 3200, rand, () => {
-    const z = randZ();
-    const d = 60 + Math.pow(rand(), 1.15) * 2400;
-    const x = coastX(z) + d;
-    return isFree(x, z) ? { x, z, s: 1 + d / 900 + rand() * 0.6 } : null;
+  // Selva: árboles en la llanura y en las lomas; crecen tierra adentro para que la serranía se lea tupida.
+  group.add(scatter(roundTreeGeo(), 4200, rand, () => {
+    const p = inBand(60, 4000);
+    return p && isFree(p.x, p.z) ? { x: p.x, z: p.z, s: 1 + Math.min(p.d, 2400) / 900 + rand() * 0.6 } : null;
   }, 0.35));
 
   // Ceibas que sobresalen del dosel.
-  group.add(scatter(ceibaGeo(), 120, rand, () => {
-    const z = randZ();
-    const d = 180 + rand() * 1900;
-    const x = coastX(z) + d;
-    return isFree(x, z) ? { x, z, s: 1 + rand() * 0.6 } : null;
+  group.add(scatter(ceibaGeo(), 170, rand, () => {
+    const p = inBand(160, 3000);
+    return p && isFree(p.x, p.z) ? { x: p.x, z: p.z, s: 1 + rand() * 0.6 } : null;
   }));
 
-  // Manglares en las desembocaduras de los ríos y en el manglar del afiche.
+  // Manglares en las desembocaduras de los ríos, en el estero de Tribugá y en el manglar del afiche.
   const mangroveSpots = [
-    ...MAP_RIVERS.map((r) => fromPoster(r.path[0][0], 10)),
+    ...RIVER_MOUTHS,
     ...nature.filter((n) => n.id === 'manglar').map((n) => n.pos),
     ...placed.filter((p) => p.id === 'lobos-del-manglar').map((p) => p.pos),
   ];
-  group.add(scatter(mangroveGeo(), 170, rand, () => {
+  group.add(scatter(mangroveGeo(), 200, rand, () => {
     const a = mangroveSpots[Math.floor(rand() * mangroveSpots.length)];
     const ang = rand() * TAU;
-    const r = 25 + rand() * 150;
+    const r = 25 + rand() * 170;
     const x = a.x + Math.cos(ang) * r;
     const z = a.z + Math.sin(ang) * r;
-    const d = x - coastX(z);
-    const free = d > -4 && d < 240 && riverReach(x, z) > 0.9 && placed.every((p) => p.pos.distanceTo(new Vector3(x, p.pos.y, z)) > 45);
+    const d = shore(x, z);
+    const free = d > -4 && d < 260 && riverReach(x, z) > 0.9 && placed.every((p) => p.pos.distanceTo(new Vector3(x, p.pos.y, z)) > 45);
     return free ? { x, z, s: 0.8 + rand() * 0.5 } : null;
   }));
 
   // Matas con flores rosadas y naranjas cerca de la costa.
   for (const color of ['#ef86bd', '#f6a03c', '#e9547f']) {
-    group.add(scatter(flowerShrubGeo(color), 110, rand, () => {
-      const { x, z } = rand() < 0.6 ? nearAnchor(30, 180) : (() => { const zz = randZ(); return { x: coastX(zz) + 20 + rand() * 300, z: zz }; })();
-      return isFree(x, z, 14) ? { x, z, s: 0.9 + rand() * 0.6 } : null;
+    group.add(scatter(flowerShrubGeo(color), 130, rand, () => {
+      const p = rand() < 0.6 ? nearAnchor(30, 180) : inBand(20, 320);
+      return p && isFree(p.x, p.z, 14) ? { x: p.x, z: p.z, s: 0.9 + rand() * 0.6 } : null;
     }, 0.1));
   }
 
@@ -173,17 +170,17 @@ export function buildMist(rand: () => number) {
   const group = new Group();
   const mat = new MeshBasicMaterial({ color: '#f4fafc', transparent: true, opacity: 0.3, depthWrite: false });
   const mist: { m: Group; speed: number; base: number }[] = [];
-  for (let i = 0; i < 16; i++) {
-    const z = Z_LIMIT.min - 600 + rand() * (Z_LIMIT.max - Z_LIMIT.min + 1200);
-    const x = coastX(z) + 900 + rand() * 1400;
+  for (let tries = 0; mist.length < 18 && tries < 2000; tries++) {
+    const { x, z } = randomPoint(rand);
+    if (shore(x, z) < 500) continue;
     const m = new Group();
     for (let j = 0; j < 4; j++) {
       const puff = new Mesh(ORB, mat);
-      puff.scale.set(70 + rand() * 60, 22 + rand() * 14, 60 + rand() * 50);
+      puff.scale.set(70 + rand() * 60, 18 + rand() * 12, 60 + rand() * 50);
       puff.position.set((rand() - 0.5) * 60, rand() * 10, (j - 1.5) * 70);
       m.add(puff);
     }
-    m.position.set(x, heightAt(x, z) + 45 + rand() * 30, z);
+    m.position.set(x, heightAt(x, z) + 40 + rand() * 30, z);
     group.add(m);
     mist.push({ m, speed: 4 + rand() * 6, base: z });
   }

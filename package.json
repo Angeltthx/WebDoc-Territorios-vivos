@@ -13,7 +13,8 @@
     "media:audio": "node scripts/optimize-audio.mjs",
     "media:360": "node scripts/optimize-360.mjs",
     "media:transiciones": "node scripts/optimize-transitions.mjs",
-    "media:historias": "node scripts/optimize-historias.mjs"
+    "media:historias": "node scripts/optimize-historias.mjs",
+    "map:relief": "node scripts/map-relief.mjs"
   },
   "dependencies": {
     "hls.js": "^1.7.3",

@@ -7,3 +7,6 @@ dist
 
 # Contenido multimedia: no se versiona (se genera desde ../Contenido)
 public/media/
+
+# Descargas del relieve del mapa (se regeneran con npm run map:relief)
+.cache/

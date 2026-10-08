@@ -1,17 +1,24 @@
 // Mapa de prueba de la costa de Nuquí (mientras llega el GLB del diseñador).
-// Los lugares salen del afiche "Nuquí, Chocó" (map.jpg del cliente), en su orden de norte a sur.
-// La costa se describe en píxeles del afiche (1000 × 1430): `py` es la altura en el afiche
-// (norte arriba) y `inland` cuánto se mete el lugar tierra adentro desde la línea de costa.
+// Los lugares, la fauna y la flora salen del afiche "Nuquí, Chocó" (map.jpg del cliente).
+//
+// Geografía real: los cinco pueblos van en sus coordenadas (GeoNames) y la costa, la llanura y las lomas
+// salen del relieve SRTM (ver map-relief.ts). De Jurubidá a Coquí hay unos 30 km de costa:
+//   Jurubidá → Tribugá 9,1 km · Tribugá → Nuquí 6,4 km · Nuquí → Panguí 6,9 km · Panguí → Coquí 8,5 km (en línea recta).
+// Detrás de la playa hay una llanura de 2 a 4 km (hasta 7 km en el estero de Tribugá) y luego lomas de 150 a 470 m.
+//
+// Los sitios turísticos y las especies no tienen coordenadas publicadas: se ubican cerca de su pueblo,
+// en el orden y el lado del afiche, con `along` (km por la costa, + hacia el sur) e `inland` (km desde
+// la orilla, + tierra adentro, − mar adentro).
+
+export type TownId = 'jurubida' | 'tribuga' | 'nuqui' | 'pangui' | 'coqui';
 
 export interface MapPlace {
   id: string;
   name: string;
   /** Pueblo, sitio turístico o especie (fauna y flora) del afiche. */
   kind: 'town' | 'site' | 'nature';
-  /** Altura en el afiche (norte → sur). */
-  py: number;
-  /** Distancia tierra adentro, en píxeles del afiche. */
-  inland: number;
+  /** Posición: pueblo de referencia y desplazamiento en km. */
+  at: { town: TownId; along: number; inland: number };
   /** Cuenta de Instagram que aparece en el afiche. */
   handle?: string;
   /** Pueblo más cercano. */
@@ -20,60 +27,51 @@ export interface MapPlace {
   scientific?: string;
 }
 
-/** Línea de costa del afiche: pares [py, px] (px = borde entre mar y tierra). */
-export const COAST: [number, number][] = [
-  [-600, 560],
-  [30, 565],
-  [150, 610],
-  [300, 645],
-  [450, 690],
-  [520, 700],
-  [600, 690],
-  [700, 645],
-  [780, 605],
-  [860, 578],
-  [950, 525],
-  [1000, 478],
-  [1060, 440],
-  [1120, 360],
-  [1180, 140],
-  [1230, 60],
-  [1900, 40],
+/** Coordenadas de los pueblos (GeoNames), de norte a sur. */
+export const TOWNS: { id: TownId; name: string; lat: number; lon: number }[] = [
+  { id: 'jurubida', name: 'Jurubidá', lat: 5.844327, lon: -77.277424 },
+  { id: 'tribuga', name: 'Tribugá', lat: 5.76653, lon: -77.250511 },
+  { id: 'nuqui', name: 'Nuquí', lat: 5.7125, lon: -77.270833 },
+  { id: 'pangui', name: 'Panguí', lat: 5.663055, lon: -77.30907 },
+  { id: 'coqui', name: 'Coquí', lat: 5.607215, lon: -77.361882 },
 ];
+
+const town = (id: TownId, name: string): MapPlace => ({ id, name, kind: 'town', at: { town: id, along: 0, inland: 0.05 } });
 
 export const MAP_PLACES: MapPlace[] = [
-  { id: 'jurubida', name: 'Jurubidá', kind: 'town', py: 75, inland: 12 },
-  { id: 'kipara-te', name: 'Etnoaldea Kipara Té', kind: 'site', py: 135, inland: 210, handle: 'kiparatenuqui', near: 'Jurubidá' },
-  { id: 'lobos-del-manglar', name: 'Lobos del Manglar', kind: 'site', py: 445, inland: 55, handle: 'lobosdelmanglar', near: 'Tribugá' },
-  { id: 'tribuga', name: 'Tribugá', kind: 'town', py: 535, inland: 12 },
-  { id: 'vientos-de-yubarta', name: 'Vientos de Yubarta', kind: 'site', py: 745, inland: 105, handle: 'vientosdeyubarta', near: 'Nuquí' },
-  { id: 'carlitours', name: 'Carlitours Nuquí', kind: 'site', py: 790, inland: 80, handle: 'carlitours.nuqui', near: 'Nuquí' },
-  { id: 'museo-melele', name: 'Museo Melelé', kind: 'site', py: 835, inland: 58, handle: 'museo_melele', near: 'Nuquí' },
-  { id: 'nuqui', name: 'Nuquí', kind: 'town', py: 866, inland: 12 },
-  { id: 'escombros-nuqui', name: 'Escombros del Mar', kind: 'site', py: 925, inland: 44, handle: 'escombrosdelmarhostal', near: 'Nuquí' },
-  { id: 'las-serranias', name: 'Danza tradicional Las Serranías', kind: 'site', py: 975, inland: 28, handle: 'orfelinamarmolejo', near: 'Nuquí' },
-  { id: 'posada-chachita', name: 'Posada ecoturística Chachita', kind: 'site', py: 1030, inland: 16, handle: 'posadaecoturisticachachita', near: 'Panguí' },
-  { id: 'pangui', name: 'Panguí', kind: 'town', py: 1070, inland: 12 },
-  { id: 'escombros-coqui', name: 'Escombros del Mar', kind: 'site', py: 1205, inland: 34, handle: 'escombrosdelmarhostal', near: 'Coquí' },
-  { id: 'posada-sonona', name: 'Posada Sonona', kind: 'site', py: 1260, inland: 70, handle: 'sononaecolodge', near: 'Coquí' },
-  { id: 'coqui', name: 'Coquí', kind: 'town', py: 1310, inland: 12 },
+  town('jurubida', 'Jurubidá'),
+  { id: 'kipara-te', name: 'Etnoaldea Kipara Té', kind: 'site', at: { town: 'jurubida', along: 0.6, inland: 2.2 }, handle: 'kiparatenuqui', near: 'Jurubidá' },
+  { id: 'lobos-del-manglar', name: 'Lobos del Manglar', kind: 'site', at: { town: 'tribuga', along: -0.9, inland: 0.5 }, handle: 'lobosdelmanglar', near: 'Tribugá' },
+  town('tribuga', 'Tribugá'),
+  { id: 'vientos-de-yubarta', name: 'Vientos de Yubarta', kind: 'site', at: { town: 'nuqui', along: -1.3, inland: 0.45 }, handle: 'vientosdeyubarta', near: 'Nuquí' },
+  { id: 'carlitours', name: 'Carlitours Nuquí', kind: 'site', at: { town: 'nuqui', along: -0.85, inland: 0.25 }, handle: 'carlitours.nuqui', near: 'Nuquí' },
+  { id: 'museo-melele', name: 'Museo Melelé', kind: 'site', at: { town: 'nuqui', along: -0.4, inland: 0.35 }, handle: 'museo_melele', near: 'Nuquí' },
+  town('nuqui', 'Nuquí'),
+  { id: 'escombros-nuqui', name: 'Escombros del Mar', kind: 'site', at: { town: 'nuqui', along: 0.35, inland: 0.2 }, handle: 'escombrosdelmarhostal', near: 'Nuquí' },
+  { id: 'las-serranias', name: 'Danza tradicional Las Serranías', kind: 'site', at: { town: 'nuqui', along: 1.0, inland: 0.15 }, handle: 'orfelinamarmolejo', near: 'Nuquí' },
+  { id: 'posada-chachita', name: 'Posada ecoturística Chachita', kind: 'site', at: { town: 'pangui', along: -0.45, inland: 0.06 }, handle: 'posadaecoturisticachachita', near: 'Panguí' },
+  town('pangui', 'Panguí'),
+  { id: 'escombros-coqui', name: 'Escombros del Mar', kind: 'site', at: { town: 'coqui', along: -1.0, inland: 0.15 }, handle: 'escombrosdelmarhostal', near: 'Coquí' },
+  { id: 'posada-sonona', name: 'Posada Sonona', kind: 'site', at: { town: 'coqui', along: -0.5, inland: 0.45 }, handle: 'sononaecolodge', near: 'Coquí' },
+  town('coqui', 'Coquí'),
 ];
 
-/** Fauna y flora ilustradas en el afiche. `inland` negativo = en el mar. */
+/** Fauna y flora ilustradas en el afiche. */
 export const MAP_NATURE: MapPlace[] = [
-  { id: 'ballena', name: 'Ballena jorobada', kind: 'nature', py: 190, inland: -95, scientific: 'Megaptera novaeangliae' },
-  { id: 'cangrejo', name: 'Cangrejo fantasma rojo', kind: 'nature', py: 590, inland: 6, scientific: 'Ocypode gaudichaudii' },
-  { id: 'tortuga', name: 'Tortuga golfina', kind: 'nature', py: 770, inland: -120, scientific: 'Lepidochelys olivacea' },
-  { id: 'pava', name: 'Pava del Baudó', kind: 'nature', py: 760, inland: 250, scientific: 'Penelope ortoni' },
-  { id: 'rana', name: 'Rana arlequín', kind: 'nature', py: 1120, inland: 170, scientific: 'Oophaga solanensis' },
-  { id: 'manglar', name: 'Manglar', kind: 'nature', py: 1165, inland: 10 },
-  { id: 'cacao', name: 'Cacao', kind: 'nature', py: 1290, inland: 120 },
+  { id: 'ballena', name: 'Ballena jorobada', kind: 'nature', at: { town: 'jurubida', along: 3.2, inland: -2.4 }, scientific: 'Megaptera novaeangliae' },
+  { id: 'cangrejo', name: 'Cangrejo fantasma rojo', kind: 'nature', at: { town: 'tribuga', along: 0.9, inland: 0.04 }, scientific: 'Ocypode gaudichaudii' },
+  { id: 'tortuga', name: 'Tortuga golfina', kind: 'nature', at: { town: 'nuqui', along: -0.9, inland: -1.6 }, scientific: 'Lepidochelys olivacea' },
+  { id: 'pava', name: 'Pava del Baudó', kind: 'nature', at: { town: 'nuqui', along: -1.6, inland: 3.6 }, scientific: 'Penelope ortoni' },
+  { id: 'rana', name: 'Rana arlequín', kind: 'nature', at: { town: 'pangui', along: 0.9, inland: 1.6 }, scientific: 'Oophaga solanensis' },
+  { id: 'manglar', name: 'Manglar', kind: 'nature', at: { town: 'coqui', along: -1.6, inland: 0.1 } },
+  { id: 'cacao', name: 'Cacao', kind: 'nature', at: { town: 'coqui', along: 0.2, inland: 1.1 } },
 ];
 
-/** Ríos que bajan al mar: puntos [py, inland] desde la desembocadura; `width` en unidades de la escena. */
-export const MAP_RIVERS: { id: string; width: number; path: [number, number][] }[] = [
-  { id: 'jurubida', width: 26, path: [[102, -12], [106, 40], [92, 100], [84, 160], [70, 230]] },
-  { id: 'tribuga', width: 48, path: [[475, -14], [470, 30], [484, 80], [466, 140], [478, 200], [458, 270]] },
-  { id: 'nuqui', width: 34, path: [[896, -12], [899, 40], [886, 100], [902, 160], [890, 240]] },
-  { id: 'coqui', width: 26, path: [[1236, -12], [1233, 30], [1246, 80], [1230, 140]] },
+/** Ríos: puntos [along, inland] en km desde la desembocadura, cerca de su pueblo; `width` en unidades de la escena. */
+export const MAP_RIVERS: { id: string; town: TownId; width: number; path: [number, number][] }[] = [
+  { id: 'jurubida', town: 'jurubida', width: 26, path: [[0.25, -0.08], [0.3, 0.4], [0.15, 0.9], [0.1, 1.6], [-0.1, 2.4]] },
+  { id: 'tribuga', town: 'tribuga', width: 48, path: [[-0.3, -0.08], [-0.35, 0.5], [-0.2, 1.2], [-0.35, 2.0], [-0.2, 3.0], [-0.4, 4.0]] },
+  { id: 'nuqui', town: 'nuqui', width: 34, path: [[0.65, -0.08], [0.7, 0.5], [0.55, 1.1], [0.75, 1.8], [0.6, 2.6]] },
+  { id: 'pangui', town: 'pangui', width: 26, path: [[-0.9, -0.08], [-0.85, 0.5], [-1.0, 1.1], [-0.9, 1.8]] },
+  { id: 'coqui', town: 'coqui', width: 26, path: [[0.3, -0.08], [0.35, 0.5], [0.25, 1.2], [0.4, 2.0]] },
 ];

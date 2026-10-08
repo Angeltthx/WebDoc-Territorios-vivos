@@ -2,9 +2,9 @@
 // cangrejo fantasma rojo, pava del Baudó, rana arlequín y cacao; además fragatas, pelícanos y mariposas.
 // Las figuras son más grandes que en la realidad, como las ilustraciones del afiche, para que se distingan.
 
-import { type BufferGeometry, Group, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three';
+import { type BufferGeometry, Group, MathUtils, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three';
 import { BALL, BLADE, CONE, ORB, merge, paint, part, pole, solid } from './kit';
-import { Z_LIMIT, coastX, heightAt, nature, placed } from './terrain';
+import { RAIL, RIVER_MOUTHS, doorTo, facing, heightAt, nature, offshoreRaw, placed, railAt, riverReach, shore, smoothstep } from './terrain';
 
 const TAU = Math.PI * 2;
 
@@ -158,7 +158,8 @@ function buildTurtle(): Living {
 // ───────── Cangrejo fantasma rojo ─────────
 
 function buildCrab(): Living {
-  const base = byId('cangrejo').pos;
+  const { pos: base, s: at, sea } = byId('cangrejo');
+  const along = railAt(at).tangent;
   const g: BufferGeometry[] = [
     part(ORB, '#e2522c', { p: [0, 5, 0], s: [7, 3, 5.5] }),
     part(ORB, '#f07a48', { p: [0, 6.4, 0], s: [5, 1.6, 4] }),
@@ -176,12 +177,12 @@ function buildCrab(): Living {
   crab.add(solid(g));
   crab.scale.setScalar(1.5);
   const update = (t: number) => {
-    const s = Math.sin(t * 0.5);
-    const z = base.z + s * 28;
-    const x = coastX(z) + 14;
+    const k = Math.sin(t * 0.5) * 28;
+    const x = base.x + along.x * k;
+    const z = base.z + along.z * k;
     crab.position.set(x, heightAt(x, z) + Math.abs(Math.sin(t * 9)) * 0.6, z);
     // Camina de lado, mirando al mar.
-    crab.rotation.set(0, -Math.PI / 2, Math.sin(t * 9) * 0.04);
+    crab.rotation.set(0, facing(sea), Math.sin(t * 9) * 0.04);
   };
   return { group: crab, update };
 }
@@ -189,9 +190,10 @@ function buildCrab(): Living {
 // ───────── Pava del Baudó, posada en una rama ─────────
 
 function buildPava(): Living {
-  const p = byId('pava').pos;
+  const { pos: p, sea } = byId('pava');
   const group = new Group();
   group.position.set(p.x, heightAt(p.x, p.z) - 1, p.z);
+  group.rotation.y = doorTo(sea); // la rama apunta al mar
   group.add(
     solid([
       pole('#8f7a63', [0, 0, 0], [0, 40, 0], 2.6),
@@ -234,9 +236,10 @@ function buildPava(): Living {
 // ───────── Rana arlequín sobre una hoja ─────────
 
 function buildFrog(): Living {
-  const p = byId('rana').pos;
+  const { pos: p, sea } = byId('rana');
   const group = new Group();
   group.position.set(p.x, heightAt(p.x, p.z) - 0.5, p.z);
+  group.rotation.y = doorTo(sea);
   // Hoja grande de platanillo donde se posa.
   group.add(solid([
     pole('#7fa84a', [0, 0, 0], [0, 8, 0], 1),
@@ -294,78 +297,253 @@ function buildCacao(rand: () => number) {
 }
 
 // ───────── Aves ─────────
+// Vuelos con física sencilla: cada ave lleva su rumbo, gira con suavidad, se inclina en las curvas,
+// sube y baja con el viento y alterna aleteos con planeos, como en la costa de verdad.
+
+/** Ala de dos tramos (brazo y mano) para poder doblarla en forma de M y aletear. */
+function wing(side: number, color: string, under: string, { arm = [1.2, 2.2], hand = [1, 2.8], sweep = 0.45 } = {}) {
+  const inner = new Group();
+  inner.add(new Mesh(merge([
+    part(BLADE, color, { r: [0, side * (Math.PI / 2), 0], s: [arm[0], 0.14, arm[1]], o: 'YXZ' }),
+    part(BLADE, under, { p: [0, -0.06, 0], r: [0, side * (Math.PI / 2), 0], s: [arm[0] * 0.9, 0.1, arm[1] * 0.95], o: 'YXZ' }),
+  ]), paint));
+  const outer = new Group();
+  outer.position.set(side * arm[1] * 1.9, 0, 0);
+  outer.add(new Mesh(merge([part(BLADE, color, { r: [0, side * (Math.PI / 2 + sweep), 0], s: [hand[0], 0.12, hand[1]], o: 'YXZ' })]), paint));
+  inner.add(outer);
+  return { inner, outer, side };
+}
+type Wing = ReturnType<typeof wing>;
+
+/** Pose de las alas: `lift` sube el brazo, `droop` baja la mano (forma de M), `fold` las recoge hacia atrás. */
+function poseWings(wings: Wing[], lift: number, droop: number, fold = 0) {
+  for (const w of wings) {
+    w.inner.rotation.set(0, w.side * fold * 1.1, w.side * lift);
+    w.outer.rotation.set(0, w.side * fold * 0.6, -w.side * droop);
+    w.inner.scale.x = 1 - fold * 0.55;
+  }
+}
+
+/** Orienta un ave según su velocidad: rumbo, cabeceo y alabeo (inclinación en las curvas). */
+function orient(o: Object3D, vel: Vector3, bank: number) {
+  const flat = Math.hypot(vel.x, vel.z);
+  o.rotation.order = 'YXZ';
+  o.rotation.set(-Math.atan2(vel.y, Math.max(flat, 0.001)), Math.atan2(vel.x, vel.z), bank);
+}
 
 function frigatebird() {
   const bird = new Group();
   bird.add(solid([
-    part(ORB, '#1d1d22', { s: [0.9, 0.9, 4] }),
-    part(ORB, '#c8352c', { p: [0, -0.5, 2.2], s: [0.6, 0.6, 0.9] }),
-    part(CONE, '#9a9a9a', { p: [0, 0, 4.6], r: [Math.PI / 2, 0, 0], s: [0.25, 1.8, 0.25] }),
-    part(BLADE, '#1d1d22', { p: [0, 0, -3], r: [0, Math.PI - 0.25, 0], s: [0.35, 0.1, 2.4], o: 'YXZ' }),
-    part(BLADE, '#1d1d22', { p: [0, 0, -3], r: [0, Math.PI + 0.25, 0], s: [0.35, 0.1, 2.4], o: 'YXZ' }),
+    part(ORB, '#1d1d22', { s: [0.8, 0.8, 3.6] }),
+    part(ORB, '#c8352c', { p: [0, -0.45, 2], s: [0.55, 0.55, 0.8] }),
+    part(CONE, '#9a9a9a', { p: [0, 0, 4.2], r: [Math.PI / 2, 0, 0], s: [0.22, 1.6, 0.22] }),
+    // Cola larga en tijera.
+    part(BLADE, '#1d1d22', { p: [0, 0, -2.8], r: [0, Math.PI - 0.22, 0], s: [0.3, 0.08, 2.6], o: 'YXZ' }),
+    part(BLADE, '#1d1d22', { p: [0, 0, -2.8], r: [0, Math.PI + 0.22, 0], s: [0.3, 0.08, 2.6], o: 'YXZ' }),
   ]));
-  const wings = [-1, 1].map((side) => {
-    const w = new Group();
-    w.add(new Mesh(merge([part(BLADE, '#25252b', { r: [0, side * (Math.PI / 2 + 0.25), 0], s: [1.3, 0.15, 4.2], o: 'YXZ' })]), paint));
-    w.userData.side = side;
-    bird.add(w);
-    return w;
-  });
-  bird.scale.setScalar(2.4);
+  const wings = [-1, 1].map((side) => wing(side, '#222228', '#2e2e35', { arm: [1.1, 2.3], hand: [0.9, 3.4], sweep: 0.55 }));
+  for (const w of wings) bird.add(w.inner);
+  bird.scale.setScalar(1.7);
   return { bird, wings };
 }
 
 function pelican() {
   const bird = new Group();
   bird.add(solid([
-    part(ORB, '#a1968a', { s: [1.4, 1.2, 4.2] }),
-    part(ORB, '#f1ece2', { p: [0, 0.8, 3.8], s: [0.9, 0.9, 1.2] }),
-    part(CONE, '#d9b25a', { p: [0, 0.4, 6.4], r: [Math.PI / 2, 0, 0], s: [0.45, 4, 0.6] }),
+    part(ORB, '#a1968a', { s: [1.3, 1.1, 4] }),
+    part(ORB, '#f1ece2', { p: [0, 0.6, 3.4], s: [0.8, 0.8, 1.1] }),
+    part(CONE, '#d9b25a', { p: [0, 0.2, 5.8], r: [Math.PI / 2 + 0.15, 0, 0], s: [0.4, 3.6, 0.55] }),
   ]));
-  const wings = [-1, 1].map((side) => {
-    const w = new Group();
-    w.add(new Mesh(merge([part(BLADE, '#7d746b', { r: [0, side * (Math.PI / 2), 0], s: [1.6, 0.18, 5], o: 'YXZ' })]), paint));
-    w.userData.side = side;
-    bird.add(w);
-    return w;
-  });
-  bird.scale.setScalar(2.2);
+  const wings = [-1, 1].map((side) => wing(side, '#7d746b', '#9a9086', { arm: [1.5, 2.4], hand: [1.2, 2.6], sweep: 0.2 }));
+  for (const w of wings) bird.add(w.inner);
+  bird.scale.setScalar(1.8);
   return { bird, wings };
 }
 
-function buildBirds(rand: () => number): Living {
+/** Piquero pardo: lomo café, vientre blanco y pico amarillo; pesca lanzándose en picada. */
+function booby() {
+  const bird = new Group();
+  bird.add(solid([
+    part(ORB, '#5a4636', { s: [0.85, 0.85, 3] }),
+    part(ORB, '#f4f1ea', { p: [0, -0.3, -0.2], s: [0.75, 0.6, 2.3] }),
+    part(CONE, '#e6c45a', { p: [0, 0, 3.6], r: [Math.PI / 2, 0, 0], s: [0.3, 1.6, 0.3] }),
+  ]));
+  const wings = [-1, 1].map((side) => wing(side, '#5a4636', '#e9e4da', { arm: [0.9, 2], hand: [0.75, 2.3], sweep: 0.3 }));
+  for (const w of wings) bird.add(w.inner);
+  bird.scale.setScalar(1.5);
+  return { bird, wings };
+}
+
+/** Garza blanca parada en el agua bajita, con el cuello en S. */
+function egret() {
+  const bird = new Group();
+  bird.add(solid([
+    pole('#1d1d1d', [-0.4, 0, 0], [-0.3, 6, 0], 0.15),
+    pole('#1d1d1d', [0.4, 0, 0.3], [0.3, 6, 0], 0.15),
+    part(ORB, '#fbfbf8', { p: [0, 7, 0], s: [1, 1.2, 2.2], r: [-0.4, 0, 0] }),
+    pole('#fbfbf8', [0, 7.6, 1.2], [0, 9.2, 1.9], 0.35),
+    pole('#fbfbf8', [0, 9.2, 1.9], [0, 10.6, 1.4], 0.3),
+  ]));
+  const head = new Group();
+  head.position.set(0, 10.8, 1.5);
+  head.add(solid([part(ORB, '#fbfbf8', { s: [0.45, 0.45, 0.7] }), part(CONE, '#e6c45a', { p: [0, -0.1, 1.3], r: [Math.PI / 2, 0, 0], s: [0.15, 1.6, 0.15] })]));
+  bird.add(head);
+  bird.scale.setScalar(1.4);
+  return { bird, head };
+}
+
+function buildBirds(rand: () => number, spray: Spray): Living {
   const group = new Group();
-  const flocks = [-1700, -350, 600].map((z) => ({ cx: coastX(z) - 60, cz: z, birds: [] as ReturnType<typeof frigatebird>[] }));
-  for (const f of flocks) for (let i = 0; i < 5; i++) {
-    const b = frigatebird();
-    b.bird.userData = { r: 90 + rand() * 120, y: 130 + rand() * 90, w: 0.12 + rand() * 0.1, a0: rand() * TAU };
-    group.add(b.bird);
-    f.birds.push(b);
-  }
-  const pelicans = Array.from({ length: 6 }, (_, i) => {
-    const b = pelican();
-    b.bird.userData.i = i;
-    group.add(b.bird);
-    return b;
+  const v = new Vector3();
+
+  // Fragatas: planean alto sobre la costa, casi sin aletear.
+  const homes = ['jurubida', 'nuqui', 'pangui'].map((id) => {
+    const t = placed.find((p) => p.id === id)!;
+    return t.pos.clone().addScaledVector(t.sea, 120);
   });
-  const span = Z_LIMIT.max - Z_LIMIT.min + 1200;
-  const update = (t: number) => {
-    for (const f of flocks) for (const { bird, wings } of f.birds) {
-      const { r, y, w, a0 } = bird.userData as { r: number; y: number; w: number; a0: number };
-      const a = a0 + t * w;
-      bird.position.set(f.cx + Math.cos(a) * r, y + Math.sin(t * 0.4 + a0) * 10, f.cz + Math.sin(a) * r);
-      bird.rotation.set(0, -a, 0.35);
-      for (const wing of wings) wing.rotation.z = wing.userData.side * (0.15 + Math.sin(t * 1.2 + a0) * 0.12);
+  const frigates = Array.from({ length: 15 }, (_, i) => {
+    const b = frigatebird();
+    const home = homes[i % homes.length];
+    const state = {
+      home,
+      pos: home.clone().add(new Vector3((rand() - 0.5) * 300, 0, (rand() - 0.5) * 300)),
+      heading: rand() * TAU,
+      speed: 11 + rand() * 6,
+      alt: 130 + rand() * 120,
+      ph: rand() * 100,
+    };
+    group.add(b.bird);
+    return { ...b, state };
+  });
+
+  // Pelícanos: fila escalonada que bordea la costa a ras del agua y regresa mar adentro.
+  const R = 300;
+  const lane = 150;
+  const span = RAIL.max - RAIL.min;
+  const loopLen = 2 * span + 2 * Math.PI * R;
+  const loopAt = (d: number) => {
+    let u = ((d % loopLen) + loopLen) % loopLen;
+    if (u < span) return offshoreRaw(RAIL.min + u, lane);
+    u -= span;
+    const turn = Math.PI * R;
+    if (u < turn) { const a = u / R; return offshoreRaw(RAIL.max + Math.sin(a) * R * 0.6, lane + R * (1 - Math.cos(a))); }
+    u -= turn;
+    if (u < span) return offshoreRaw(RAIL.max - u, lane + 2 * R);
+    u -= span;
+    const a = u / R;
+    return offshoreRaw(RAIL.min - Math.sin(a) * R * 0.6, lane + 2 * R - R * (1 - Math.cos(a)));
+  };
+  const pelicanStart = placed.find((p) => p.id === 'tribuga')!.s - RAIL.min;
+  const pelicans = Array.from({ length: 7 }, (_, i) => {
+    const b = pelican();
+    group.add(b.bird);
+    return { ...b, i };
+  });
+
+  // Piqueros: dan vueltas sobre el agua y cada tanto se lanzan en picada.
+  const spots = [['tribuga', 0.6, 300], ['nuqui', -1.2, 380], ['pangui', 0.4, 320]] as const;
+  const boobies = spots.flatMap(([id, along, off]) => {
+    const t = placed.find((p) => p.id === id)!;
+    const c = offshoreRaw(t.s + along * 110, off);
+    return Array.from({ length: 3 }, () => {
+      const b = booby();
+      group.add(b.bird);
+      return { ...b, c, r: 35 + rand() * 35, ph: rand() * 30, w: (rand() < 0.5 ? -1 : 1) * (0.3 + rand() * 0.15), dived: -1 };
+    });
+  });
+
+  // Garzas en las desembocaduras.
+  const egrets = RIVER_MOUTHS.flatMap((m) => Array.from({ length: 2 }, () => {
+    const e = egret();
+    for (let k = 0; k < 40; k++) {
+      const x = m.x + (rand() - 0.5) * 120;
+      const z = m.z + (rand() - 0.5) * 120;
+      const d = shore(x, z);
+      if (d > -10 && d < 25 && riverReach(x, z) > 0.8) {
+        e.bird.position.set(x, Math.max(heightAt(x, z), -0.8), z);
+        break;
+      }
     }
-    // Pelícanos en fila, rozando el agua a lo largo de la costa.
-    const lead = Z_LIMIT.min - 600 + ((t * 26) % span);
-    for (const { bird, wings } of pelicans) {
-      const i = bird.userData.i as number;
-      const z = lead - i * 22;
-      bird.position.set(coastX(z) - 140 - i * 9, 16 + Math.sin(t * 0.8 + i) * 2, z);
-      bird.rotation.set(0, 0, 0);
-      const flap = Math.sin(t * 5 - i * 0.6);
-      for (const wing of wings) wing.rotation.z = wing.userData.side * (flap > 0.6 ? flap * 0.5 : 0.05);
+    e.bird.rotation.y = rand() * TAU;
+    e.bird.userData.ph = rand() * 20;
+    group.add(e.bird);
+    return e;
+  }));
+
+  const update = (t: number, dt: number) => {
+    for (const f of frigates) {
+      const s = f.state;
+      // Giro suave y cambiante, con una leve atracción hacia su zona de la costa.
+      let turn = 0.16 * Math.sin(t * 0.11 + s.ph) + 0.1 * Math.sin(t * 0.27 + s.ph * 2);
+      const toHome = Math.atan2(s.home.x - s.pos.x, s.home.z - s.pos.z);
+      let diff = toHome - s.heading;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      const far = smoothstep(Math.hypot(s.home.x - s.pos.x, s.home.z - s.pos.z), 250, 600);
+      turn += diff * 0.35 * far;
+      s.heading += turn * dt;
+      const y = s.alt + 28 * Math.sin(t * 0.07 + s.ph) + 9 * Math.sin(t * 0.21 + s.ph);
+      v.set(Math.sin(s.heading) * s.speed, (y - f.bird.position.y) / Math.max(dt, 0.001), Math.cos(s.heading) * s.speed);
+      s.pos.x += v.x * dt;
+      s.pos.z += v.z * dt;
+      f.bird.position.set(s.pos.x, y, s.pos.z);
+      orient(f.bird, v.setY(MathUtils.clamp(v.y, -3, 3)), MathUtils.clamp(-turn * 2.2, -0.7, 0.7));
+      // Casi siempre planea; a ratos da unos aletazos lentos.
+      const flapping = smoothstep(Math.sin(t * 0.19 + s.ph * 3), 0.8, 0.95);
+      const beat = Math.sin(t * 6 + s.ph) * 0.55 * flapping;
+      poseWings(f.wings, 0.16 + beat + 0.03 * Math.sin(t * 1.3 + s.ph), 0.32 - beat * 0.4);
+    }
+
+    const lead = pelicanStart + t * 19;
+    for (const p of pelicans) {
+      const d = lead - p.i * 15;
+      const a = loopAt(d);
+      const b = loopAt(d + 4);
+      const side = new Vector3(b.z - a.z, 0, a.x - b.x).normalize();
+      a.addScaledVector(side, p.i * 7);
+      p.bird.position.set(a.x, 12 + 3 * Math.sin(t * 0.45 + p.i * 0.4), a.z);
+      orient(p.bird, v.set(b.x - a.x, 0, b.z - a.z), 0);
+      // Aletean en cadena (del primero al último) y luego planean juntos.
+      const c = (t - p.i * 0.28) % 7;
+      const flap = c > 0 && c < 1.8 ? Math.sin((c / 1.8) * TAU * 3) * 0.6 : 0;
+      poseWings(p.wings, 0.05 + flap, 0.1 - flap * 0.3);
+    }
+
+    for (const b of boobies) {
+      const c = (t + b.ph) % 13;
+      const ang = b.w * (t + b.ph);
+      const x = b.c.x + Math.cos(ang) * b.r;
+      const z = b.c.z + Math.sin(ang) * b.r;
+      const cruise = 48 + 6 * Math.sin(t * 0.5 + b.ph);
+      let y = cruise;
+      let fold = 0;
+      b.bird.visible = true;
+      if (c > 8 && c < 9.1) {
+        const k = (c - 8) / 1.1;
+        y = cruise * (1 - k * k);
+        fold = 1;
+      } else if (c >= 9.1 && c < 10) {
+        b.bird.visible = false;
+        y = -2;
+        const cycle = Math.floor((t + b.ph) / 13);
+        if (b.dived !== cycle) {
+          b.dived = cycle;
+          spray.emit(new Vector3(x, 1, z), 10, { spread: 6, up: 22, size: 1.6 });
+        }
+      } else if (c >= 10) {
+        y = cruise * smoothstep(c, 10, 13);
+      }
+      const prevY = b.bird.position.y;
+      b.bird.position.set(x, y, z);
+      v.set(-Math.sin(ang) * b.w * b.r, (y - prevY) / Math.max(dt, 0.001), Math.cos(ang) * b.w * b.r);
+      if (fold) v.set(v.x * 0.15, -40, v.z * 0.15);
+      orient(b.bird, v, fold ? 0 : -0.4 * Math.sign(b.w));
+      const beat = c >= 10 ? Math.sin(t * 9) * 0.6 : Math.sin(t * 5 + b.ph) * 0.35 * smoothstep(Math.sin(t * 0.6 + b.ph), 0.3, 0.8);
+      poseWings(b.wings, 0.08 + beat, 0.12, fold);
+    }
+
+    for (const e of egrets) {
+      const c = (t + (e.bird.userData.ph as number)) % 9;
+      e.head.rotation.x = c > 7 && c < 7.8 ? Math.sin(((c - 7) / 0.8) * Math.PI) * 1.1 : Math.sin(t * 0.8) * 0.05;
     }
   };
   return { group, update };
@@ -375,7 +553,7 @@ function buildBirds(rand: () => number): Living {
 
 function buildButterflies(rand: () => number): Living {
   const group = new Group();
-  const anchors = [...placed.filter((p) => p.kind !== 'town').map((p) => p.pos), ...nature.filter((n) => n.inland > 0).map((n) => n.pos)];
+  const anchors = [...placed.filter((p) => p.kind !== 'town').map((p) => p.pos), ...nature.filter((n) => n.at.inland > 0).map((n) => n.pos)];
   const wingGeo = (side: number, color: string) => merge([
     part(ORB, color, { p: [side * 2.1, 0, 0.6], s: [2.1, 0.12, 1.7] }),
     part(ORB, color, { p: [side * 1.6, 0, -1.4], s: [1.5, 0.12, 1.2] }),
@@ -420,7 +598,7 @@ export const NATURE_LABEL_HEIGHT: Record<string, number> = {
 
 export function buildFauna(rand: () => number): Living {
   const spray = new Spray(90);
-  const parts: Living[] = [buildWhales(spray), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand), buildButterflies(rand)];
+  const parts: Living[] = [buildWhales(spray), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand, spray), buildButterflies(rand)];
   const group = new Group();
   group.add(spray.group, buildCacao(rand), ...parts.map((p) => p.group));
   return {
