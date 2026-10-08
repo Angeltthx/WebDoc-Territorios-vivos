@@ -4,7 +4,7 @@
 
 import { type BufferGeometry, Color, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D, Vector3 } from 'three';
 import { BALL, BLADE, BOX, ORB, merge, paint, part, pole } from './kit';
-import { RIVER_MOUTHS, heightAt, isFree, nature, placed, randomPoint, riverReach, shore } from './terrain';
+import { BOUNDS, RIVER_MOUTHS, farHeight, heightAt, isFree, nature, placed, randomPoint, riverReach, shore } from './terrain';
 
 const TAU = Math.PI * 2;
 
@@ -97,7 +97,7 @@ function bigLeafGeo() {
 type Sampler = () => { x: number; z: number; s: number } | null;
 
 /** Siembra hasta `count` copias de una planta donde el muestreador encuentre sitio. */
-function scatter(geo: BufferGeometry, count: number, rand: () => number, sample: Sampler, tint = 0.18) {
+function scatter(geo: BufferGeometry, count: number, rand: () => number, sample: Sampler, tint = 0.18, ground = heightAt) {
   const mesh = new InstancedMesh(geo, paint, count);
   const dummy = new Object3D();
   const c = new Color();
@@ -105,7 +105,7 @@ function scatter(geo: BufferGeometry, count: number, rand: () => number, sample:
   for (let tries = 0; n < count && tries < count * 200; tries++) {
     const at = sample();
     if (!at) continue;
-    dummy.position.set(at.x, heightAt(at.x, at.z) - 0.6, at.z);
+    dummy.position.set(at.x, ground(at.x, at.z) - 0.6, at.z);
     dummy.rotation.set(0, rand() * TAU, 0);
     dummy.scale.setScalar(at.s);
     dummy.updateMatrix();
@@ -155,6 +155,15 @@ export function buildFlora(rand: () => number) {
   }, 0.35));
 
   // Ceibas que sobresalen del dosel.
+  // Más allá del relieve fino, la selva sigue sobre el relieve de fondo (árboles más grandes, se ven de lejos).
+  const BAND = 9000;
+  const HOLE = 150;
+  group.add(scatter(roundTreeGeo(), 2600, rand, () => {
+    const x = BOUNDS.x0 + rand() * (BOUNDS.x1 - BOUNDS.x0 + BAND);
+    const z = BOUNDS.z0 - BAND + rand() * (BOUNDS.z1 - BOUNDS.z0 + BAND * 2);
+    if (x > BOUNDS.x0 + HOLE && x < BOUNDS.x1 - HOLE && z > BOUNDS.z0 + HOLE && z < BOUNDS.z1 - HOLE) return null;
+    return farHeight(x, z) > 12 ? { x, z, s: 2 + rand() * 1.2 } : null;
+  }, 0.18, farHeight));
   group.add(scatter(ceibaGeo(), 170, rand, () => {
     const p = inBand(160, 3000);
     return p && isFree(p.x, p.z) ? { x: p.x, z: p.z, s: 1 + rand() * 0.6 } : null;
@@ -220,5 +229,10 @@ export function buildMist(rand: () => number) {
   const update = (t: number) => {
     for (const { m, speed, base } of mist) m.position.z = base + Math.sin(t * 0.02 * speed) * 120;
   };
-  return { group, update };
+  /** Se desvanece cuando la cámara está muy alta (al llegar desde el planeta). */
+  const setOpacity = (o: number) => {
+    mat.opacity = 0.3 * o;
+    group.visible = o > 0.01;
+  };
+  return { group, update, setOpacity };
 }

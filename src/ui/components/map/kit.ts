@@ -48,8 +48,10 @@ function outlineMat(width: number) {
     m = new MeshBasicMaterial({ color: '#fffdf6', side: BackSide });
     m.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-transformed += normalize(objectNormal) * ${width.toFixed(3)};`);
+transformed += normalize(normal) * ${width.toFixed(3)};`);
     };
+    // Cada grosor es un programa distinto (el código de arriba es el mismo texto para todos).
+    m.customProgramCacheKey = () => `sticker-${width}`;
     outlineMats.set(width, m);
   }
   return m;

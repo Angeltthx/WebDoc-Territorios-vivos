@@ -4,6 +4,7 @@
 
 import { CatmullRomCurve3, MathUtils, Vector3 } from 'three';
 import { MAP_NATURE, MAP_PLACES, MAP_RIVERS, TOWNS, type MapPlace, type TownId } from '../../../content/map';
+import { REGION_RELIEF } from '../../../content/map-region';
 import { RELIEF } from '../../../content/map-relief';
 
 /** Unidades de la escena por kilómetro. */
@@ -19,6 +20,7 @@ const KM_PER_LON = 110.77; // a 5,7° de latitud
 export const smoothstep = MathUtils.smoothstep;
 
 export const toScene = (lat: number, lon: number) => new Vector3((lon - LON0) * KM_PER_LON * S, 0, (LAT0 - lat) * KM_PER_LAT * S);
+export const sceneToLatLon = (x: number, z: number) => ({ lat: LAT0 - z / (KM_PER_LAT * S), lon: LON0 + x / (KM_PER_LON * S) });
 
 // ───────── Relieve real ─────────
 
@@ -54,32 +56,33 @@ function meters(x: number, z: number) {
 const D_CELL = 12;
 const D_COLS = Math.ceil((BOUNDS.x1 - BOUNDS.x0) / D_CELL) + 1;
 const D_ROWS = Math.ceil((BOUNDS.z1 - BOUNDS.z0) / D_CELL) + 1;
-const SHORE = (() => {
-  const n = D_COLS * D_ROWS;
+/** Distancia con signo (chaflán) a la orilla en una grilla: positiva en tierra, negativa en el mar. */
+function signedField(cols: number, rows: number, cell: number, isLand: (c: number, r: number) => boolean) {
+  const n = cols * rows;
   const land = new Uint8Array(n);
-  for (let r = 0; r < D_ROWS; r++) for (let c = 0; c < D_COLS; c++) land[r * D_COLS + c] = meters(BOUNDS.x0 + c * D_CELL, BOUNDS.z0 + r * D_CELL) > 0 ? 1 : 0;
-  // Distancia (chaflán) desde cada celda hasta la celda más cercana del otro lado de la orilla.
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) land[r * cols + c] = isLand(c, r) ? 1 : 0;
+  // Distancia desde cada celda hasta la celda más cercana del otro lado de la orilla.
   const dist = (inside: number) => {
     const d = new Float32Array(n).fill(1e9);
     for (let i = 0; i < n; i++) if (land[i] !== inside) d[i] = 0;
-    const a = D_CELL;
-    const b = D_CELL * 1.4142;
-    for (let r = 0; r < D_ROWS; r++) for (let c = 0; c < D_COLS; c++) {
-      const i = r * D_COLS + c;
+    const a = cell;
+    const b = cell * 1.4142;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
       if (c > 0) d[i] = Math.min(d[i], d[i - 1] + a);
       if (r > 0) {
-        d[i] = Math.min(d[i], d[i - D_COLS] + a);
-        if (c > 0) d[i] = Math.min(d[i], d[i - D_COLS - 1] + b);
-        if (c < D_COLS - 1) d[i] = Math.min(d[i], d[i - D_COLS + 1] + b);
+        d[i] = Math.min(d[i], d[i - cols] + a);
+        if (c > 0) d[i] = Math.min(d[i], d[i - cols - 1] + b);
+        if (c < cols - 1) d[i] = Math.min(d[i], d[i - cols + 1] + b);
       }
     }
-    for (let r = D_ROWS - 1; r >= 0; r--) for (let c = D_COLS - 1; c >= 0; c--) {
-      const i = r * D_COLS + c;
-      if (c < D_COLS - 1) d[i] = Math.min(d[i], d[i + 1] + a);
-      if (r < D_ROWS - 1) {
-        d[i] = Math.min(d[i], d[i + D_COLS] + a);
-        if (c < D_COLS - 1) d[i] = Math.min(d[i], d[i + D_COLS + 1] + b);
-        if (c > 0) d[i] = Math.min(d[i], d[i + D_COLS - 1] + b);
+    for (let r = rows - 1; r >= 0; r--) for (let c = cols - 1; c >= 0; c--) {
+      const i = r * cols + c;
+      if (c < cols - 1) d[i] = Math.min(d[i], d[i + 1] + a);
+      if (r < rows - 1) {
+        d[i] = Math.min(d[i], d[i + cols] + a);
+        if (c < cols - 1) d[i] = Math.min(d[i], d[i + cols + 1] + b);
+        if (c > 0) d[i] = Math.min(d[i], d[i + cols - 1] + b);
       }
     }
     return d;
@@ -87,12 +90,59 @@ const SHORE = (() => {
   const inLand = dist(1);
   const inSea = dist(0);
   const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) out[i] = land[i] ? inLand[i] - D_CELL / 2 : -(inSea[i] - D_CELL / 2);
+  for (let i = 0; i < n; i++) out[i] = land[i] ? inLand[i] - cell / 2 : -(inSea[i] - cell / 2);
   return out;
-})();
+}
+
+const SHORE = signedField(D_COLS, D_ROWS, D_CELL, (c, r) => meters(BOUNDS.x0 + c * D_CELL, BOUNDS.z0 + r * D_CELL) > 0);
 
 /** Datos del campo de distancia, para pasarlo al sombreador del mar. */
 export const SHORE_FIELD = { data: SHORE, cols: D_COLS, rows: D_ROWS, cell: D_CELL, x0: BOUNDS.x0, z0: BOUNDS.z0 };
+
+// ───────── Relieve de fondo: el resto del Chocó ─────────
+// Grilla gruesa (≈ 2,8 km) con la costa hacia el norte y el sur, el valle del Atrato y la cordillera Occidental.
+// Se ve detrás del relieve fino para que la costa siga tierra adentro y no parezca una isla.
+
+const regionBytes = Uint8Array.from(atob(REGION_RELIEF.data), (c) => c.charCodeAt(0));
+const F_X0 = (REGION_RELIEF.west - LON0) * KM_PER_LON * S;
+const F_Z0 = (LAT0 - REGION_RELIEF.north) * KM_PER_LAT * S;
+const F_DX = REGION_RELIEF.step * KM_PER_LON * S;
+const F_DZ = REGION_RELIEF.step * KM_PER_LAT * S;
+/** Hondura del fondo marino en el relieve de fondo (queda tapado por el mar). */
+const FAR_SEA = -60;
+
+/** Grilla del relieve de fondo, en unidades de la escena (de norte a sur y de oeste a este). */
+export const FAR_GRID = { x0: F_X0, z0: F_Z0, dx: F_DX, dz: F_DZ, cols: REGION_RELIEF.cols, rows: REGION_RELIEF.rows };
+
+/** Altura del relieve de fondo en un vértice de su grilla (unidades de la escena, exagerada como el resto). */
+export function farVertex(c: number, r: number) {
+  const b = regionBytes[r * REGION_RELIEF.cols + c];
+  return b === 0 ? FAR_SEA : b * REGION_RELIEF.metersPerUnit * UNITS_PER_METER;
+}
+
+/** Altura del relieve de fondo en cualquier punto (interpolada como la malla que se ve). */
+export function farHeight(x: number, z: number) {
+  const fx = MathUtils.clamp((x - F_X0) / F_DX, 0, REGION_RELIEF.cols - 1.001);
+  const fz = MathUtils.clamp((z - F_Z0) / F_DZ, 0, REGION_RELIEF.rows - 1.001);
+  const ix = Math.floor(fx);
+  const iz = Math.floor(fz);
+  const tx = fx - ix;
+  const tz = fz - iz;
+  const top = farVertex(ix, iz) + (farVertex(ix + 1, iz) - farVertex(ix, iz)) * tx;
+  const bottom = farVertex(ix, iz + 1) + (farVertex(ix + 1, iz + 1) - farVertex(ix, iz + 1)) * tx;
+  return top + (bottom - top) * tz;
+}
+
+const FAR_CELL = (F_DX + F_DZ) / 2;
+/** Distancia a la orilla en la grilla de fondo (para el color del agua frente al resto de la costa). */
+export const FAR_SHORE_FIELD = {
+  data: signedField(REGION_RELIEF.cols, REGION_RELIEF.rows, FAR_CELL, (c, r) => regionBytes[r * REGION_RELIEF.cols + c] > 0),
+  cols: REGION_RELIEF.cols,
+  rows: REGION_RELIEF.rows,
+  cell: FAR_CELL,
+  x0: F_X0,
+  z0: F_Z0,
+};
 
 /** Distancia a la orilla (unidades): positiva en tierra, negativa en el mar. */
 export function shore(x: number, z: number) {
@@ -279,6 +329,18 @@ export const placed = MAP_PLACES.map(toPlaced);
 /** Fauna y flora del afiche. */
 export const nature = MAP_NATURE.map(toPlaced);
 
+/**
+ * Llegada desde el planeta: el punto frente a Nuquí al que mira la cámara al entrar, y el rumbo hacia tierra adentro
+ * (radianes desde el norte, hacia el este). El planeta termina su viaje mirando ese punto desde arriba, con ese rumbo
+ * hacia arriba en la pantalla, igual que la primera imagen del mapa.
+ */
+export const ARRIVAL = (() => {
+  const s = placed.find((p) => p.id === 'nuqui')!.s;
+  const r = railAt(s);
+  const t = r.pos.clone().addScaledVector(r.sea, -170);
+  return { s, ...sceneToLatLon(t.x, t.z), bearing: Math.atan2(-r.sea.x, r.sea.z) };
+})();
+
 // ───────── Ríos ─────────
 
 interface RiverSeg { ax: number; az: number; bx: number; bz: number; wa: number; wb: number; minX: number; maxX: number; minZ: number; maxZ: number }
@@ -318,6 +380,16 @@ export function riverReach(x: number, z: number) {
 
 /** Relieve sin retoques: fondo marino, playa, llanura costera y las lomas reales (exageradas). */
 function rawHeight(x: number, z: number) {
+  const h = closeHeight(x, z);
+  // En los bordes norte, sur y este se funde con el relieve de fondo (un poco por debajo, para que este lo tape).
+  const edge = Math.min(BOUNDS.x1 - x, z - BOUNDS.z0, BOUNDS.z1 - z);
+  return edge < EDGE_BLEND ? MathUtils.lerp(farHeight(x, z) - 6, h, smoothstep(edge, 0, EDGE_BLEND)) : h;
+}
+
+/** Ancho de la franja donde el relieve fino se funde con el de fondo. */
+export const EDGE_BLEND = 450;
+
+function closeHeight(x: number, z: number) {
   const d = shore(x, z);
   if (d < 0) return Math.max(d * 0.05, -30) - 0.5;
   const beach = 1.5 + Math.min(d, 40) * 0.12;
@@ -384,3 +456,4 @@ export function isFree(x: number, z: number, minInland = 8) {
 export function randomPoint(rand: () => number) {
   return { x: GRID.x0 + rand() * GRID.w, z: GRID.z0 + rand() * GRID.d };
 }
+

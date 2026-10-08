@@ -9,7 +9,7 @@ import {
   BackSide, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
   Fog, Group, HemisphereLight, IcosahedronGeometry, MathUtils, Mesh, MeshStandardMaterial, LinearFilter, Object3D, UnsignedByteType,
   PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster, RedFormat, SRGBColorSpace, Scene, ShaderMaterial,
-  SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer,
+  SphereGeometry, Timer, UniformsLib, UniformsUtils, Vector2, Vector3, Vector4, WebGLRenderer, type Texture, type WebGLProgramParametersWithUniforms,
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import type { MapPlace } from '../../../content/map';
@@ -17,16 +17,23 @@ import { buildFauna, NATURE_LABEL_HEIGHT } from './fauna';
 import { sticker } from './kit';
 import { buildFlora, buildMist } from './flora';
 import { buildPlaces } from './places';
+import { DIVE, diveProgress, fovs, mapUnitsPerKm, type Handoff } from './dive';
+import { REGION, posterTexture, regionCanvas } from './posterArt';
 import {
-  GRID, HEIGHTS, RAIL, SHORE_FIELD, nature, placeNear, placed, railAt, rng, shore, smoothstep, valueNoise, type PlacedPlace,
+  ARRIVAL, BOUNDS, FAR_GRID, FAR_SHORE_FIELD, GRID, HEIGHTS, RAIL, SHORE_FIELD, farVertex, nature, placeNear, placed, railAt, rng,
+  shore, smoothstep, toScene, valueNoise, type PlacedPlace,
 } from './terrain';
 
-const DIST = { min: 300, max: 1700, start: 950 };
+const DIST = { min: 300, max: 1700, start: DIVE.mapDist };
 const PITCH = { min: 5, max: 38, start: 10 };
 
 const SUN_DIR = new Vector3(1, 0.21, 0.26).normalize();
 const HORIZON = new Color('#dcf1ec');
 const ZENITH = new Color('#4aa6c8');
+const ARRIVAL_POS = toScene(ARRIVAL.lat, ARRIVAL.lon);
+
+/** Neblina a ras del mar: lo lejano (la cordillera, la costa al norte y al sur) se pierde en el azul del horizonte. */
+const FOG = { near: 2500, far: 30000 };
 /** Punto de vista inicial aproximado (frente a Nuquí), para dejar el sol despejado. */
 const START_VIEW = (() => {
   const nuqui = placed.find((p) => p.id === 'nuqui')!;
@@ -82,7 +89,67 @@ const LAND_COLORS = {
   seabed: new Color('#6fc7bd'),
 };
 
-function buildLand() {
+/**
+ * Dibujo del afiche visto desde muy alto (el mismo del planeta). Al llegar desde el planeta, la tierra y el mar lo
+ * muestran y lo van soltando mientras la cámara baja (`uRegionMix` de 1 a 0).
+ */
+interface RegionUniforms {
+  uRegion: { value: Texture };
+  uRegionBox: { value: Vector4 };
+  uRegionMix: { value: number };
+}
+
+function regionUniforms(): RegionUniforms {
+  const nw = toScene(REGION.latMax, REGION.lonMin);
+  const se = toScene(REGION.latMin, REGION.lonMax);
+  return {
+    uRegion: { value: posterTexture(regionCanvas()) },
+    uRegionBox: { value: new Vector4(nw.x, nw.z, se.x - nw.x, se.z - nw.z) },
+    uRegionMix: { value: 0 },
+  };
+}
+
+const REGION_GLSL = `uniform sampler2D uRegion;
+  uniform vec4 uRegionBox;
+  uniform float uRegionMix;
+  vec3 regionArt(vec3 w) {
+    return texture2D(uRegion, vec2((w.x - uRegionBox.x) / uRegionBox.z, 1.0 - (w.z - uRegionBox.y) / uRegionBox.w)).rgb;
+  }`;
+
+/**
+ * Material de la tierra: colores por vértice, el dibujo de hojas del afiche y, desde lo alto, el dibujo del planeta.
+ * `hole` (x0, z0, x1, z1) deja un hueco donde ya está el relieve fino.
+ */
+function landMaterial(region: RegionUniforms, flatShading: boolean, hole?: Vector4) {
+  const mat = new MeshStandardMaterial({ vertexColors: true, flatShading, roughness: 1 });
+  mat.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    Object.assign(shader.uniforms, region, { uHole: { value: hole ?? new Vector4(0, 0, 0, 0) } });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLand;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLand = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vLand;\nuniform vec4 uHole;${LAND_GLSL}${REGION_GLSL}`)
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+        if (vLand.x > uHole.x && vLand.x < uHole.z && vLand.z > uHole.y && vLand.z < uHole.w) discard;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float jungle = smoothstep(0.004, 0.02, vColor.g - vColor.r * 1.3);
+        diffuseColor.rgb = posterJungle(diffuseColor.rgb, vLand.xz, jungle);`)
+      .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, regionArt(vLand), uRegionMix);`);
+  };
+  return mat;
+}
+
+/** Color de la selva según la altura (unidades de la escena), con algo de variación. */
+function jungleColor(c: Color, h: number, x: number, z: number, top: number) {
+  const t = MathUtils.clamp(h / top, 0, 1);
+  if (t < 0.12) c.lerpColors(LAND_COLORS.low, LAND_COLORS.mid, t / 0.12);
+  else if (t < 0.7) c.lerpColors(LAND_COLORS.mid, LAND_COLORS.high, (t - 0.12) / 0.58);
+  else c.lerpColors(LAND_COLORS.high, LAND_COLORS.peak, (t - 0.7) / 0.3);
+  return c.offsetHSL(0, 0, valueNoise(x * 0.01, z * 0.01) * 0.035);
+}
+
+function buildLand(region: RegionUniforms) {
   // La malla usa la misma grilla que `heightAt` (vértice i = fila * (nx + 1) + columna, de norte a sur).
   const geo = new PlaneGeometry(GRID.w, GRID.d, GRID.nx, GRID.nz);
   geo.rotateX(-Math.PI / 2);
@@ -96,107 +163,210 @@ function buildLand() {
     const h = HEIGHTS[i];
     pos.setY(i, h);
     const d = shore(x, z);
-    if (d < 0 || h < -0.5) c.copy(LAND_COLORS.seabed);
+    if (h < 0.2) c.copy(LAND_COLORS.seabed);
+    else if (d < 0) c.copy(LAND_COLORS.sand); // bajos de arena que asoman (alrededor de los pueblos)
     else if (h < 2.2 && d > 60) c.copy(LAND_COLORS.bank);
     else if (d < 34 + valueNoise(z * 0.02, 3) * 10 && h < 6) c.copy(LAND_COLORS.sand);
     else if (d < 70 && h > 8) c.lerpColors(LAND_COLORS.rock, LAND_COLORS.mid, smoothstep(d, 20, 70)); // acantilados de las puntas
-    else {
-      const t = MathUtils.clamp(h / 300, 0, 1);
-      if (t < 0.12) c.lerpColors(LAND_COLORS.low, LAND_COLORS.mid, t / 0.12);
-      else if (t < 0.7) c.lerpColors(LAND_COLORS.mid, LAND_COLORS.high, (t - 0.12) / 0.58);
-      else c.lerpColors(LAND_COLORS.high, LAND_COLORS.peak, (t - 0.7) / 0.3);
-      c.offsetHSL(0, 0, valueNoise(x * 0.01, z * 0.01) * 0.035);
-    }
+    else jungleColor(c, h, x, z, 300);
     colors.set([c.r, c.g, c.b], i * 3);
   }
   geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  const mat = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 });
-  // Dibujo del afiche sobre la selva: hojas oscuras, hojas claras y manchas verde claro.
-  mat.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vLand;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLand = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vLand;${LAND_GLSL}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        float jungle = smoothstep(0.004, 0.02, vColor.g - vColor.r * 1.3);
-        diffuseColor.rgb = posterJungle(diffuseColor.rgb, vLand.xz, jungle);`);
-  };
-  return new Mesh(geo, mat);
+  return new Mesh(geo, landMaterial(region, true));
 }
 
-/** Mar con olas suaves, agua clara cerca de la orilla, espuma en la playa y ríos en calma. */
-function buildSea() {
-  // Distancia a la orilla en una textura (un byte por celda), para que el sombreador sepa dónde hay
-  // agua clara, espuma o río. 0 = 100 unidades tierra adentro; 255 = 920 mar adentro.
-  const { data, cols, rows, cell, x0, z0 } = SHORE_FIELD;
+/**
+ * El resto del Chocó, de fondo: la costa sigue al norte y al sur, y tierra adentro vienen el valle del Atrato y la
+ * cordillera Occidental. Es una grilla gruesa (≈ 2,8 km) con un hueco donde está el relieve fino de la costa.
+ */
+function buildFarLand(region: RegionUniforms) {
+  const { x0, z0, dx, dz, cols, rows } = FAR_GRID;
+  const geo = new PlaneGeometry((cols - 1) * dx, (rows - 1) * dz, cols - 1, rows - 1);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(x0 + ((cols - 1) * dx) / 2, 0, z0 + ((rows - 1) * dz) / 2);
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const c = new Color();
+  for (let i = 0; i < pos.count; i++) {
+    const h = farVertex(i % cols, Math.floor(i / cols));
+    pos.setY(i, h);
+    if (h < 0) c.copy(LAND_COLORS.sand);
+    else jungleColor(c, h, pos.getX(i), pos.getZ(i), 700);
+    colors.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  const m = 150;
+  const hole = new Vector4(BOUNDS.x0 + m, BOUNDS.z0 + m, BOUNDS.x1 - m, BOUNDS.z1 - m);
+  return new Mesh(geo, landMaterial(region, false, hole));
+}
+
+/** Distancia a la orilla en una textura (un byte por celda): 0 = 100 unidades tierra adentro; 255 = 920 mar adentro. */
+function shoreTexture({ data, cols, rows }: { data: Float32Array; cols: number; rows: number }) {
   const bytes = new Uint8Array(cols * rows);
   for (let i = 0; i < bytes.length; i++) bytes[i] = MathUtils.clamp(Math.round(((-data[i] + 100) / 1020) * 255), 0, 255);
-  const shoreTex = new DataTexture(bytes, cols, rows, RedFormat, UnsignedByteType);
-  shoreTex.minFilter = shoreTex.magFilter = LinearFilter;
-  shoreTex.needsUpdate = true;
+  const tex = new DataTexture(bytes, cols, rows, RedFormat, UnsignedByteType);
+  tex.minFilter = tex.magFilter = LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
 
+/**
+ * Mar: olas pequeñas que se mueven (dibujadas en el sombreador, no en la malla), reflejo del cielo según el ángulo,
+ * el brillo del sol, agua turquesa junto a la orilla, espuma que llega a la playa y ríos en calma.
+ */
+function buildSea(region: RegionUniforms) {
+  const near = SHORE_FIELD;
+  const far = FAR_SHORE_FIELD;
   const uniforms = {
+    ...UniformsUtils.clone(UniformsLib.fog),
+    ...region,
     uTime: { value: 0 },
-    uShore: { value: shoreTex },
-    uOrigin: { value: new Vector2(x0, z0) },
-    uSize: { value: new Vector2(cols * cell, rows * cell) },
+    uShore: { value: shoreTexture(near) },
+    uOrigin: { value: new Vector2(near.x0, near.z0) },
+    uSize: { value: new Vector2(near.cols * near.cell, near.rows * near.cell) },
+    uShoreFar: { value: shoreTexture(far) },
+    uOriginFar: { value: new Vector2(far.x0, far.z0) },
+    uSizeFar: { value: new Vector2(far.cols * far.cell, far.rows * far.cell) },
+    uSun: { value: SUN_DIR },
+    uHorizon: { value: HORIZON },
+    uZenith: { value: ZENITH },
   };
-  // Distancia mar adentro desde la orilla (negativa tierra adentro, es decir, en los ríos).
+  // Distancia mar adentro desde la orilla (negativa tierra adentro, es decir, en los ríos): fina junto a Nuquí y
+  // gruesa en el resto de la costa.
   const coastGlsl = `uniform float uTime;
     uniform sampler2D uShore;
     uniform vec2 uOrigin;
     uniform vec2 uSize;
+    uniform sampler2D uShoreFar;
+    uniform vec2 uOriginFar;
+    uniform vec2 uSizeFar;
     varying vec3 vSea;
     float seaOff(vec3 w) {
+      vec2 uvF = (w.xz - uOriginFar) / uSizeFar;
+      if (uvF.x < 0.0 || uvF.y < 0.0 || uvF.x > 1.0 || uvF.y > 1.0) return 920.0;
+      float far = texture2D(uShoreFar, uvF).r * 1020.0 - 100.0;
       vec2 uv = (w.xz - uOrigin) / uSize;
-      float d = texture2D(uShore, clamp(uv, 0.0, 1.0)).r * 1020.0 - 100.0;
-      return uv.x < 0.0 ? d - uv.x * uSize.x : d;
+      vec2 e = min(uv, 1.0 - uv);
+      float inside = smoothstep(0.0, 0.03, min(e.x, e.y));
+      if (inside <= 0.0) return far;
+      return mix(far, texture2D(uShore, uv).r * 1020.0 - 100.0, inside);
     }`;
-  const mat = new MeshStandardMaterial({ color: '#1b6f8a', flatShading: true, roughness: 0.75, metalness: 0 });
-  mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${coastGlsl}`)
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-        vec4 seaW = modelMatrix * vec4(transformed, 1.0);
-        float calm = mix(0.15, 1.0, smoothstep(-40.0, 30.0, seaOff(seaW.xyz)));
-        transformed.z += calm * (sin(seaW.x * 0.011 + uTime * 0.8) * 1.8 + sin(seaW.z * 0.016 - uTime * 0.6) * 1.3
-          + sin((seaW.x + seaW.z) * 0.031 + uTime * 1.4) * 0.6);
-        vSea = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${coastGlsl}${GLSL_COMMON}`)
-      .replace(
-        'vec4 diffuseColor = vec4( diffuse, opacity );',
-        `float off = seaOff(vSea);
-        // Turquesa del afiche: más claro junto a la orilla.
-        float near = 1.0 - smoothstep(0.0, 420.0, off);
-        vec3 sea = mix(srgb(vec3(0.090, 0.486, 0.533)), srgb(vec3(0.122, 0.561, 0.592)), smoothstep(2600.0, 700.0, off));
-        sea = mix(sea, srgb(vec3(0.208, 0.682, 0.675)), near);
-        // Remolinos: trazos curvos oscuros (y algunos claros), como los del afiche.
-        vec2 q = vSea.xz * 0.0032;
-        vec2 warp = vec2(vnoise(q * 1.7 + uTime * 0.015), vnoise(q * 1.7 + 5.2 - uTime * 0.015));
-        float n = vnoise(q + warp * 1.7) * 7.0;
-        float stroke = (1.0 - smoothstep(0.06, 0.06 + fwidth(n) * 1.5, abs(fract(n) - 0.5))) * step(0.35, fract(n * 0.37 + 0.2));
-        float n2 = vnoise(q * 2.4 + warp * 2.2 + 9.0) * 9.0;
-        float lightStroke = (1.0 - smoothstep(0.02, 0.02 + fwidth(n2) * 1.5, abs(fract(n2) - 0.5))) * step(0.55, fract(n2 * 0.11));
-        sea = mix(sea, srgb(vec3(0.07, 0.40, 0.45)), stroke * 0.7 * (1.0 - near * 0.4));
-        sea = mix(sea, srgb(vec3(0.42, 0.80, 0.78)), lightStroke * 0.12);
-        float foam = (1.0 - smoothstep(0.0, 22.0, off + sin(vSea.z * 0.06 + uTime * 1.6) * 5.0)) * smoothstep(-12.0, 0.0, off);
-        sea = mix(sea, srgb(vec3(0.85, 0.95, 0.93)), foam * 0.9);
-        // Ríos: agua verde turquesa y quieta.
-        sea = mix(sea, srgb(vec3(0.25, 0.58, 0.55)), smoothstep(-10.0, -60.0, off));
-        vec4 diffuseColor = vec4(sea, opacity);`,
-      );
-  };
-  const geo = new PlaneGeometry(16000, 16000, 320, 320);
+  const mat = new ShaderMaterial({
+    uniforms,
+    fog: true,
+    vertexShader: `#include <common>
+      #include <fog_pars_vertex>
+      varying vec3 vSea;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vSea = w.xyz;
+        vec4 mvPosition = viewMatrix * w;
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `#include <common>
+      #include <fog_pars_fragment>
+      ${coastGlsl}${GLSL_COMMON}${REGION_GLSL}
+      uniform vec3 uSun;
+      uniform vec3 uHorizon;
+      uniform vec3 uZenith;
+
+      // Olas: un mar de fondo largo que avanza hacia la costa (+x) y, encima, capas de olas irregulares (ruido girado
+      // y desplazado en direcciones distintas, para que no se forme una cuadrícula). Cada capa se apaga cuando es más
+      // fina que un píxel, para que no titile. Devuelve la pendiente del agua (1 unidad = 9,1 m).
+      vec3 noiseD(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        vec2 du = 6.0 * f * (1.0 - f);
+        float a = hash2(i);
+        float b = hash2(i + vec2(1.0, 0.0));
+        float c = hash2(i + vec2(0.0, 1.0));
+        float d = hash2(i + vec2(1.0, 1.0));
+        float k = a - b - c + d;
+        return vec3(a + (b - a) * u.x + (c - a) * u.y + k * u.x * u.y, du * vec2(b - a + k * u.y, c - a + k * u.x));
+      }
+      vec2 waveSlope(vec2 p, float t, float foot) {
+        vec2 g = vec2(0.0);
+        // Mar de fondo: tres ondas largas y suaves.
+        for (int i = 0; i < 3; i++) {
+          float fi = float(i);
+          float lambda = 44.0 - fi * 11.0;
+          float ang = 0.15 + (fi - 1.0) * 0.35;
+          vec2 d = vec2(cos(ang), sin(ang));
+          float k = 6.2831 / lambda;
+          float fade = 1.0 - smoothstep(0.15, 0.5, foot / lambda);
+          g += d * 0.05 * cos(k * dot(d, p) - sqrt(9.8 * k / 9.1) * t + fi * 2.1) * fade;
+        }
+        // Olas de viento: capas de ruido, cada una más fina, girada y moviéndose a su ritmo.
+        float scale = 14.0;
+        float amp = 0.11;
+        float ang = 0.4;
+        for (int i = 0; i < 5; i++) {
+          mat2 r = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
+          vec2 dir = vec2(cos(ang * 1.7), sin(ang * 1.7));
+          vec2 q = r * p / scale + dir * t * (1.4 / sqrt(scale));
+          float fade = 1.0 - smoothstep(0.2, 0.7, foot / scale);
+          g += (transpose(r) * noiseD(q).yz) * amp * fade;
+          scale *= 0.55;
+          amp *= 0.8;
+          ang += 1.37;
+        }
+        float gust = 0.6 + 0.8 * vnoise(p * 0.0021 + vec2(t * 0.012, -t * 0.008));
+        return g * gust;
+      }
+
+      void main() {
+        float off = seaOff(vSea);
+        float foot = length(fwidth(vSea.xz));
+        // Más calma en los ríos y al fondo de las ensenadas.
+        vec2 g = waveSlope(vSea.xz, uTime, foot) * mix(0.3, 1.0, smoothstep(-20.0, 200.0, off));
+        vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
+        vec3 V = normalize(cameraPosition - vSea);
+        float fres = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+        vec3 R = reflect(-V, N);
+        R.y = abs(R.y);
+        float sd = max(dot(R, uSun), 0.0);
+        vec3 sky = mix(uHorizon, uZenith, pow(R.y, 0.5)) + vec3(1.0, 0.93, 0.75) * pow(sd, 12.0) * 0.22;
+
+        // Color del agua: azul verdoso mar adentro, turquesa cerca de la orilla, claro sobre la arena, verdoso en los ríos.
+        float nearShore = 1.0 - smoothstep(0.0, 500.0, off);
+        vec3 body = mix(srgb(vec3(0.05, 0.34, 0.42)), srgb(vec3(0.035, 0.27, 0.36)), smoothstep(1500.0, 7000.0, off));
+        body *= 0.88 + 0.24 * vnoise(vSea.xz * 0.0009 + 3.0);
+        body = mix(body, srgb(vec3(0.12, 0.55, 0.56)), nearShore);
+        body = mix(body, srgb(vec3(0.34, 0.72, 0.65)), 1.0 - smoothstep(0.0, 70.0, off));
+        body = mix(body, srgb(vec3(0.19, 0.44, 0.38)), smoothstep(-8.0, -50.0, off));
+        // La luz atraviesa las olas que dan al sol.
+        body += srgb(vec3(0.10, 0.32, 0.28)) * max(dot(N.xz, uSun.xz), 0.0) * 0.6;
+
+        vec3 col = mix(body, sky, fres);
+        // Brillo del sol sobre las olas.
+        col += vec3(1.0, 0.95, 0.82) * (pow(sd, 500.0) * 2.2 + pow(sd, 50.0) * 0.12);
+
+        // Espuma: la orilla y las olas que llegan a la playa.
+        float n = vnoise(vSea.xz * 0.11 + vec2(uTime * 0.06, 0.0));
+        float swash = sin(off * 0.11 + uTime * 1.25 + n * 3.0);
+        float band = smoothstep(0.82, 0.98, swash) * (1.0 - smoothstep(8.0, 75.0, off));
+        float edge = 1.0 - smoothstep(0.0, 7.0 + n * 7.0, off);
+        float foam = max(band * 0.75, edge) * smoothstep(-6.0, 0.0, off);
+        foam *= 0.55 + 0.45 * smoothstep(0.3, 0.7, vnoise(vSea.xz * 0.35 - uTime * 0.1));
+        foam *= 1.0 - smoothstep(4.0, 16.0, foot);
+        col = mix(col, srgb(vec3(0.94, 0.98, 0.96)), foam * 0.9);
+
+        // Desde muy alto: el dibujo del planeta.
+        col = mix(col, regionArt(vSea), uRegionMix);
+        gl_FragColor = vec4(col, 1.0);
+        #include <colorspace_fragment>
+        #include <fog_fragment>
+      }`,
+  });
+  // Un solo plano enorme: el mar llega hasta el horizonte (y hasta los bordes de la vista desde lo alto).
+  const geo = new PlaneGeometry(500000, 500000, 4, 4);
+  geo.rotateX(-Math.PI / 2);
   const sea = new Mesh(geo, mat);
-  sea.rotation.x = -Math.PI / 2;
-  sea.position.set(-1500, 0, -300);
+  sea.position.set(ARRIVAL_POS.x, 0, ARRIVAL_POS.z);
   return { sea, uniforms };
 }
 
@@ -235,7 +405,7 @@ function buildSky() {
 /** Nubes redondeadas que se mueven despacio. */
 function buildClouds(rand: () => number) {
   const group = new Group();
-  const mat = new MeshStandardMaterial({ color: '#ffffff', emissive: '#dfeefa', emissiveIntensity: 0.55, flatShading: true, roughness: 1 });
+  const mat = new MeshStandardMaterial({ color: '#ffffff', emissive: '#dfeefa', emissiveIntensity: 0.55, flatShading: true, roughness: 1, transparent: true });
   const geo = new IcosahedronGeometry(1, 1);
   for (let i = 0; i < 10; i++) {
     const cloud = new Group();
@@ -257,7 +427,12 @@ function buildClouds(rand: () => number) {
   const update = (t: number) => {
     for (const c of group.children) c.position.z = c.userData.z + Math.sin(t * 0.01 + c.userData.z) * 300;
   };
-  return { group, update };
+  /** Se desvanecen cuando la cámara está muy alta (al llegar desde el planeta). */
+  const setOpacity = (o: number) => {
+    mat.opacity = o;
+    group.visible = o > 0.01;
+  };
+  return { group, update, setOpacity };
 }
 
 /** Morros: islotes de roca con copete verde frente a la costa. */
@@ -286,7 +461,9 @@ function buildRocks(rand: () => number) {
 export interface MapSceneHandle {
   focus: (id: string) => void;
   select: (id: string | null) => void;
-  /** Pausa o reanuda la escena; al reanudar, la cámara entra desde lo alto, como si bajara del planeta. */
+  /** Sigue el viaje que empezó el planeta: baja desde la vista cenital y se inclina hasta la vista desde el mar. */
+  land: (handoff: Handoff, onLanded: () => void) => void;
+  /** Pausa o reanuda la escena. */
   setActive: (active: boolean) => void;
   dispose: () => void;
 }
@@ -309,17 +486,23 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   host.appendChild(labels.domElement);
 
   const scene = new Scene();
-  scene.fog = new Fog(HORIZON, 1400, 7200);
-  const camera = new PerspectiveCamera(52, 1, 5, 20000);
+  const fog = new Fog(HORIZON, FOG.near, FOG.far);
+  scene.fog = fog;
+  const camera = new PerspectiveCamera(52, 1, 5, 60000);
 
   const rand = rng(20261008);
   const sky = buildSky();
-  const { sea, uniforms } = buildSea();
+  const region = regionUniforms();
+  const { sea, uniforms } = buildSea(region);
   const clouds = buildClouds(rand);
   const mist = buildMist(rand);
   const places = buildPlaces(rand);
   const fauna = buildFauna(rand);
-  scene.add(sky, sea, buildLand(), buildRocks(rand), buildFlora(rand), clouds.group, mist.group, places.group, fauna.group);
+  const rocks = buildRocks(rand);
+  const flora = buildFlora(rand);
+  scene.add(sky, sea, buildLand(region), buildFarLand(region), rocks, flora, clouds.group, mist.group, places.group, fauna.group);
+  /** Lo que solo se ve de cerca: desde muy alto se esconde (no se alcanza a ver y ensuciaría el dibujo del planeta). */
+  const details = [rocks, flora, places.group, fauna.group];
 
   // Luz de ilustración: pareja y suave, con poca sombra.
   scene.add(new HemisphereLight('#eaf7f3', '#3a5a40', 2.1));
@@ -405,6 +588,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   const worldPerPixel = () => (2 * view.dist * Math.tan(MathUtils.degToRad(camera.fov / 2))) / Math.max(host.clientHeight, 1);
 
   const onDown = (e: PointerEvent) => {
+    if (intro) return;
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -441,11 +625,13 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   };
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    if (intro) return;
     goal.dist *= Math.exp(e.deltaY * 0.0012);
     clampGoal();
     onInteract();
   };
   const onKey = (e: KeyboardEvent) => {
+    if (intro || !active) return;
     const step = { ArrowLeft: [-260, 1], ArrowRight: [260, 1], ArrowUp: [0, 0.85], ArrowDown: [0, 1.18] }[e.key];
     if (step) {
       e.preventDefault();
@@ -496,14 +682,16 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   }
 
   // ───────── Tamaño y bucle ─────────
+  let aspect = 1;
   const resize = () => {
     const w = host.clientWidth;
     const h = host.clientHeight;
     renderer.setSize(w, h);
     labels.setSize(w, h);
-    camera.aspect = w / h;
+    aspect = w / Math.max(h, 1);
+    camera.aspect = aspect;
     // En pantallas verticales se abre el campo de visión para que quepa más costa.
-    camera.fov = w / h < 0.8 ? 64 : 52;
+    camera.fov = fovs(aspect).map;
     camera.updateProjectionMatrix();
   };
   const ro = new ResizeObserver(resize);
@@ -515,16 +703,46 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   const bob = new Quaternion();
   let frame = 0;
   let active = !paused;
+  /** Llegada desde el planeta en curso. */
+  let intro: { handoff: Handoff; fromDist: number; onLanded: () => void } | null = null;
   const loop = () => {
     frame = requestAnimationFrame(loop);
     if (!active) return;
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.1);
     const t = timer.getElapsed();
-    const ease = 1 - Math.exp(-dt * 3.2);
-    view.s += (goal.s - view.s) * ease;
-    view.dist += (goal.dist - view.dist) * ease;
-    view.pitch += (goal.pitch - view.pitch) * ease;
+    if (intro) {
+      // La misma curva de bajada del planeta (ver dive.ts): primero mirando hacia abajo, al final se inclina hacia la costa.
+      const it = (performance.now() - intro.handoff.startedAt) / 1000;
+      const e = diveProgress(it);
+      view.s = ARRIVAL.s;
+      view.dist = intro.fromDist * (DIST.start / intro.fromDist) ** e;
+      view.pitch = MathUtils.lerp(89.6, PITCH.start, MathUtils.smootherstep(e, 0.7, 1));
+      if (it >= DIVE.end) {
+        const done = intro.onLanded;
+        intro = null;
+        Object.assign(goal, { s: view.s, dist: view.dist, pitch: view.pitch });
+        done();
+      }
+    } else {
+      const ease = 1 - Math.exp(-dt * 3.2);
+      view.s += (goal.s - view.s) * ease;
+      view.dist += (goal.dist - view.dist) * ease;
+      view.pitch += (goal.pitch - view.pitch) * ease;
+    }
+    // Desde lo alto: planos de recorte y neblina a la medida de la altura, y el dibujo del planeta.
+    camera.near = Math.max(5, view.dist * 0.01);
+    camera.far = Math.max(60000, view.dist * 4);
+    camera.updateProjectionMatrix();
+    fog.near = Math.max(FOG.near, view.dist * 1.3);
+    fog.far = Math.max(FOG.far, view.dist * 5);
+    region.uRegionMix.value = smoothstep(view.dist, 4000, 20000);
+    const low = 1 - smoothstep(view.dist, 2500, 6500);
+    clouds.setOpacity(low);
+    mist.setOpacity(low);
+    const showDetails = view.dist < 8000;
+    for (const g of details) g.visible = showDetails;
+    for (const p of pins) p.pin.visible = showDetails;
     placeCamera();
     uniforms.uTime.value = t;
     clouds.update(t);
@@ -589,12 +807,14 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   return {
     focus,
     select,
+    land: (handoff, onLanded) => {
+      select(null);
+      intro = { handoff, fromDist: handoff.fromKm * mapUnitsPerKm(aspect), onLanded };
+      if (!active) timer.reset();
+      active = true;
+    },
     setActive: (on) => {
-      if (on && !active) {
-        view.dist = 2600;
-        view.pitch = 42;
-        timer.reset();
-      }
+      if (on && !active) timer.reset();
       active = on;
     },
     dispose: () => {
@@ -609,6 +829,8 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
         else mat?.dispose();
       });
       uniforms.uShore.value.dispose();
+      uniforms.uShoreFar.value.dispose();
+      region.uRegion.value.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       labels.domElement.remove();

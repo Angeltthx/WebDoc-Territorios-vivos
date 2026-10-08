@@ -15,6 +15,7 @@
     "media:transiciones": "node scripts/optimize-transitions.mjs",
     "media:historias": "node scripts/optimize-historias.mjs",
     "map:relief": "node scripts/map-relief.mjs",
+    "map:region": "node scripts/map-region.mjs",
     "map:world": "node scripts/map-world.mjs"
   },
   "dependencies": {

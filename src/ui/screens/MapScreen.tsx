@@ -1,6 +1,6 @@
 // Mapa 3D de prueba (/mapa). Empieza con el planeta Tierra (arte del afiche): solo el Chocó se puede tocar.
-// Al tocarlo o acercarse, el planeta gira hasta Colombia, baja al Chocó y aparece la costa de Nuquí desde el mar,
-// con los pueblos, sitios y especies del afiche.
+// Al tocarlo o acercarse, el planeta gira hasta Nuquí y baja; a mitad de camino el mapa de la costa sigue la misma
+// bajada con el mismo encuadre y las dos escenas se funden, hasta quedar frente a la costa, desde el mar.
 // Se carga bajo demanda para que three.js no pese en el resto del recorrido.
 
 import { useEffect, useRef, useState } from 'react';
@@ -8,9 +8,10 @@ import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
 import { TopBar } from '../components/Chrome';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
+import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
 
-type Phase = 'loading' | 'globe' | 'diving' | 'map';
+type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map';
 
 export default function MapScreen() {
   const stage = useRef<HTMLDivElement>(null);
@@ -40,11 +41,11 @@ export default function MapScreen() {
       });
       earth = createGlobe(globeStage.current!, {
         onDive: () => setPhase('diving'),
-        onArrive: () => {
-          map?.setActive(true);
-          setPhase('map');
-          // El planeta se desvanece y luego deja de dibujarse.
-          setTimeout(() => earth?.setActive(false), 1200);
+        onHandoff: (handoff) => {
+          // El mapa sigue bajando desde donde va el planeta; el planeta se desvanece encima y luego deja de dibujarse.
+          map?.land(handoff, () => setPhase('map'));
+          setPhase('landing');
+          setTimeout(() => earth?.setActive(false), DIVE.fade * 1000 + 200);
         },
       });
       handle.current = map;
