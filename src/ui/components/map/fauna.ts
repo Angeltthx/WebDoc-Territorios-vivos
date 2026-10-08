@@ -458,7 +458,7 @@ function buildPava(): Living {
   const living = swappable(new Group(), update, (kit) => {
     if (!kit.pava) return null;
     // La pava del modelo, en la misma rama: casi siempre quieta mirando alrededor y, cada tanto, canta.
-    const a = kit.pava(20);
+    const a = kit.pava(12);
     a.root.position.copy(bird.position);
     a.root.rotation.y = bird.rotation.y;
     bird.visible = false;
@@ -498,9 +498,16 @@ function buildFrog(): Living {
   const group = new Group();
   group.position.set(p.x, heightAt(p.x, p.z) - 0.5, p.z);
   group.rotation.y = doorTo(sea);
-  // Hojas y ranas grandes (como en el afiche), en el borde de la selva, para que se vean desde el mar.
-  group.scale.setScalar(1.9);
+  // Un parche de platanillo en el borde de la selva, como en el afiche, con las ranas pequeñas sobre sus hojas.
+  group.scale.setScalar(1.6);
   group.add(frogLeaf());
+  for (const [x, z, yaw, k] of [[3, -10, 0.9, 1.15], [10, -4, -1.4, 1.05], [7, 8, 2.8, 0.95], [1, 13, 1.9, 1.2]]) {
+    const leaf = frogLeaf(); // detrás (+x es tierra adentro), para no tapar a las ranas desde el mar
+    leaf.position.set(x, -0.6, z);
+    leaf.rotation.y = yaw;
+    leaf.scale.setScalar(k);
+    group.add(leaf);
+  }
   const frog = new Group();
   const g: BufferGeometry[] = [
     part(ORB, '#e8452c', { p: [0, 3, 0], s: [4, 3, 5] }),
@@ -515,16 +522,16 @@ function buildFrog(): Living {
     g.push(pole('#2a1a14', [side * 2.6, 2.2, 3], [side * 3.2, 0, 4.4], 0.6));
   }
   frog.add(sticker(solid(g), 0.3));
-  frog.scale.setScalar(1.6);
-  frog.position.set(-6, 8.2, 0);
+  frog.scale.setScalar(0.7);
+  frog.position.set(-6, 9.6, 0); // sobre la cara de la hoja
   frog.rotation.y = -Math.PI / 2;
   group.add(frog);
   const update = (t: number) => {
     const c = t % 6;
     const hop = c < 0.6 ? Math.sin((c / 0.6) * Math.PI) : 0;
-    frog.position.y = 8.2 + hop * 6;
+    frog.position.y = 9.6 + hop * 3;
     frog.rotation.x = -hop * 0.3;
-    frog.scale.y = 1.6 * (1 + Math.sin(t * 6) * 0.03 * (1 - hop)); // respira
+    frog.scale.y = 0.7 * (1 + Math.sin(t * 6) * 0.03 * (1 - hop)); // respira
   };
   const living = swappable(new Group(), update, (kit) => {
     const make = kit.rana;
@@ -538,10 +545,10 @@ function buildFrog(): Living {
     group.add(second);
     const frogs = [
       { at: frog.position.clone(), yaw: frog.rotation.y, holder: group },
-      { at: new Vector3(-5.1, 7, 0), yaw: -Math.PI / 2, holder: second },
+      { at: new Vector3(-5.1, 9.6, 0), yaw: -Math.PI / 2, holder: second },
     ].map(({ at, yaw, holder }, i) => {
-      const a = make(12);
-      a.root.position.copy(at).setY(at.y - 0.4);
+      const a = make(5.5);
+      a.root.position.copy(at);
       a.root.rotation.y = yaw;
       holder.add(a.root);
       return { a, step: i, wait: 1 + i * 2.5, busy: false };
@@ -923,7 +930,7 @@ function buildButterflies(rand: () => number): Living {
 
 /** Altura de cada rótulo de naturaleza sobre el terreno o el agua. */
 export const NATURE_LABEL_HEIGHT: Record<string, number> = {
-  ballena: 70, tortuga: 22, cangrejo: 26, pava: 86, rana: 44, manglar: 30, cacao: 34,
+  ballena: 70, tortuga: 22, cangrejo: 26, pava: 84, rana: 30, manglar: 30, cacao: 34,
 };
 
 export function buildFauna(rand: () => number, onSplash: OnSplash = () => {}): Living {

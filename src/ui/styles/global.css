@@ -560,64 +560,88 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 }
 
 /* ───────── Mapa 3D de prueba (/mapa) ─────────
-   Rótulos como los del afiche: pueblos en píldora blanca con letra serif verde; sitios en etiqueta rosada. */
-.map-screen { position: fixed; inset: 0; overflow: hidden; background: #cfe8f0; }
+   Todo con el lenguaje del afiche: tintas planas, sin vidrio ni desenfoque. Pueblos en píldora crema con borde
+   oscuro y letra serif verde; sitios en etiqueta rosada con filete blanco; fauna en el rótulo azul de dos franjas
+   (nombre común arriba, nombre científico en cursiva abajo). */
+.map-screen {
+  --p-cream: #fdf6e3; --p-ink: #1f4a35; --p-line: #173628; --p-pink: #e2456f; --p-sky: #6b97cd; --p-navy: #3e6197;
+  --p-drop: 0 3px 0 rgba(15, 40, 30, 0.38);
+  position: fixed; inset: 0; overflow: hidden; background: #cfe8f0;
+}
 .map-stage { position: absolute; inset: 0; touch-action: none; cursor: grab; }
 .map-stage:active { cursor: grabbing; }
 .map-stage canvas { display: block; }
 .map-labels { position: absolute; inset: 0; pointer-events: none; }
 .map-label {
-  pointer-events: auto; border: 0; white-space: nowrap; line-height: 1.15;
-  box-shadow: 0 3px 12px rgba(10, 40, 40, 0.25); transition: opacity 0.3s, translate 0.25s var(--ease), scale 0.25s var(--ease), background 0.25s;
+  pointer-events: auto; border: 0; white-space: nowrap; line-height: 1.15; cursor: pointer;
+  transition: opacity 0.35s, translate 0.25s var(--ease), scale 0.25s var(--ease), background 0.25s, color 0.25s;
 }
 .map-label--town {
-  padding: 5px 14px; border-radius: 999px; background: #fffdf4; color: #1f4a35;
-  font: 700 clamp(12px, 1.3vw, 16px) var(--serif); letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 4px 15px 5px; border: 2px solid var(--p-line); border-radius: 999px; background: var(--p-cream); color: var(--p-ink);
+  box-shadow: var(--p-drop); font: 700 clamp(12px, 1.25vw, 15px) var(--serif); letter-spacing: 0.16em; text-transform: uppercase;
 }
 .map-label--site {
-  margin-top: calc(var(--lift, 0px) * -1); padding: 4px 8px; border-radius: 4px; background: #e2456f; color: #fff;
-  font: 600 11px var(--serif); letter-spacing: 0.02em;
+  margin-top: calc(var(--lift, 0px) * -1); padding: 3px 7px; border: 1.5px solid #fff; border-radius: 3px;
+  background: var(--p-pink); color: #fff; box-shadow: var(--p-drop); font: 700 10.5px var(--serif); letter-spacing: 0.01em;
 }
 /* Línea que une el rótulo con su alfiler cuando sube para no pisar a otro. */
-.map-label--site::after {
-  content: ''; position: absolute; left: 50%; top: 100%; width: 1.5px; height: var(--lift, 0px);
-  background: #e2456f; pointer-events: none;
+.map-label--site::after, .map-label--nature::after {
+  content: ''; position: absolute; left: 50%; top: 100%; width: 1.5px; height: var(--lift, 0px); background: #fff; pointer-events: none;
 }
 /* El renderizador de rótulos ocupa `transform`; el realce usa `translate` y `scale`. */
-/* Fauna y flora: recuadro azul con el nombre científico en cursiva, como en el afiche. */
 .map-label--nature {
-  margin-top: calc(var(--lift, 0px) * -1); display: flex; flex-direction: column; align-items: center; gap: 1px;
-  padding: 3px 9px 4px; border-radius: 4px; background: #6f9fd0; color: #fff;
-  font: 600 10px var(--sans); letter-spacing: 0.08em; text-transform: uppercase;
+  margin-top: calc(var(--lift, 0px) * -1); display: flex; flex-direction: column; align-items: stretch; padding: 0;
+  background: none; text-align: center; filter: drop-shadow(0 3px 0 rgba(15, 40, 30, 0.32));
 }
-.map-label--nature em { font: italic 400 10px var(--serif); letter-spacing: 0; text-transform: none; opacity: 0.95; }
-.map-label--nature::after {
-  content: ''; position: absolute; left: 50%; top: 100%; width: 1.5px; height: var(--lift, 0px);
-  background: #6f9fd0; pointer-events: none;
+.map-label--nature span {
+  padding: 3px 10px 2px; border-radius: 3px 3px 0 0; background: var(--p-sky); color: #fff;
+  font: 500 11px 'Fredoka', var(--sans); letter-spacing: 0.06em; text-transform: uppercase;
 }
-.map-label--nature.is-selected { background: #3f6fa6; }
-.map-card__sci { margin-top: 2px; font: italic 15px var(--serif); opacity: 0.85; }
-
+.map-label--nature span:only-child { border-radius: 3px; }
+.map-label--nature em {
+  padding: 1px 10px 3px; border-radius: 0 0 3px 3px; background: var(--p-navy); color: #fff;
+  font: italic 400 10.5px var(--serif);
+}
 .map-label:hover, .map-label.is-selected { translate: 0 -3px; scale: 1.06; }
 .map-label--site.is-selected { background: #b8264e; }
-.map-label--town.is-selected { background: var(--gold); }
+.map-label--town.is-selected { background: var(--p-pink); color: #fff; }
+.map-label--nature.is-selected span { background: var(--p-navy); }
+.map-label--nature.is-selected em { background: var(--p-line); }
 
-.map-screen .topbar .chip { background: rgba(15, 35, 28, 0.6); }
-.map-screen .topbar .ghost-link { min-height: 0; padding: 6px 12px; border-radius: 7px; background: rgba(15, 35, 28, 0.6); backdrop-filter: blur(8px); text-shadow: none; }
-
-.map-card {
-  position: absolute; z-index: 6; left: var(--gutter); bottom: 86px; width: min(340px, calc(100vw - 32px));
-  padding: 18px 20px 16px; border-radius: 12px; background: rgba(15, 35, 28, 0.82); backdrop-filter: blur(10px);
-  animation: rise 0.4s var(--ease) both;
+/* Barra superior y avisos: píldoras crema del afiche. */
+.map-screen .topbar .chip, .map-screen .topbar .ghost-link, .map-hint, .map-pull, .globe-title__hint {
+  border: 2px solid var(--p-line); border-radius: 999px; background: var(--p-cream); color: var(--p-ink);
+  box-shadow: var(--p-drop); backdrop-filter: none; text-shadow: none;
 }
-.map-card__title { margin-top: 6px; font: 700 22px/1.2 var(--serif); }
-.map-card__handle { display: inline-block; margin-top: 8px; color: #f6b8c9; text-decoration: none; font-size: 14px; }
+.map-screen .topbar .chip { padding: 5px 14px; font: 700 11px var(--serif); letter-spacing: 0.16em; }
+.map-screen .topbar .ghost-link {
+  min-height: 0; padding: 5px 14px; font: 700 11px var(--serif); letter-spacing: 0.12em; text-transform: uppercase;
+  transition: background 0.2s, color 0.2s;
+}
+.map-screen .topbar .ghost-link:hover { background: var(--p-pink); color: #fff; }
+.map-screen .topbar__right { gap: 10px; }
+
+/* Ficha del lugar elegido: papel crema con la cabecera del color de su rótulo. */
+.map-card {
+  position: absolute; z-index: 6; left: var(--gutter); bottom: 86px; width: min(320px, calc(100vw - 32px));
+  overflow: hidden; border: 2px solid var(--p-line); border-radius: 10px; background: var(--p-cream); color: var(--p-ink);
+  box-shadow: 0 5px 0 rgba(15, 40, 30, 0.38); animation: rise 0.4s var(--ease) both;
+}
+.map-card__head { padding: 12px 44px 11px 16px; background: var(--p-ink); color: var(--p-cream); }
+.map-card--site .map-card__head { background: var(--p-pink); color: #fff; }
+.map-card--nature .map-card__head { background: var(--p-sky); color: #fff; }
+.map-card .eyebrow { font: 500 10.5px 'Fredoka', var(--sans); letter-spacing: 0.16em; opacity: 1; }
+.map-card__title { margin-top: 2px; font: 700 21px/1.2 var(--serif); }
+.map-card--town .map-card__title { letter-spacing: 0.08em; text-transform: uppercase; }
+.map-card__sci { padding: 5px 16px 6px; background: var(--p-navy); color: #fff; font: italic 14px var(--serif); }
+.map-card__body { padding: 10px 16px 12px; font: 14px/1.5 var(--serif); }
+.map-card__handle { color: #b8264e; font-weight: 600; text-decoration: none; }
 .map-card__handle:hover { text-decoration: underline; }
 .map-card__close {
-  position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; border: 0; border-radius: 50%;
-  background: none; font-size: 22px; line-height: 1;
+  position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2); color: inherit; font-size: 20px; line-height: 1;
 }
-.map-card__close:hover { background: rgba(255, 255, 255, 0.12); }
+.map-card__close:hover { background: rgba(255, 255, 255, 0.35); }
 
 /* Aviso mientras se arma la escena (tarda unos segundos la primera vez). */
 .map-loading {
@@ -630,38 +654,49 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 
 .map-hint {
   position: absolute; z-index: 4; left: 50%; top: 72px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
-  padding: 7px 14px; border-radius: 999px; background: rgba(15, 35, 28, 0.6); backdrop-filter: blur(8px);
-  font-size: 12px; text-align: center; pointer-events: none; transition: opacity 0.6s ease;
+  padding: 5px 16px 6px; font: italic 13px var(--serif); text-align: center; pointer-events: none; transition: opacity 0.6s ease;
 }
 .map-hint.is-hidden { opacity: 0; }
 /* Aviso al alejarse más allá del máximo: si sigue, vuelve al planeta. La barra se llena con el tirón. */
 .map-pull {
   position: absolute; z-index: 6; left: 50%; bottom: 84px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
-  margin: 0; padding: 9px 16px 11px; border-radius: 999px; background: rgba(15, 35, 28, 0.66); backdrop-filter: blur(8px);
-  font-size: 13px; letter-spacing: 0.04em; text-align: center; pointer-events: none; overflow: hidden; transition: opacity 0.25s ease;
+  margin: 0; padding: 7px 18px 10px; font: italic 14px var(--serif); text-align: center; pointer-events: none; overflow: hidden;
+  transition: opacity 0.25s ease;
 }
 .map-pull__bar {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #e2456f; transform-origin: left; transition: transform 0.15s linear;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--p-pink); transform-origin: left; transition: transform 0.15s linear;
 }
 
 .map-towns {
-  position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; justify-content: center;
-  padding: 18px var(--gutter) max(14px, env(safe-area-inset-bottom));
-  background: linear-gradient(transparent, rgba(8, 40, 50, 0.55));
+  position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; justify-content: center; gap: 10px;
+  padding: 16px var(--gutter) max(14px, env(safe-area-inset-bottom));
 }
-.map-towns .tab { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); }
+/* Pueblos abajo: las mismas píldoras de la costa, en pequeño. */
+.map-towns .tab {
+  min-height: 0; padding: 4px 13px 5px; border: 2px solid var(--p-line); border-radius: 999px; background: var(--p-cream);
+  color: var(--p-ink); box-shadow: var(--p-drop); font: 700 11px var(--serif); letter-spacing: 0.14em; text-shadow: none;
+  transition: background 0.2s, color 0.2s, translate 0.2s var(--ease);
+}
+.map-towns .tab::after { display: none; }
+.map-towns .tab:hover { translate: 0 -2px; color: var(--p-ink); }
+.map-towns .tab.is-active { background: var(--p-pink); color: #fff; }
 
 @media (max-width: 640px) {
-  .map-card { bottom: 70px; }
-  .map-hint { top: 64px; font-size: 11px; }
+  .map-card { bottom: 64px; }
+  .map-hint { top: 60px; padding: 4px 12px 5px; font-size: 11px; }
   .map-label--site { font-size: 10px; }
+  /* No cabe el rótulo de la barra junto a los botones. */
+  .map-screen .topbar .chip { display: none; }
+  .map-screen .topbar .ghost-link { padding: 4px 10px; font-size: 10px; letter-spacing: 0.08em; white-space: nowrap; }
+  .map-towns { gap: 6px; padding-left: 10px; padding-right: 10px; }
+  .map-towns .tab { padding: 3px 8px 4px; font-size: 9.5px; letter-spacing: 0.08em; }
 }
 
 /* ───────── Planeta de entrada del mapa (arte del afiche) ───────── */
 .globe-stage {
   position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: grab;
   /* El espacio: casi negro, con un resplandor tenue detrás del planeta y nebulosas muy suaves. Las estrellas se
-     dibujan en el lienzo (titilan); aquí quedan solo los dos destellos del afiche. */
+     dibujan en el lienzo y giran con el planeta. */
   background:
     radial-gradient(circle at 50% 52%, rgba(40, 110, 130, 0.22), transparent 42%),
     radial-gradient(ellipse 60% 40% at 18% 22%, rgba(88, 62, 140, 0.16), transparent 70%),
@@ -669,13 +704,6 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
     linear-gradient(#03060c, #040912 55%, #020409);
   transition: opacity 0.9s ease-in-out, visibility 0.9s;
 }
-.globe-stage::before, .globe-stage::after {
-  content: '✳'; position: absolute; color: #fdf6e3; opacity: 0.8; pointer-events: none;
-  animation: twinkle 3.2s ease-in-out infinite;
-}
-.globe-stage::before { left: 16%; top: 30%; font-size: 22px; }
-.globe-stage::after { right: 14%; top: 62%; font-size: 16px; animation-delay: 1.4s; }
-@keyframes twinkle { 50% { opacity: 0.25; transform: scale(0.8) rotate(20deg); } }
 .globe-stage canvas { display: block; }
 .globe-stage.is-diving { cursor: default; }
 .map-screen.is-landing .globe-stage, .map-screen.is-map .globe-stage, .map-screen.is-leaving .globe-stage { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -717,10 +745,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   transition: opacity 0.8s ease, transform 0.8s var(--ease);
 }
 .map-screen.is-diving .globe-title, .map-screen.is-landing .globe-title, .map-screen.is-leaving .globe-title, .map-screen.is-map .globe-title, .map-screen.is-loading .globe-title { opacity: 0; transform: translateY(16px); }
-.globe-title__hint {
-  margin-top: 10px; display: inline-block; padding: 7px 14px; border-radius: 999px;
-  background: rgba(15, 35, 28, 0.6); backdrop-filter: blur(8px); font-size: 12px; letter-spacing: 0.08em;
-}
+.globe-title__hint { margin-top: 12px; display: inline-block; padding: 5px 16px 6px; font: italic 13px var(--serif); }
 
 /* Título del afiche: "Nuquí" en letras gruesas con franjas verde, crema y naranja; "Chocó" en letra pincel. */
 .poster-title { display: flex; flex-direction: column; line-height: 0.85; }

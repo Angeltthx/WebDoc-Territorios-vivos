@@ -441,6 +441,8 @@ export function heightAt(x: number, z: number) {
 for (const p of [...placed, ...nature]) p.pos.y = Math.max(heightAt(p.pos.x, p.pos.z), 0);
 
 /** ¿Hay espacio libre para sembrar algo aquí? (en tierra, lejos de lugares y de los ríos). */
+const CLEARING: Record<string, number> = { rana: 14, pava: 20 };
+
 export function isFree(x: number, z: number, minInland = 8) {
   if (shore(x, z) < minInland) return false;
   if (riverReach(x, z) < 1.8) return false;
@@ -448,7 +450,8 @@ export function isFree(x: number, z: number, minInland = 8) {
     const r = p.kind === 'town' ? 125 : p.id === 'kipara-te' ? 110 : 50;
     if (Math.abs(x - p.pos.x) < r && Math.abs(z - p.pos.z) < r && Math.hypot(x - p.pos.x, z - p.pos.z) < r) return false;
   }
-  for (const p of nature) if (Math.hypot(x - p.pos.x, z - p.pos.z) < 45) return false;
+  // La pava y las ranas quedan metidas en la vegetación; el resto, en su claro.
+  for (const p of nature) if (Math.hypot(x - p.pos.x, z - p.pos.z) < (CLEARING[p.id] ?? 45)) return false;
   return true;
 }
 

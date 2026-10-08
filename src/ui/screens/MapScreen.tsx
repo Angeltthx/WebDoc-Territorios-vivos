@@ -118,18 +118,22 @@ export default function MapScreen() {
       />
 
       {onMap && place && (
-        <aside className="map-card" aria-live="polite">
+        <aside className={`map-card map-card--${place.kind}`} aria-live="polite">
+          <div className="map-card__head">
+            <p className="eyebrow">{place.kind === 'town' ? 'Pueblo' : place.kind === 'nature' ? 'Naturaleza del Pacífico' : `Cerca de ${place.near}`}</p>
+            <h2 className="map-card__title">{place.name}</h2>
+          </div>
+          {place.scientific && <p className="map-card__sci">{place.scientific}</p>}
+          {place.handle && (
+            <p className="map-card__body">
+              <a className="map-card__handle" href={`https://www.instagram.com/${place.handle}/`} target="_blank" rel="noopener noreferrer">
+                @{place.handle}
+              </a>
+            </p>
+          )}
           <button type="button" className="map-card__close" aria-label="Cerrar" onClick={() => handle.current?.select(null)}>
             ×
           </button>
-          <p className="eyebrow">{place.kind === 'town' ? 'Pueblo' : place.kind === 'nature' ? 'Naturaleza del Pacífico' : `Cerca de ${place.near}`}</p>
-          <h2 className="map-card__title">{place.name}</h2>
-          {place.scientific && <p className="map-card__sci">{place.scientific}</p>}
-          {place.handle && (
-            <a className="map-card__handle" href={`https://www.instagram.com/${place.handle}/`} target="_blank" rel="noopener noreferrer">
-              @{place.handle}
-            </a>
-          )}
         </aside>
       )}
 

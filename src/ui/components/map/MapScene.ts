@@ -728,7 +728,8 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     const place = [...placed, ...nature].find((p) => p.id === id) ?? null;
     if (place) {
       goal.s = place.s;
-      goal.dist = Math.min(goal.dist, place.kind === 'town' ? 760 : 560);
+      // La fauna es pequeña: al elegirla, la cámara se acerca más.
+      goal.dist = Math.min(goal.dist, place.kind === 'town' ? 760 : place.kind === 'nature' ? 380 : 560);
       clampGoal();
     }
     onSelect(place);
@@ -762,6 +763,8 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   const tmp = new Vector3();
   const bob = new Quaternion();
   let frame = 0;
+  // Contador propio: el id de requestAnimationFrame lo comparten todos los bucles de la página.
+  let ticks = 0;
   let active = !paused;
   /** Llegada desde el planeta en curso. */
   let intro: { handoff: Handoff; fromDist: number; onLanded: () => void } | null = null;
@@ -840,19 +843,20 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
         pin.scale.setScalar(place.id === selected ? 1.45 : 1);
       }
       // Los rótulos de los sitios lejanos se desvanecen para no amontonarse.
-      const far = place.kind === 'town' ? 1 : 1 - smoothstep(pin.position.distanceTo(camera.position), 1500, 2300);
+      const far = place.kind === 'town' ? 1 : 1 - smoothstep(pin.position.distanceTo(camera.position), 1300, 1900);
       el.dataset.far = String(far);
     }
 
     renderer.render(scene, camera);
     labels.render(scene, camera);
-    if (frame % 8 === 0) declutter();
+    if (ticks++ % 6 === 0) declutter();
   };
 
   /**
    * Evita que los rótulos se pisen: si uno choca con otro más importante (pueblos, luego el elegido,
    * luego los cercanos), sube un escalón unido a su alfiler por una línea; si no cabe, se oculta.
    */
+  const GAP = { x: 14, y: 8 };
   const declutter = () => {
     const order = [...pins].sort((a, b) => rank(a) - rank(b));
     const taken: { l: number; r: number; t: number; b: number }[] = [];
@@ -860,11 +864,12 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
       const far = Number(el.dataset.far ?? 1);
       const lift = Number(el.dataset.lift ?? 0);
       const box = el.getBoundingClientRect();
-      const step = box.height + 6;
+      const step = box.height + 10;
       let placedAt = -1;
-      for (let k = 0; far > 0.2 && k < 4 && placedAt < 0; k++) {
+      // A lo sumo dos pisos: una torre de rótulos se ve revuelta; si no cabe, queda solo su alfiler.
+      for (let k = 0; far > 0.2 && k < 2 && placedAt < 0; k++) {
         const t = box.top + lift - k * step;
-        const hit = taken.some((o) => box.left < o.r + 4 && box.right > o.l - 4 && t < o.b + 2 && t + box.height > o.t - 2);
+        const hit = taken.some((o) => box.left < o.r + GAP.x && box.right > o.l - GAP.x && t < o.b + GAP.y && t + box.height > o.t - GAP.y);
         if (!hit) {
           placedAt = k;
           taken.push({ l: box.left, r: box.right, t, b: t + box.height });
