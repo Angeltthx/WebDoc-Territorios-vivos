@@ -19,19 +19,20 @@ import { buildFlora, buildMist } from './flora';
 import { buildPlaces } from './places';
 import { loadAnimals } from './animals';
 import { ASCENT, DIVE, diveProgress, fovs, mapUnitsPerKm, type Handoff } from './dive';
-import { REGION, posterTexture, regionCanvas } from './posterArt';
+import { DUSK_AT_NUQUI, DUSK_GLSL, REGION, posterTexture, regionCanvas } from './posterArt';
 import {
-  ARRIVAL, BOUNDS, FAR_GRID, FAR_SHORE_FIELD, GRID, HEIGHTS, RAIL, SHORE_FIELD, farVertex, nature, placeNear, placed, railAt, rng,
+  ARRIVAL, BOUNDS, FAR_GRID, FAR_SHORE_FIELD, GRID, HEIGHTS, RAIL, SHORE_FIELD, farVertex, nature, placeNear, placed, railAt, rng, SUN_DIR, viewOffset, viewTurn,
   shore, smoothstep, toScene, valueNoise, type PlacedPlace,
 } from './terrain';
 
 const DIST = { min: 300, max: 1700, start: DIVE.mapDist };
 const PITCH = { min: 5, max: 38, start: 10 };
 
-// Atardecer: el sol bajo sobre el Pacífico, a espaldas de la cámara (que mira hacia la costa, +x). Alumbra de frente
-// la costa con luz naranja; el cielo que se ve es el del lado contrario al sol: durazno en el horizonte, una franja
-// rosada encima y azul violeta arriba.
-const SUN_DIR = new Vector3(-1, 0.4, 0.22).normalize();
+// Atardecer, como el del final del recorrido: el sol bajo sobre el mar abierto, a la derecha del cuadro (la cámara mira
+// en diagonal a lo largo de la costa, ver VIEW_YAW), con su rayo de luz en el agua. El cielo arde en naranja hacia el
+// sol y del otro lado es durazno, con una franja rosada y azul violeta arriba.
+/** La luz que modela la costa viene del mismo lado que el sol, pero más alta, para que los cerros no queden a oscuras. */
+const KEY_DIR = new Vector3(SUN_DIR.x, 0, SUN_DIR.z).normalize().setY(0.45).normalize();
 const HORIZON = new Color('#f7a46c');
 const GLOW = new Color('#ffb14e');
 const BELT = new Color('#f4a296');
@@ -45,7 +46,7 @@ const FOG = { near: 2500, far: 30000 };
 /** Punto de vista inicial aproximado (frente a Nuquí), para dejar el sol despejado. */
 const START_VIEW = (() => {
   const nuqui = placed.find((p) => p.id === 'nuqui')!;
-  return nuqui.pos.clone().addScaledVector(nuqui.sea, 900).setY(170);
+  return nuqui.pos.clone().addScaledVector(viewOffset(nuqui.sea), 900).setY(170);
 })();
 
 // ───────── Construcción de la escena ─────────
@@ -120,8 +121,10 @@ function regionUniforms(): RegionUniforms {
 const REGION_GLSL = `uniform sampler2D uRegion;
   uniform vec4 uRegionBox;
   uniform float uRegionMix;
+  ${DUSK_GLSL}
   vec3 regionArt(vec3 w) {
-    return texture2D(uRegion, vec2((w.x - uRegionBox.x) / uRegionBox.z, 1.0 - (w.z - uRegionBox.y) / uRegionBox.w)).rgb;
+    vec3 art = texture2D(uRegion, vec2((w.x - uRegionBox.x) / uRegionBox.z, 1.0 - (w.z - uRegionBox.y) / uRegionBox.w)).rgb;
+    return dusk(art, ${DUSK_AT_NUQUI.toFixed(2)});
   }`;
 
 /**
@@ -380,15 +383,12 @@ function buildSea(region: RegionUniforms) {
         vec3 col = mix(body, sky, fres);
         // Brillo del sol sobre las olas.
         col += vec3(1.0, 0.7, 0.4) * (pow(sd, 500.0) * 2.2 + pow(sd, 50.0) * 0.12);
-        // El sol está a espaldas de quien mira: no hay camino de luz, pero el mar picado lo devuelve igual. Las caras
-        // de las olas que miran al sol (y a la cámara) se encienden de dorado, y algunas facetas centellean.
-        vec3 Nc = normalize(vec3(-g.x * 8.0, 1.0, -g.y * 8.0));
-        float near = 1.0 - smoothstep(3.0, 12.0, foot);
-        float face = max(dot(Nc, uSun), 0.0);
-        col += srgb(vec3(1.0, 0.5, 0.22)) * pow(face, 3.0) * 0.3 * near;
-        float glit = pow(max(dot(Nc, normalize(uSun + V)), 0.0), 70.0);
-        glit *= smoothstep(0.35, 0.8, vnoise(vSea.xz * 0.5 + vec2(uTime * 0.9, -uTime * 0.6)));
-        col += vec3(1.0, 0.68, 0.34) * glit * 3.2 * near;
+        // Rayo de sol en el agua: cada ola que devuelve el sol hacia la cámara centellea, y juntas forman el camino de
+        // luz que va del sol hasta quien mira. Más ancho y suave lejos, chispeante cerca.
+        float sparkle = smoothstep(0.3, 0.75, vnoise(vSea.xz * 0.45 + vec2(uTime * 1.1, -uTime * 0.7)));
+        col += vec3(1.0, 0.62, 0.3) * pow(sd, 18.0) * 0.35;
+        col += vec3(1.0, 0.76, 0.45) * pow(sd, 90.0) * 1.1;
+        col += vec3(1.0, 0.9, 0.7) * pow(sd, 400.0) * (1.5 + 4.0 * sparkle);
 
         // Espuma: la orilla y las olas que llegan a la playa.
         float n = vnoise(vSea.xz * 0.11 + vec2(uTime * 0.06, 0.0));
@@ -447,8 +447,11 @@ function buildSky() {
         vec3 col = mix(horizon, uZenith, pow(h, 0.45));
         col = mix(col, uBelt, exp(-pow((h - 0.13) / 0.09, 2.0)) * (1.0 - toward) * 0.3);
         float s = max(dot(d, uSun), 0.0);
-        col += vec3(1.0, 0.6, 0.28) * (pow(s, 8.0) * 0.35 + pow(s, 160.0) * 0.8);
-        col = mix(col, vec3(1.0, 0.86, 0.6), smoothstep(0.9988, 0.9991, s));
+        col += vec3(1.0, 0.55, 0.22) * (pow(s, 8.0) * 0.4 + pow(s, 60.0) * 0.35);
+        col += vec3(1.0, 0.72, 0.38) * pow(s, 700.0) * 0.9;
+        // Disco: blanco amarillento al centro y naranja hacia el borde.
+        float disc = smoothstep(0.99935, 0.99945, s);
+        col = mix(col, mix(vec3(1.0, 0.62, 0.25), vec3(1.0, 0.95, 0.78), smoothstep(0.99945, 0.99985, s)), disc);
         gl_FragColor = vec4(col, 1.0);
         #include <colorspace_fragment>
       }`,
@@ -573,7 +576,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   // Luz de la tarde: el sol naranja de frente sobre la costa y, en las caras que no le dan, el cielo rosado y violeta.
   scene.add(new HemisphereLight('#ffcfa8', '#55405a', 1.8));
   const key = new DirectionalLight(SUN_LIGHT, 2.9);
-  key.position.copy(SUN_DIR).multiplyScalar(1000);
+  key.position.copy(KEY_DIR).multiplyScalar(1000);
   scene.add(key);
 
   // Marcadores: alfiler rosado para los sitios, rótulo blanco para los pueblos.
@@ -628,13 +631,16 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   const goal = { s: startS, dist: DIST.start, pitch: PITCH.start };
   const target = new Vector3();
 
+  const tmpOff = new Vector3();
+  const UP_AXIS = new Vector3(0, 1, 0);
   const placeCamera = () => {
     const r = railAt(view.s);
     target.copy(r.pos).addScaledVector(r.sea, -170).setY(25);
     const p = MathUtils.degToRad(view.pitch);
-    camera.position.copy(target).addScaledVector(r.sea, view.dist * Math.cos(p));
+    camera.position.copy(target).addScaledVector(viewOffset(r.sea, tmpOff), view.dist * Math.cos(p));
     camera.position.y += view.dist * Math.sin(p);
-    camera.lookAt(target);
+    // En pantallas angostas, la mirada gira hacia el mar abierto sin mover la cámara (ver viewTurn).
+    camera.lookAt(tmpOff.copy(target).sub(camera.position).applyAxisAngle(UP_AXIS, viewTurn(aspect)).add(camera.position));
     sky.position.copy(camera.position);
   };
 

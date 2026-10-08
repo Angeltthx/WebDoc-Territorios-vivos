@@ -317,6 +317,14 @@ export function regionCanvas() {
   return canvas;
 }
 
+/**
+ * Luz de la tarde sobre el dibujo del afiche (en espacio lineal): lo entibia hacia el naranja. El planeta la aplica en la
+ * franja donde está atardeciendo (Nuquí cae ahí) y el mapa, sobre el mismo dibujo, al llegar desde lo alto.
+ */
+export const DUSK_GLSL = `vec3 dusk(vec3 c, float k) { return mix(c, c * vec3(1.35, 0.82, 0.55) + vec3(0.03, 0.01, 0.0), k); }`;
+/** Cuánto atardecer recibe el dibujo en Nuquí (el planeta y el mapa coinciden ahí). */
+export const DUSK_AT_NUQUI = 0.62;
+
 /** Textura (sRGB) de un lienzo del afiche. */
 export function posterTexture(canvas: HTMLCanvasElement) {
   const tex = new CanvasTexture(canvas);

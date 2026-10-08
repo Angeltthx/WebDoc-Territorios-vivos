@@ -3,13 +3,13 @@
 // viaje al mapa de la costa (ver dive.ts).
 
 import {
-  AdditiveBlending, BackSide, BufferGeometry, Float32BufferAttribute, Group, MathUtils, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Points, Quaternion,
+  AdditiveBlending, BackSide, BufferGeometry, CanvasTexture, Sprite, SpriteMaterial, Float32BufferAttribute, Group, MathUtils, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Points, Quaternion,
   Raycaster, SRGBColorSpace, Scene, ShaderMaterial, SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ASCENT, DIVE, diveAltitude, fovs, type Handoff } from './dive';
-import { ARRIVAL } from './terrain';
-import { REGION, isChoco, posterTexture, regionCanvas, worldCanvas } from './posterArt';
+import { ARRIVAL, arrivalBearing } from './terrain';
+import { DUSK_GLSL, REGION, isChoco, posterTexture, regionCanvas, worldCanvas } from './posterArt';
 
 const R = 1;
 const DEG = Math.PI / 180;
@@ -156,6 +156,75 @@ function buildStars(pixelRatio: number) {
   return { points: new Points(geo, mat), uniforms: mat.uniforms };
 }
 
+// ───────── Sol ─────────
+
+/**
+ * El sol de la tarde visto desde el espacio: se está poniendo en Nuquí, bajo (4,5°) sobre el Pacífico hacia el
+ * oeste (algo al sur), como el ocaso real de allí en octubre. Nuquí queda justo en la franja del atardecer, con la misma luz naranja
+ * que en la costa, y al girar el planeta se ve el sol. (En la costa la cámara mira en diagonal y el sol se corre hacia
+ * el mar abierto que queda en el cuadro; desde aquí arriba no se nota.)
+ */
+const SUN_GLOBE = (() => {
+  const out = latLonToVec(ARRIVAL.lat, ARRIVAL.lon).normalize();
+  const north = latLonToVec(ARRIVAL.lat + 0.01, ARRIVAL.lon).normalize().sub(out).normalize();
+  const east = latLonToVec(ARRIVAL.lat, ARRIVAL.lon + 0.01).normalize().sub(out).normalize();
+  const bearing = 264 * DEG;
+  const elev = 4.5 * DEG;
+  return out.multiplyScalar(Math.sin(elev))
+    .addScaledVector(north, Math.cos(bearing) * Math.cos(elev))
+    .addScaledVector(east, Math.sin(bearing) * Math.cos(elev))
+    .normalize();
+})();
+
+/**
+ * Luz del sol sobre el dibujo del planeta: el lado de día con su color, la franja del atardecer entibiada de naranja
+ * y la noche en penumbra azulada (se sigue viendo el dibujo).
+ */
+function sunlit(mat: MeshBasicMaterial) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uSun = { value: SUN_GLOBE };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSunN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSunN = normal;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSunN;\nuniform vec3 uSun;\n${DUSK_GLSL}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        float sunD = dot(normalize(vSunN), uSun);
+        vec3 c = diffuseColor.rgb;
+        vec3 lit = c * (0.9 + 0.22 * smoothstep(0.0, 0.8, sunD));
+        vec3 night = c * vec3(0.26, 0.3, 0.46);
+        vec3 col = mix(night, lit, smoothstep(-0.28, 0.02, sunD));
+        diffuseColor.rgb = dusk(col, exp(-pow((sunD - 0.02) / 0.16, 2.0)) * 0.7);`);
+  };
+  return mat;
+}
+
+/** El sol: un disco brillante con su resplandor, lejos, en la dirección del sol (gira con el planeta y el cielo). */
+function buildSun() {
+  const sprite = (stops: [number, string][], size: number) => {
+    const n = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = n;
+    const ctx = canvas.getContext('2d')!;
+    const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+    for (const [o, c] of stops) g.addColorStop(o, c);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, n, n);
+    const tex = new CanvasTexture(canvas);
+    tex.colorSpace = SRGBColorSpace;
+    const s = new Sprite(new SpriteMaterial({ map: tex, blending: AdditiveBlending, depthWrite: false, transparent: true }));
+    s.scale.setScalar(size);
+    return s;
+  };
+  const sun = new Group();
+  sun.add(
+    sprite([[0, 'rgba(255,190,120,0.55)'], [0.25, 'rgba(255,140,70,0.22)'], [0.6, 'rgba(255,110,60,0.06)'], [1, 'rgba(255,100,60,0)']], 26),
+    sprite([[0, 'rgba(255,250,235,1)'], [0.35, 'rgba(255,236,190,1)'], [0.5, 'rgba(255,200,130,0.6)'], [1, 'rgba(255,170,90,0)']], 2.6),
+  );
+  sun.position.copy(SUN_GLOBE).multiplyScalar(40);
+  return sun;
+}
+
 // ───────── Escena ─────────
 
 export interface GlobeHandle {
@@ -200,14 +269,14 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
   const globe = new Group();
   scene.add(globe);
 
-  const world = new Mesh(new SphereGeometry(R, 128, 96), new MeshBasicMaterial({ map: posterTexture(worldCanvas()) }));
+  const world = new Mesh(new SphereGeometry(R, 128, 96), sunlit(new MeshBasicMaterial({ map: posterTexture(worldCanvas()) })));
   globe.add(world);
   const patchGeo = new SphereGeometry(
     R * 1.0008, 96, 96,
     (REGION.lonMin + 180) * DEG, (REGION.lonMax - REGION.lonMin) * DEG,
     (90 - REGION.latMax) * DEG, (REGION.latMax - REGION.latMin) * DEG,
   );
-  const patchMat = new MeshBasicMaterial({ map: posterTexture(regionCanvas()), transparent: true, opacity: 0 });
+  const patchMat = sunlit(new MeshBasicMaterial({ map: posterTexture(regionCanvas()), transparent: true, opacity: 0 }));
   const patch = new Mesh(patchGeo, patchMat);
   globe.add(patch);
 
@@ -221,11 +290,16 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
       depthWrite: false,
       vertexShader: `varying vec3 vN; varying vec3 vV;
         void main() { vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `varying vec3 vN; varying vec3 vV;
+      uniforms: { uSun: { value: new Vector3() } },
+      fragmentShader: `uniform vec3 uSun; varying vec3 vN; varying vec3 vV;
         void main() {
-          // Brilla pegado al borde del planeta y se desvanece hacia afuera.
+          // Brilla pegado al borde del planeta y se desvanece hacia afuera. Del lado de noche casi no se ve; en la franja
+          // del atardecer se tiñe de naranja, y con el sol detrás del planeta el borde se enciende.
           float f = 1.0 - smoothstep(-0.42, 0.0, dot(vN, vV));
-          gl_FragColor = vec4(vec3(0.45, 0.85, 0.9) * f * 0.9, f);
+          float s = dot(vN, uSun);
+          vec3 col = mix(vec3(0.45, 0.85, 0.9), vec3(1.0, 0.58, 0.32), exp(-pow(s / 0.3, 2.0)) * 0.85);
+          float light = 0.12 + 0.88 * smoothstep(-0.35, 0.2, s) + 1.2 * pow(max(dot(-vV, uSun), 0.0), 6.0);
+          gl_FragColor = vec4(col * f * 0.9 * light, f);
         }`,
     }),
   );
@@ -235,7 +309,8 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
   const galaxy = buildGalaxy();
   galaxy.renderOrder = -2;
   stars.points.renderOrder = -1;
-  globe.add(galaxy, stars.points);
+  globe.add(galaxy, stars.points, buildSun());
+  const haloSun = (halo.material as ShaderMaterial).uniforms.uSun.value as Vector3;
 
   // Marcador del Chocó: el alfiler rosado del afiche, clavado justo en la costa de Nuquí (la punta del alfiler es el
   // punto de anclaje), con el rótulo encima. No cambia de tamaño: solo late un aro alrededor de la punta.
@@ -422,6 +497,8 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     aspect = w / Math.max(h, 1);
     camera.aspect = aspect;
     camera.fov = fovs(aspect).globe;
+    // La costa encuadra según la forma de la pantalla: el planeta entrega la vista con ese mismo rumbo.
+    arrivalQ.copy(faceQ(ARRIVAL.lat, ARRIVAL.lon, arrivalBearing(aspect)));
     camera.updateProjectionMatrix();
   };
   const ro = new ResizeObserver(resize);
@@ -488,6 +565,8 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     chocoEl.style.visibility = facing > 0.15 ? 'visible' : 'hidden';
     for (const x of extra) if (tmp.copy(x.at).applyQuaternion(globe.quaternion).normalize().dot(camDir) < 0.2) x.el.style.opacity = '0';
 
+    // La cámara no gira (mira al planeta desde +z): la dirección del sol en la vista es la del planeta girado.
+    haloSun.copy(SUN_GLOBE).applyQuaternion(globe.quaternion);
     renderer.render(scene, camera);
     labels.render(scene, camera);
   };
