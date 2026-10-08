@@ -7,7 +7,7 @@ import {
   Raycaster, SRGBColorSpace, Scene, ShaderMaterial, SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { DIVE, diveAltitude, fovs, type Handoff } from './dive';
+import { ASCENT, DIVE, diveAltitude, fovs, type Handoff } from './dive';
 import { ARRIVAL } from './terrain';
 import { REGION, isChoco, posterTexture, regionCanvas, worldCanvas } from './posterArt';
 
@@ -33,8 +33,8 @@ function vecToLatLon(v: Vector3) {
 // ───────── Escena ─────────
 
 export interface GlobeHandle {
-  /** Vuelve a la vista del planeta (al salir del mapa). */
-  reset: () => void;
+  /** Sigue la subida que empezó el mapa: desde la altura de la posta hasta la vista de reposo. */
+  ascend: () => void;
   setActive: (active: boolean) => void;
   dispose: () => void;
 }
@@ -156,15 +156,17 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     fromQ: new Quaternion(),
     fromKm: 0,
     handedOff: false,
-    /** Volviendo a la vista de reposo (al salir del mapa): segundos desde que empezó. */
+    /** Volviendo a la vista de reposo tras arrastrarlo: segundos desde que empezó. */
     returning: -1,
+    /** Subida desde el mapa en curso (momento en que empezó), o 0. */
+    ascent: 0,
     active: true,
     hover: false,
   };
   globe.quaternion.copy(restQ);
 
   const dive = () => {
-    if (state.diving) return;
+    if (state.diving || state.ascent) return;
     state.diving = true;
     state.handedOff = false;
     state.diveStart = performance.now();
@@ -283,6 +285,14 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
         state.handedOff = true;
         onHandoff({ startedAt: state.diveStart, fromKm: state.fromKm });
       }
+    } else if (state.ascent) {
+      // Desde la posta hasta la vista de reposo: sube frenando y vuelve a poner el norte arriba.
+      const t = (performance.now() - state.ascent) / 1000;
+      const u = Math.min(t / ASCENT.globe, 1);
+      const restKm = (REST_DIST - R) * EARTH_KM;
+      state.dist = R + (DIVE.handoffKm * (restKm / DIVE.handoffKm) ** (1 - (1 - u) ** 2)) / EARTH_KM;
+      globe.quaternion.slerpQuaternions(arrivalQ, restQ, MathUtils.smootherstep(t, 0.2, ASCENT.globe + 0.5));
+      if (t > ASCENT.globe + 0.5) state.ascent = 0;
     } else {
       // Solo se mueve si lo arrastran (con algo de inercia); al volver del mapa regresa a la vista de reposo.
       if (pointers.size === 0 && state.spin.lengthSq() > 0.01) {
@@ -317,12 +327,14 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
   loop();
 
   return {
-    reset: () => {
+    ascend: () => {
       state.diving = false;
       state.handedOff = false;
-      state.dist = R * 1.6;
-      state.returning = 0;
+      state.returning = -1;
       state.spin.set(0, 0);
+      state.ascent = performance.now();
+      state.dist = R + DIVE.handoffKm / EARTH_KM;
+      globe.quaternion.copy(arrivalQ);
       host.classList.remove('is-diving');
     },
     setActive: (active) => {

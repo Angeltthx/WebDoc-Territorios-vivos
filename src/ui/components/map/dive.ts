@@ -21,6 +21,17 @@ export const DIVE = {
   mapDist: 950,
 };
 
+/**
+ * La vuelta al planeta (al alejarse mucho del mapa o con «Ver el planeta»): el mapa sube acelerando hasta la altura
+ * de la posta y el planeta sigue subiendo desde ahí, frenando, con el mismo ritmo en el empalme.
+ */
+export const ASCENT = {
+  /** Subida del mapa hasta la posta (s). */
+  map: 2.4,
+  /** Subida del planeta desde la posta hasta su vista de reposo (s). */
+  globe: 2.0,
+};
+
 /** Campo de visión vertical de cada escena según la forma de la pantalla. */
 export const fovs = (aspect: number) => (aspect < 0.8 ? { globe: 52, map: 64 } : { globe: 36, map: 52 });
 

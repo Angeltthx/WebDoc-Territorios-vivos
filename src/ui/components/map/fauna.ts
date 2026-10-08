@@ -1,17 +1,47 @@
 // Fauna y flora del afiche, animadas: ballena jorobada (salta y sopla, con su cría), tortuga golfina,
 // cangrejo fantasma rojo, pava del Baudó, rana arlequín y cacao; además fragatas, pelícanos y mariposas.
 // Las figuras son más grandes que en la realidad, como las ilustraciones del afiche, para que se distingan.
+//
+// Ballenas, tortugas, cangrejos, pava y ranas empiezan con figuras dibujadas con código y, cuando llegan los modelos
+// animados de la diseñadora (ver animals.ts), cada una se cambia por su modelo (`swap`).
 
 import { type BufferGeometry, Group, MathUtils, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three';
+import type { Animal, AnimalKit } from './animals';
 import { BALL, BLADE, CONE, ORB, merge, paint, part, pole, solid, sticker } from './kit';
-import { RAIL, RIVER_MOUTHS, doorTo, facing, heightAt, nature, offshoreRaw, placed, railAt, riverReach, shore, smoothstep } from './terrain';
+import {
+  RAIL, RIVER_MOUTHS, S, doorTo, facing, heightAt, nature, offshore, offshoreRaw, placeNear, placed, railAt, riverReach, shore, smoothstep,
+} from './terrain';
 
 const TAU = Math.PI * 2;
 
 export interface Living {
   group: Object3D;
   update: (t: number, dt: number) => void;
+  /** Cambia las figuras dibujadas por los modelos animados que hayan llegado. */
+  swap?: (kit: AnimalKit) => void;
 }
+
+/** Un `Living` cuyo comportamiento se puede reemplazar (al llegar los modelos). */
+function swappable(group: Group, first: Living['update'], swap: (kit: AnimalKit) => Living | null): Living {
+  let step = first;
+  return {
+    group,
+    update: (t, dt) => step(t, dt),
+    swap: (kit) => {
+      const next = swap(kit);
+      if (!next) return;
+      group.clear();
+      group.add(next.group);
+      step = next.update;
+    },
+  };
+}
+
+/** Dirección de avance en una órbita elíptica (radio `r` × `r * flat`) en el ángulo `a`, girando en sentido `dir`. */
+const orbit = (c: Vector3, r: number, flat: number, a: number, dir: number) => ({
+  pos: new Vector3(c.x + Math.cos(a) * r, 0, c.z + Math.sin(a) * r * flat),
+  heading: new Vector3(-Math.sin(a) * r * dir, 0, Math.cos(a) * r * flat * dir),
+});
 
 const byId = (id: string) => nature.find((n) => n.id === id)!;
 
@@ -79,7 +109,7 @@ function whaleBody() {
   return solid(g);
 }
 
-function buildWhales(spray: Spray): Living {
+function buildWhales(spray: Spray, rand: () => number): Living {
   const base = byId('ballena').pos.clone();
   const group = new Group();
   const mother = new Group();
@@ -118,6 +148,95 @@ function buildWhales(spray: Spray): Living {
     // La cría acompaña a la madre, siempre cerca de la superficie.
     calf.position.set(base.x - 26 + 6 * Math.sin(t * 0.3), -4.5 + 2.2 * Math.sin(t * 0.9), base.z + 30 + 20 * Math.sin(t * 0.12));
     calf.rotation.set(-0.08 * Math.cos(t * 0.9), 0.35, 0);
+  };
+  return swappable(group, update, (kit) => (kit.ballena ? whalePod(kit.ballena, spray, rand) : null));
+}
+
+/**
+ * Ballenas con el modelo animado: una madre con su cría frente a Jurubidá (donde está la del afiche) y otras dos
+ * más al sur. Nadan en círculos amplios con el lomo afuera, soplan y, cada tanto, una salta con el salto del
+ * animador: sale casi entera, gira en el aire y cae de espaldas, con un salpicón al salir y otro al caer.
+ */
+function whalePod(make: (length: number) => Animal, spray: Spray, rand: () => number): Living {
+  const group = new Group();
+  const town = (id: string) => placed.find((p) => p.id === id)!;
+  const main = byId('ballena').pos;
+  type Whale = {
+    a: Animal; length: number; c: Vector3; r: number; flat: number; ang: number; dir: number; speed: number;
+    follow?: Whale; breaching: number; elapsed: number; nextBreach: number; nextBlow: number;
+  };
+  // La de Nuquí salta justo después de llegar del planeta, frente a la cámara.
+  const spots = [
+    { c: main.clone(), r: 160, len: 96, first: 16 },
+    { c: offshore(town('nuqui').s + 0.1 * S, 330), r: 120, len: 88, first: 6.5 },
+    { c: offshore(town('pangui').s + 0.4 * S, 800), r: 200, len: 90, first: 28 },
+  ];
+  const whales: Whale[] = spots.map((sp, i) => ({
+    a: make(sp.len), length: sp.len, c: sp.c, r: sp.r, flat: 0.55, ang: rand() * TAU, dir: i % 2 ? -1 : 1, speed: 9 + rand() * 3,
+    breaching: -1, elapsed: 0, nextBreach: sp.first + rand() * 2, nextBlow: 1 + rand() * 4,
+  }));
+  // La cría nada pegada a la madre y salta de vez en cuando, más bajito.
+  whales.push({
+    a: make(46), length: 46, c: main, r: 0, flat: 1, ang: 0, dir: 1, speed: 0, follow: whales[0],
+    breaching: -1, elapsed: 0, nextBreach: 40 + rand() * 20, nextBlow: 3,
+  });
+  for (const w of whales) {
+    w.a.play('Swin', { speed: 0.8 + rand() * 0.3 });
+    w.a.mixer.setTime(rand() * 3);
+    group.add(w.a.root);
+  }
+  const jump = whales[0].a.actions.Jump.getClip().duration;
+  const head = new Vector3();
+  const update = (t: number, dt: number) => {
+    for (const w of whales) {
+      w.a.mixer.update(dt);
+      if (w.breaching >= 0) {
+        const before = w.elapsed;
+        w.elapsed += dt;
+        for (const sp of w.a.splashes) {
+          if (before < sp.at && w.elapsed >= sp.at) {
+            head.set(0, 0, w.length * 0.15).applyEuler(w.a.root.rotation).add(w.a.root.position).setY(1);
+            spray.emit(head, Math.round(30 + 40 * sp.strength), { spread: w.length * 0.45 * sp.strength, up: 30 + 30 * sp.strength, size: 2.5 + 3 * sp.strength });
+          }
+        }
+        if (w.elapsed > jump) {
+          w.breaching = -1;
+          w.a.play('Swin', { fade: 0.6 });
+          w.nextBreach = t + (w.follow ? 45 : 22) + rand() * 30;
+        }
+      } else if (t > w.nextBreach) {
+        w.breaching = t;
+        w.elapsed = 0;
+        w.a.play('Jump', { once: true, fade: 0.4 });
+      }
+      // Mientras salta casi no avanza.
+      const pace = w.breaching >= 0 ? 0.2 : 1;
+      let heading: Vector3;
+      if (w.follow) {
+        const m = w.follow.a.root;
+        const fwd = new Vector3(Math.sin(m.rotation.y), 0, Math.cos(m.rotation.y));
+        const side = new Vector3(fwd.z, 0, -fwd.x);
+        const target = m.position.clone().addScaledVector(side, 34).addScaledVector(fwd, -14 + 6 * Math.sin(t * 0.2));
+        w.a.root.position.x += (target.x - w.a.root.position.x) * Math.min(1, dt * 2);
+        w.a.root.position.z += (target.z - w.a.root.position.z) * Math.min(1, dt * 2);
+        heading = fwd;
+      } else {
+        w.ang += (w.dir * dt * w.speed * pace) / w.r;
+        const o = orbit(w.c, w.r, w.flat, w.ang, w.dir);
+        w.a.root.position.x = o.pos.x;
+        w.a.root.position.z = o.pos.z;
+        heading = o.heading;
+      }
+      // Nada con el lomo afuera (el mar tapa el resto).
+      w.a.root.position.y = -w.a.height * 0.62 + Math.sin(t * 0.7 + w.r) * 0.6;
+      w.a.root.rotation.y = facing(heading);
+      // Soplo: un chorro alto y fino sobre la cabeza.
+      if (w.breaching < 0 && t > w.nextBlow) {
+        w.nextBlow = t + 6 + rand() * 6;
+        head.set(0, w.a.height * 0.95, w.length * 0.28).applyEuler(w.a.root.rotation).add(w.a.root.position);
+        spray.emit(head, w.follow ? 8 : 16, { spread: 2.5, up: w.follow ? 28 : 44, size: w.follow ? 1.5 : 2.2 });
+      }
+    }
   };
   return { group, update };
 }
@@ -158,7 +277,42 @@ function buildTurtle(): Living {
     turtle.rotation.y = -a + Math.PI;
     for (const f of flippers) f.rotation.z = f.userData.side * Math.sin(t * (f.userData.front ? 2.2 : 2.2) + (f.userData.front ? 0 : 1)) * 0.45;
   };
-  return { group: turtle, update };
+  const group = new Group();
+  group.add(turtle);
+  return swappable(group, update, (kit) => (kit.tortuga ? turtles(kit.tortuga) : null));
+}
+
+/** Tortugas golfinas con el modelo animado: nadan a flor de agua y, a ratos, se quedan flotando. */
+function turtles(make: (length: number) => Animal): Living {
+  const group = new Group();
+  const town = (id: string) => placed.find((p) => p.id === id)!;
+  const spots = [
+    { c: byId('tortuga').pos.clone(), r: 55 },
+    { c: offshore(town('nuqui').s + 0.9 * S, 260), r: 70 },
+    { c: offshore(town('tribuga').s + 0.3 * S, 300), r: 60 },
+  ];
+  const list = spots.map((sp, i) => {
+    const a = make(i === 0 ? 26 : 22);
+    a.play('Swin');
+    a.mixer.setTime(i * 0.7);
+    group.add(a.root);
+    return { a, ...sp, ang: i * 2.1, dir: i % 2 ? -1 : 1, floating: false, until: 8 + i * 5 };
+  });
+  const update = (t: number, dt: number) => {
+    for (const u of list) {
+      u.a.mixer.update(dt);
+      if (t > u.until) {
+        u.floating = !u.floating;
+        u.a.play(u.floating ? 'Idle' : 'Swin', { fade: 0.8 });
+        u.until = t + (u.floating ? 4 + Math.random() * 3 : 12 + Math.random() * 10);
+      }
+      u.ang += (u.dir * dt * (u.floating ? 1 : 7)) / u.r;
+      const o = orbit(u.c, u.r, 1, u.ang, u.dir);
+      u.a.root.position.set(o.pos.x, -u.a.height * 0.45 + Math.sin(t * 1.1 + u.r) * 0.3, o.pos.z);
+      u.a.root.rotation.y = facing(o.heading);
+    }
+  };
+  return { group, update };
 }
 
 // ───────── Cangrejo fantasma rojo ─────────
@@ -190,7 +344,55 @@ function buildCrab(): Living {
     // Camina de lado, mirando al mar.
     crab.rotation.set(0, facing(sea), Math.sin(t * 9) * 0.04);
   };
-  return { group: crab, update };
+  const group = new Group();
+  group.add(crab);
+  return swappable(group, update, (kit) => (kit.cangrejo ? crabs(kit.cangrejo) : null));
+}
+
+/**
+ * Cangrejos fantasma con el modelo animado, en la playa del afiche y en otras playas: se quedan quietos un rato
+ * (moviendo las tenazas) y salen corriendo de lado, como los de verdad.
+ */
+function crabs(make: (length: number) => Animal): Living {
+  const group = new Group();
+  const home = byId('cangrejo');
+  const beach = (town: 'nuqui' | 'coqui' | 'tribuga', along: number, offs: number[]) => {
+    const { pos, s: at } = placeNear(town, along, 0.02);
+    return { base: pos, sea: railAt(at).sea, offs };
+  };
+  const spots = [
+    { base: home.pos, sea: home.sea, offs: [-34, 0, 30] },
+    beach('nuqui', 0.55, [-15, 20]),
+    beach('coqui', -0.35, [0]),
+    beach('tribuga', -0.45, [-10, 18]),
+  ];
+  const list = spots.flatMap((sp) => sp.offs.map((off, i) => {
+    const a = make(20 + (i % 2) * 3);
+    a.play('Idle', { speed: 0.9 + Math.random() * 0.2 });
+    a.mixer.setTime(Math.random() * 1.3);
+    const yaw = facing(sp.sea);
+    a.root.rotation.y = yaw;
+    group.add(a.root);
+    // De lado: el eje x del cangrejo, a lo largo de la playa.
+    const side = new Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    return { a, base: sp.base.clone().addScaledVector(side, off), side, off: 0, dir: 1, walking: false, until: 2 + Math.random() * 6 };
+  }));
+  const update = (t: number, dt: number) => {
+    for (const c of list) {
+      c.a.mixer.update(dt);
+      if (t > c.until) {
+        c.walking = !c.walking;
+        if (c.walking) c.dir = c.off > 22 ? -1 : c.off < -22 ? 1 : Math.random() < 0.5 ? -1 : 1;
+        c.a.play(c.walking ? 'Walk' : 'Idle', { fade: 0.2 });
+        c.until = t + (c.walking ? 1.3 * (1 + Math.floor(Math.random() * 3)) : 3 + Math.random() * 6);
+      }
+      if (c.walking) c.off += c.dir * 11 * dt;
+      const x = c.base.x + c.side.x * c.off;
+      const z = c.base.z + c.side.z * c.off;
+      c.a.root.position.set(x, heightAt(x, z) - 0.3, z);
+    }
+  };
+  return { group, update };
 }
 
 // ───────── Pava del Baudó, posada en una rama ─────────
@@ -237,23 +439,50 @@ function buildPava(): Living {
     head.rotation.x = Math.sin(t * 1.7) * 0.12;
     head.rotation.y = Math.sin(t * 0.6) * 0.5;
   };
-  return { group, update };
+  const living = swappable(new Group(), update, (kit) => {
+    if (!kit.pava) return null;
+    // La pava del modelo, en la misma rama: casi siempre quieta mirando alrededor y, cada tanto, canta.
+    const a = kit.pava(24);
+    a.root.position.copy(bird.position);
+    a.root.rotation.y = bird.rotation.y;
+    bird.visible = false;
+    a.play('Idle');
+    a.mixer.addEventListener('finished', () => a.play('Idle', { fade: 0.6 }));
+    let next = 6;
+    const inner = new Group();
+    inner.add(a.root);
+    group.add(inner);
+    return {
+      group: new Group(),
+      update: (t: number, dt: number) => {
+        a.mixer.update(dt);
+        if (t > next) {
+          a.play('Sing', { once: true, fade: 0.4 });
+          next = t + 4.7 + 14 + Math.random() * 10;
+        }
+      },
+    };
+  });
+  group.add(living.group);
+  return { ...living, group };
 }
 
 // ───────── Rana arlequín sobre una hoja ─────────
+
+/** Hoja grande de platanillo donde se posa una rana. */
+const frogLeaf = () => solid([
+  pole('#7fa84a', [0, 0, 0], [0, 8, 0], 1),
+  part(BLADE, '#5fb04f', { p: [0, 8, 0], r: [-0.12, -Math.PI / 2, 0], s: [5.5, 0.5, 9], o: 'YXZ' }),
+  part(BLADE, '#6cbf5a', { p: [0, 7, 0], r: [-0.6, 0.6, 0], s: [3.5, 0.4, 7], o: 'YXZ' }),
+  part(BLADE, '#5aae4c', { p: [0, 6, 0], r: [-0.7, 2.4, 0], s: [3.5, 0.4, 7], o: 'YXZ' }),
+]);
 
 function buildFrog(): Living {
   const { pos: p, sea } = byId('rana');
   const group = new Group();
   group.position.set(p.x, heightAt(p.x, p.z) - 0.5, p.z);
   group.rotation.y = doorTo(sea);
-  // Hoja grande de platanillo donde se posa.
-  group.add(solid([
-    pole('#7fa84a', [0, 0, 0], [0, 8, 0], 1),
-    part(BLADE, '#5fb04f', { p: [0, 8, 0], r: [-0.12, -Math.PI / 2, 0], s: [5.5, 0.5, 9], o: 'YXZ' }),
-    part(BLADE, '#6cbf5a', { p: [0, 7, 0], r: [-0.6, 0.6, 0], s: [3.5, 0.4, 7], o: 'YXZ' }),
-    part(BLADE, '#5aae4c', { p: [0, 6, 0], r: [-0.7, 2.4, 0], s: [3.5, 0.4, 7], o: 'YXZ' }),
-  ]));
+  group.add(frogLeaf());
   const frog = new Group();
   const g: BufferGeometry[] = [
     part(ORB, '#e8452c', { p: [0, 3, 0], s: [4, 3, 5] }),
@@ -279,7 +508,52 @@ function buildFrog(): Living {
     frog.rotation.x = -hop * 0.3;
     frog.scale.y = 1.6 * (1 + Math.sin(t * 6) * 0.03 * (1 - hop)); // respira
   };
-  return { group, update };
+  const living = swappable(new Group(), update, (kit) => {
+    const make = kit.rana;
+    if (!make) return null;
+    frog.visible = false;
+    // Dos ranas del modelo: la del afiche en su hoja y otra en una hoja vecina. Caminan un poco y saltan.
+    const second = frogLeaf();
+    second.position.set(9, -1.5, 13);
+    second.rotation.y = 2.2;
+    second.scale.setScalar(0.85);
+    group.add(second);
+    const frogs = [
+      { at: frog.position.clone(), yaw: frog.rotation.y, holder: group },
+      { at: new Vector3(-5.1, 7, 0), yaw: -Math.PI / 2, holder: second },
+    ].map(({ at, yaw, holder }, i) => {
+      const a = make(15);
+      a.root.position.copy(at).setY(at.y - 0.4);
+      a.root.rotation.y = yaw;
+      holder.add(a.root);
+      return { a, step: i, wait: 1 + i * 2.5, busy: false };
+    });
+    const steps = ['Walk', 'Walk', 'Jump'];
+    for (const f of frogs) {
+      f.a.mixer.addEventListener('finished', () => {
+        f.busy = false;
+        f.wait = 1.5 + Math.random() * 3;
+      });
+      // Quieta en la primera pose del paso hasta que le toque moverse.
+      f.a.play('Walk', { once: true }).paused = true;
+    }
+    return {
+      group: new Group(),
+      update: (_t: number, dt: number) => {
+        for (const f of frogs) {
+          f.a.mixer.update(dt);
+          if (f.busy) continue;
+          f.wait -= dt;
+          if (f.wait > 0) continue;
+          f.busy = true;
+          f.a.play(steps[f.step % steps.length], { once: true, fade: 0.25 });
+          f.step++;
+        }
+      },
+    };
+  });
+  group.add(living.group);
+  return { ...living, group };
 }
 
 // ───────── Cacao ─────────
@@ -356,6 +630,11 @@ function poseWings(wings: Wing[], lift: number, droop: number, fold = 0) {
   }
 }
 
+/**
+ * Golpe de ala (−1 abajo … 1 arriba): baja rápido (el golpe que empuja) y sube más despacio, como las aves de verdad.
+ */
+const flapStroke = (phase: number) => Math.sin(phase + 0.45 * Math.sin(phase));
+
 /** Orienta un ave según su velocidad: rumbo, cabeceo y alabeo (inclinación en las curvas). */
 function orient(o: Object3D, vel: Vector3, bank: number) {
   const flat = Math.hypot(vel.x, vel.z);
@@ -375,7 +654,7 @@ function frigatebird() {
   ]));
   const wings = [-1, 1].map((side) => wing(side, '#222228', '#2e2e35', { arm: [1.1, 2.3], hand: [0.9, 3.4], sweep: 0.55 }));
   for (const w of wings) bird.add(w.inner);
-  bird.scale.setScalar(1.7);
+  bird.scale.setScalar(2);
   return { bird, wings };
 }
 
@@ -517,12 +796,13 @@ function buildBirds(rand: () => number, spray: Spray): Living {
       v.set(Math.sin(s.heading) * s.speed, (y - f.bird.position.y) / Math.max(dt, 0.001), Math.cos(s.heading) * s.speed);
       s.pos.x += v.x * dt;
       s.pos.z += v.z * dt;
-      f.bird.position.set(s.pos.x, y, s.pos.z);
+      // Planea largo rato y, cada tanto, da una tanda de aletazos amplios: el ala baja rápido y sube despacio, y el
+      // cuerpo sube un poco con cada golpe hacia abajo.
+      const flapping = smoothstep(Math.sin(t * 0.23 + s.ph * 3), 0.35, 0.6);
+      const beat = flapStroke(t * 6.5 + s.ph) * 0.8 * flapping;
+      f.bird.position.set(s.pos.x, y - beat * 1.4, s.pos.z);
       orient(f.bird, v.setY(MathUtils.clamp(v.y, -3, 3)), MathUtils.clamp(-turn * 2.2, -0.7, 0.7));
-      // Casi siempre planea; a ratos da unos aletazos lentos.
-      const flapping = smoothstep(Math.sin(t * 0.19 + s.ph * 3), 0.8, 0.95);
-      const beat = Math.sin(t * 6 + s.ph) * 0.55 * flapping;
-      poseWings(f.wings, 0.16 + beat + 0.03 * Math.sin(t * 1.3 + s.ph), 0.32 - beat * 0.4);
+      poseWings(f.wings, 0.14 + beat + 0.04 * Math.sin(t * 1.3 + s.ph), 0.3 - beat * 0.55);
     }
 
     const lead = pelicanStart + t * 19;
@@ -532,12 +812,12 @@ function buildBirds(rand: () => number, spray: Spray): Living {
       const b = loopAt(d + 4);
       const side = new Vector3(b.z - a.z, 0, a.x - b.x).normalize();
       a.addScaledVector(side, p.i * 7);
-      p.bird.position.set(a.x, 12 + 3 * Math.sin(t * 0.45 + p.i * 0.4), a.z);
-      orient(p.bird, v.set(b.x - a.x, 0, b.z - a.z), 0);
-      // Aletean en cadena (del primero al último) y luego planean juntos.
+      // Aletean en cadena (del primero al último) y luego planean juntos, casi rozando el agua.
       const c = (t - p.i * 0.28) % 7;
-      const flap = c > 0 && c < 1.8 ? Math.sin((c / 1.8) * TAU * 3) * 0.6 : 0;
-      poseWings(p.wings, 0.05 + flap, 0.1 - flap * 0.3);
+      const flap = c > 0 && c < 2.4 ? flapStroke((c / 2.4) * TAU * 3) * 0.75 * Math.sin((c / 2.4) * Math.PI) ** 0.3 : 0;
+      p.bird.position.set(a.x, 12 + 3 * Math.sin(t * 0.45 + p.i * 0.4) - flap * 1.2, a.z);
+      orient(p.bird, v.set(b.x - a.x, 0, b.z - a.z), 0);
+      poseWings(p.wings, 0.05 + flap, 0.1 - flap * 0.45);
     }
 
     for (const b of boobies) {
@@ -629,8 +909,8 @@ export const NATURE_LABEL_HEIGHT: Record<string, number> = {
 };
 
 export function buildFauna(rand: () => number): Living {
-  const spray = new Spray(90);
-  const parts: Living[] = [buildWhales(spray), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand, spray), buildButterflies(rand)];
+  const spray = new Spray(200);
+  const parts: Living[] = [buildWhales(spray, rand), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand, spray), buildButterflies(rand)];
   const group = new Group();
   group.add(spray.group, buildCacao(rand), buildPosterMangrove(), ...parts.map((p) => p.group));
   return {
@@ -638,6 +918,9 @@ export function buildFauna(rand: () => number): Living {
     update: (t, dt) => {
       for (const p of parts) p.update(t, dt);
       spray.update(dt);
+    },
+    swap: (kit) => {
+      for (const p of parts) p.swap?.(kit);
     },
   };
 }

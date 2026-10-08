@@ -17,7 +17,8 @@ import { buildFauna, NATURE_LABEL_HEIGHT } from './fauna';
 import { sticker } from './kit';
 import { buildFlora, buildMist } from './flora';
 import { buildPlaces } from './places';
-import { DIVE, diveProgress, fovs, mapUnitsPerKm, type Handoff } from './dive';
+import { loadAnimals } from './animals';
+import { ASCENT, DIVE, diveProgress, fovs, mapUnitsPerKm, type Handoff } from './dive';
 import { REGION, posterTexture, regionCanvas } from './posterArt';
 import {
   ARRIVAL, BOUNDS, FAR_GRID, FAR_SHORE_FIELD, GRID, HEIGHTS, RAIL, SHORE_FIELD, farVertex, nature, placeNear, placed, railAt, rng,
@@ -463,6 +464,8 @@ export interface MapSceneHandle {
   select: (id: string | null) => void;
   /** Sigue el viaje que empezó el planeta: baja desde la vista cenital y se inclina hasta la vista desde el mar. */
   land: (handoff: Handoff, onLanded: () => void) => void;
+  /** Sube hasta la altura de la posta (camino inverso a `land`) y avisa para que el planeta siga desde ahí. */
+  ascend: (onHandoff: () => void) => void;
   /** Pausa o reanuda la escena. */
   setActive: (active: boolean) => void;
   dispose: () => void;
@@ -473,9 +476,13 @@ export interface MapSceneOptions {
   onInteract: () => void;
   /** Empieza en pausa (detrás del planeta de la entrada). */
   paused?: boolean;
+  /** El visitante se alejó mucho más allá del máximo: quiere volver al planeta. */
+  onZoomOut?: () => void;
+  /** Cuánto se ha estirado el alejamiento más allá del máximo (0–1), para avisarle que siga si quiere ir al planeta. */
+  onPull?: (amount: number) => void;
 }
 
-export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false }: MapSceneOptions): MapSceneHandle {
+export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull }: MapSceneOptions): MapSceneHandle {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = SRGBColorSpace;
@@ -574,11 +581,21 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
 
   const clampGoal = () => {
     goal.s = MathUtils.clamp(goal.s, RAIL.min, RAIL.max);
-    goal.dist = MathUtils.clamp(goal.dist, DIST.min, DIST.max);
+    // Al seguir alejándose en el máximo, la vista cede un poco (como un elástico) antes de volver al planeta.
+    goal.dist = MathUtils.clamp(goal.dist, DIST.min, DIST.max * (1 + 0.35 * pull));
     goal.pitch = MathUtils.clamp(goal.pitch, PITCH.min, PITCH.max);
   };
 
   // ───────── Interacción ─────────
+  /** Alejamiento acumulado más allá del máximo (0–1); al llegar a 1 se vuelve al planeta. */
+  let pull = 0;
+  let pullAt = 0;
+  const pullOut = (amount: number) => {
+    pull = Math.min(1, pull + amount);
+    pullAt = performance.now();
+    if (pull >= 1) onZoomOut?.();
+  };
+  const atMax = () => goal.dist >= DIST.max * 0.98;
   const pointers = new Map<number, { x: number; y: number }>();
   let downAt: { x: number; y: number; t: number } | null = null;
   let pinchStart = 0;
@@ -588,7 +605,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   const worldPerPixel = () => (2 * view.dist * Math.tan(MathUtils.degToRad(camera.fov / 2))) / Math.max(host.clientHeight, 1);
 
   const onDown = (e: PointerEvent) => {
-    if (intro) return;
+    if (intro || outro) return;
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -609,7 +626,15 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchStart > 0) goal.dist = pinchDist * (pinchStart / d);
+      if (pinchStart > 0) {
+        goal.dist = pinchDist * (pinchStart / d);
+        // Pellizcar hacia adentro más allá del máximo también lleva al planeta.
+        if (goal.dist > DIST.max) {
+          pull = Math.min(1, (goal.dist / DIST.max - 1) / 0.7);
+          pullAt = performance.now();
+          if (pull >= 1) onZoomOut?.();
+        }
+      }
     } else {
       // Arrastrar a los lados recorre la costa; arriba y abajo cambia la inclinación de la mirada.
       goal.s -= dx * worldPerPixel() * 1.15;
@@ -625,13 +650,17 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   };
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    if (intro) return;
-    goal.dist *= Math.exp(e.deltaY * 0.0012);
+    if (intro || outro) return;
+    // Con el panel táctil (pellizco = rueda con Ctrl) llegan pasos pequeños: cuentan más.
+    if (e.deltaY > 0 && atMax()) pullOut(e.deltaY / (e.ctrlKey ? 250 : 1000));
+    else if (e.deltaY < 0) pull = 0;
+    goal.dist *= Math.exp(e.deltaY * (e.ctrlKey ? 0.006 : 0.0012));
     clampGoal();
     onInteract();
   };
   const onKey = (e: KeyboardEvent) => {
-    if (intro || !active) return;
+    if (intro || outro || !active) return;
+    if (e.key === 'ArrowDown' && atMax()) pullOut(0.34);
     const step = { ArrowLeft: [-260, 1], ArrowRight: [260, 1], ArrowUp: [0, 0.85], ArrowDown: [0, 1.18] }[e.key];
     if (step) {
       e.preventDefault();
@@ -705,6 +734,9 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   let active = !paused;
   /** Llegada desde el planeta en curso. */
   let intro: { handoff: Handoff; fromDist: number; onLanded: () => void } | null = null;
+  /** Vuelta al planeta en curso. Sigue subiendo un poco después de la posta, mientras el planeta aparece encima. */
+  let outro: { start: number; from: { s: number; dist: number; pitch: number }; toDist: number; onHandoff: (() => void) | null } | null = null;
+  let lastPull = 0;
   const loop = () => {
     frame = requestAnimationFrame(loop);
     if (!active) return;
@@ -724,7 +756,23 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
         Object.assign(goal, { s: view.s, dist: view.dist, pitch: view.pitch });
         done();
       }
+    } else if (outro) {
+      // Camino inverso a la llegada: se endereza mirando hacia abajo, vuelve frente a Nuquí y sube acelerando.
+      const u = (performance.now() - outro.start) / 1000 / ASCENT.map;
+      view.dist = outro.from.dist * (outro.toDist / outro.from.dist) ** (u * u);
+      view.pitch = MathUtils.lerp(outro.from.pitch, 89.6, MathUtils.smootherstep(u, 0, 0.45));
+      view.s = MathUtils.lerp(outro.from.s, ARRIVAL.s, MathUtils.smootherstep(u, 0, 0.6));
+      if (u >= 1 && outro.onHandoff) {
+        outro.onHandoff();
+        outro.onHandoff = null;
+      }
+      if (u > 1 + (DIVE.fade + 0.3) / ASCENT.map) outro = null;
     } else {
+      // Si deja de alejarse, el elástico vuelve.
+      if (pull > 0 && performance.now() - pullAt > 600) {
+        pull = Math.max(0, pull - dt * 1.2);
+        clampGoal();
+      }
       const ease = 1 - Math.exp(-dt * 3.2);
       view.s += (goal.s - view.s) * ease;
       view.dist += (goal.dist - view.dist) * ease;
@@ -737,6 +785,10 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     fog.near = Math.max(FOG.near, view.dist * 1.3);
     fog.far = Math.max(FOG.far, view.dist * 5);
     region.uRegionMix.value = smoothstep(view.dist, 4000, 20000);
+    if (Math.abs(pull - lastPull) > 0.02 || (pull === 0 && lastPull !== 0)) {
+      lastPull = pull;
+      onPull?.(pull);
+    }
     const low = 1 - smoothstep(view.dist, 2500, 6500);
     clouds.setOpacity(low);
     mist.setOpacity(low);
@@ -804,6 +856,14 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     renderer.compile(scene, camera);
   }
 
+  // Los animales de la diseñadora llegan después: cada uno reemplaza a su figura dibujada.
+  let disposed = false;
+  loadAnimals().then((kit) => {
+    if (disposed) return;
+    fauna.swap?.(kit);
+    if (!active) renderer.compile(scene, camera);
+  });
+
   return {
     focus,
     select,
@@ -813,11 +873,23 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
       if (!active) timer.reset();
       active = true;
     },
+    ascend: (onHandoff) => {
+      select(null);
+      pull = 0;
+      outro = {
+        start: performance.now(),
+        from: { s: view.s, dist: view.dist, pitch: view.pitch },
+        toDist: DIVE.handoffKm * mapUnitsPerKm(aspect),
+        onHandoff,
+      };
+      active = true;
+    },
     setActive: (on) => {
       if (on && !active) timer.reset();
       active = on;
     },
     dispose: () => {
+      disposed = true;
       cancelAnimationFrame(frame);
       ro.disconnect();
       window.removeEventListener('keydown', onKey);

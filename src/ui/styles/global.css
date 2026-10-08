@@ -634,6 +634,15 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   font-size: 12px; text-align: center; pointer-events: none; transition: opacity 0.6s ease;
 }
 .map-hint.is-hidden { opacity: 0; }
+/* Aviso al alejarse más allá del máximo: si sigue, vuelve al planeta. La barra se llena con el tirón. */
+.map-pull {
+  position: absolute; z-index: 6; left: 50%; bottom: 84px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
+  margin: 0; padding: 9px 16px 11px; border-radius: 999px; background: rgba(15, 35, 28, 0.66); backdrop-filter: blur(8px);
+  font-size: 13px; letter-spacing: 0.04em; text-align: center; pointer-events: none; overflow: hidden; transition: opacity 0.25s ease;
+}
+.map-pull__bar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #e2456f; transform-origin: left; transition: transform 0.15s linear;
+}
 
 .map-towns {
   position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; justify-content: center;
@@ -673,7 +682,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 @keyframes twinkle { 50% { opacity: 0.25; transform: scale(0.8) rotate(20deg); } }
 .globe-stage canvas { display: block; }
 .globe-stage.is-diving { cursor: default; }
-.map-screen.is-landing .globe-stage, .map-screen.is-map .globe-stage { opacity: 0; visibility: hidden; pointer-events: none; }
+.map-screen.is-landing .globe-stage, .map-screen.is-map .globe-stage, .map-screen.is-leaving .globe-stage { opacity: 0; visibility: hidden; pointer-events: none; }
 .map-screen.is-loading .globe-stage { opacity: 0; }
 .globe-labels { position: absolute; inset: 0; pointer-events: none; }
 /* Los rótulos de la costa aparecen cuando el planeta ya se fue. */
@@ -711,7 +720,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   position: absolute; z-index: 3; left: var(--gutter); bottom: calc(var(--gutter) + 8px); pointer-events: none;
   transition: opacity 0.8s ease, transform 0.8s var(--ease);
 }
-.map-screen.is-diving .globe-title, .map-screen.is-landing .globe-title, .map-screen.is-map .globe-title, .map-screen.is-loading .globe-title { opacity: 0; transform: translateY(16px); }
+.map-screen.is-diving .globe-title, .map-screen.is-landing .globe-title, .map-screen.is-leaving .globe-title, .map-screen.is-map .globe-title, .map-screen.is-loading .globe-title { opacity: 0; transform: translateY(16px); }
 .globe-title__hint {
   margin-top: 10px; display: inline-block; padding: 7px 14px; border-radius: 999px;
   background: rgba(15, 35, 28, 0.6); backdrop-filter: blur(8px); font-size: 12px; letter-spacing: 0.08em;

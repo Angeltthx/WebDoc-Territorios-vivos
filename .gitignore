@@ -5,8 +5,9 @@ dist
 .env*
 !.env*.example
 
-# Contenido multimedia: no se versiona (se genera desde ../Contenido)
+# Contenido multimedia: no se versiona (se genera desde ../Contenido; los modelos 3D, con npm run map:models)
 public/media/
+public/draco/
 
 # Descargas del relieve del mapa (se regeneran con npm run map:relief)
 .cache/

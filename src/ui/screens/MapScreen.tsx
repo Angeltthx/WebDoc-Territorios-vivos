@@ -11,7 +11,7 @@ import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
 
-type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map';
+type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
 export default function MapScreen() {
   const stage = useRef<HTMLDivElement>(null);
@@ -22,6 +22,7 @@ export default function MapScreen() {
   const [place, setPlace] = useState<MapPlace | null>(null);
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
+  const [pull, setPull] = useState(0);
 
   useEffect(() => {
     // Armar las escenas toma un momento: primero se pinta el aviso de carga y luego se construyen.
@@ -38,6 +39,8 @@ export default function MapScreen() {
           if (p?.kind === 'town') setTown(p.id);
         },
         onInteract: () => setHint(false),
+        onZoomOut: () => leave.current(),
+        onPull: setPull,
       });
       earth = createGlobe(globeStage.current!, {
         onDive: () => setPhase('diving'),
@@ -66,12 +69,19 @@ export default function MapScreen() {
     handle.current?.focus(id);
   };
 
-  const backToPlanet = () => {
-    handle.current?.select(null);
-    globe.current?.reset();
-    globe.current?.setActive(true);
-    setPhase('globe');
-    setTimeout(() => handle.current?.setActive(false), 900);
+  // Vuelta al planeta (con «Ver el planeta» o al alejarse mucho): el mapa sube y, a la altura de la posta, el planeta
+  // aparece encima y sigue subiendo. Va en una referencia porque el mapa la llama desde su propio bucle.
+  const leave = useRef(() => {});
+  leave.current = () => {
+    if (phase !== 'map') return;
+    setPull(0);
+    setPhase('leaving');
+    handle.current?.ascend(() => {
+      globe.current?.setActive(true);
+      globe.current?.ascend();
+      setPhase('globe');
+      setTimeout(() => handle.current?.setActive(false), DIVE.fade * 1000 + 400);
+    });
   };
 
   const onMap = phase === 'map';
@@ -96,7 +106,7 @@ export default function MapScreen() {
         right={
           <>
             {onMap && (
-              <button type="button" className="ghost-link" onClick={backToPlanet}>
+              <button type="button" className="ghost-link" onClick={() => leave.current()}>
                 <span aria-hidden="true">◍</span> Ver el planeta
               </button>
             )}
@@ -125,6 +135,10 @@ export default function MapScreen() {
 
       {onMap && (
         <>
+          <p className="map-pull" style={{ opacity: Math.min(1, pull * 3) }} aria-hidden={pull === 0}>
+            Sigue alejándote para ver el planeta
+            <span className="map-pull__bar" style={{ transform: `scaleX(${pull})` }} />
+          </p>
           <p className={`map-hint${hint ? '' : ' is-hidden'}`}>Arrastra para recorrer la costa · rueda o pellizca para acercarte · toca un lugar</p>
           <nav className="map-towns tabs" aria-label="Pueblos de la costa, de norte a sur">
             {MAP_TOWNS.map((t) => (

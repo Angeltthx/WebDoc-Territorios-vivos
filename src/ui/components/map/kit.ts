@@ -3,7 +3,7 @@
 
 import {
   BoxGeometry, type BufferGeometry, Color, type ColorRepresentation, ConeGeometry, CylinderGeometry, Euler, Float32BufferAttribute,
-  BackSide, BufferGeometry as Geometry, type EulerOrder, Group, IcosahedronGeometry, MeshBasicMaterial, type Object3D, Matrix4, Mesh, MeshStandardMaterial, Quaternion, SphereGeometry, Vector3,
+  BackSide, BufferGeometry as Geometry, type EulerOrder, Group, IcosahedronGeometry, MeshBasicMaterial, type Object3D, Matrix4, Mesh, MeshStandardMaterial, Quaternion, SkinnedMesh, SphereGeometry, Vector3,
 } from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -48,7 +48,7 @@ function outlineMat(width: number) {
     m = new MeshBasicMaterial({ color: '#fffdf6', side: BackSide });
     m.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-transformed += normalize(normal) * ${width.toFixed(3)};`);
+transformed += normalize(normal) * ${width.toPrecision(4)};`);
     };
     // Cada grosor es un programa distinto (el código de arriba es el mismo texto para todos).
     m.customProgramCacheKey = () => `sticker-${width}`;
@@ -71,6 +71,30 @@ export function sticker(root: Object3D, width = 0.45) {
     const hull = new Mesh(smooth, outlineMat(width));
     hull.userData.outline = true;
     mesh.add(hull);
+  }
+  return root;
+}
+
+/**
+ * Borde blanco para los modelos con esqueleto (los animales de la diseñadora). La copia de cada malla comparte el
+ * esqueleto del original, así el borde se dobla con la animación. `ratio`: grosor respecto al tamaño de la malla.
+ */
+export function stickerSkinned(root: Object3D, ratio = 0.015) {
+  const meshes: SkinnedMesh[] = [];
+  root.traverse((o) => {
+    if ((o as SkinnedMesh).isSkinnedMesh && !o.userData.outline) meshes.push(o as SkinnedMesh);
+  });
+  for (const m of meshes) {
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const size = m.geometry.boundingBox!.getSize(new Vector3());
+    const hull = new SkinnedMesh(m.geometry, outlineMat(Number((Math.max(size.x, size.y, size.z) * ratio).toPrecision(3))));
+    hull.userData.outline = true;
+    hull.frustumCulled = false;
+    hull.position.copy(m.position);
+    hull.quaternion.copy(m.quaternion);
+    hull.scale.copy(m.scale);
+    hull.bind(m.skeleton, m.bindMatrix);
+    m.parent!.add(hull);
   }
   return root;
 }
