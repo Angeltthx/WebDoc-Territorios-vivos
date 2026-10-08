@@ -30,6 +30,8 @@ export interface VideoAsset {
   poster?: Photo;
   /** URL del stream cuando exista. Mientras falte, el reproductor muestra el estado pendiente. */
   src?: string;
+  /** Video en streaming HLS: id en public/media/historias/<id> (master.m3u8 + poster.webp). */
+  stream?: string;
   tint?: string;
 }
 
@@ -64,6 +66,8 @@ export interface Station {
 
 export interface Transition {
   number: number;
+  /** Rótulo propio en la barra superior (si no, "Transición N · desde → hacia"). */
+  label?: string;
   from: string;
   to: string;
   symbol: 'wave' | 'rain' | 'meet' | 'sea';

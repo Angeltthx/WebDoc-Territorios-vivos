@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type TouchEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent } from 'react';
 import type { Photo, Station, VideoAsset } from '../../domain/types';
 import { aspectOf, Backdrop, Img } from './Media';
 import { Arrow } from './Chrome';
@@ -24,8 +24,14 @@ export function QuotePanel({ station }: { station: Station }) {
 
 const toSeconds = (t: string) => t.split(':').reduce((acc, n) => acc * 60 + Number(n), 0);
 
-/** Reproductor del corto. Mientras no exista el archivo de streaming, muestra el estado pendiente. */
-export function VideoPanel({ video, bar }: { video: VideoAsset; bar?: string }) {
+/** Pestaña Historia: el video en streaming si ya existe; si no, el estado pendiente. */
+export function VideoPanel({ video, bar, active = false }: { video: VideoAsset; bar?: string; active?: boolean }) {
+  if (video.stream) return <StoryPlayer id={video.stream} title={video.title} active={active} />;
+  return <PendingVideo video={video} bar={bar} />;
+}
+
+/** Reproductor pendiente: portada y botón, hasta que se entregue el archivo final. */
+function PendingVideo({ video, bar }: { video: VideoAsset; bar?: string }) {
   const [asked, setAsked] = useState(false);
   const [now, total] = bar ? bar.split('/').map((s) => toSeconds(s.trim())) : [0, 1];
   return (
@@ -38,7 +44,7 @@ export function VideoPanel({ video, bar }: { video: VideoAsset; bar?: string }) 
       )}
       <div className="video reveal">
         <button type="button" className={`play${video.poster ? ' play--on-image' : ''}`} onClick={() => setAsked(true)} aria-label={`Reproducir ${video.title}`}>
-          <svg width="34" height="34" viewBox="0 0 30 30" aria-hidden="true"><path d="M10 6v18l14-9Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+          <PlayGlyph />
         </button>
         {!video.poster && <p className="video__title">{video.title}{video.duration && <span> · {video.duration}</span>}</p>}
         {asked && <p className="notice" role="status">El video se integrará cuando se entregue el archivo final.</p>}
@@ -51,6 +57,184 @@ export function VideoPanel({ video, bar }: { video: VideoAsset; bar?: string }) 
         </div>
       )}
     </>
+  );
+}
+
+function PlayGlyph() {
+  return <svg width="34" height="34" viewBox="0 0 30 30" aria-hidden="true"><path d="M10 6v18l14-9Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>;
+}
+
+const fmt = (s: number) => {
+  if (!Number.isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+};
+
+/**
+ * Video de HISTORIA en streaming (HLS en 1080p, 720p y 480p según la conexión), a pantalla completa
+ * y con sus colores originales. Empieza con el botón de reproducir. Mientras el video corre, las
+ * pestañas y el rótulo de la estación salen de la pantalla y los controles ocupan su lugar; tras unos
+ * segundos sin movimiento se oculta todo (modo cine). Al pausar, las pestañas regresan. Si el visitante sigue bajando, el video se pausa y al volver continúa
+ * donde iba. hls.js solo se descarga al reproducir (Safari usa su reproductor nativo).
+ */
+function StoryPlayer({ id, title, active }: { id: string; title: string; active: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLVideoElement>(null);
+  const hls = useRef<{ destroy: () => void } | null>(null);
+  const [started, setStarted] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [time, setTime] = useState({ now: 0, total: 0 });
+  const [idle, setIdle] = useState(false);
+  const idleTimer = useRef(0);
+  const base = `/media/historias/${id}`;
+  const src = `${base}/master.m3u8`;
+
+  // Al salir de la página, el video se pausa (sin reiniciarse).
+  useEffect(() => {
+    if (!active) ref.current?.pause();
+  }, [active]);
+
+  useEffect(() => () => {
+    hls.current?.destroy();
+    window.clearTimeout(idleTimer.current);
+  }, []);
+
+  // Los controles se ocultan tras unos segundos sin movimiento mientras el video corre.
+  const wake = () => {
+    setIdle(false);
+    window.clearTimeout(idleTimer.current);
+    idleTimer.current = window.setTimeout(() => setIdle(true), 2600);
+  };
+
+  const start = async () => {
+    const v = ref.current;
+    if (!v) return;
+    setStarted(true);
+    setError(false);
+    wake();
+    if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari: HLS nativo, asignado y reproducido dentro del mismo clic.
+      if (!v.src) v.src = src;
+      void v.play().catch(() => {}); // interrumpido (pausa, salir de la página): no es un error
+      return;
+    }
+    const { default: Hls } = await import('hls.js/light');
+    if (!Hls.isSupported()) {
+      setError(true);
+      return;
+    }
+    if (!hls.current) {
+      const h = new Hls({ maxBufferLength: 30, capLevelToPlayerSize: true });
+      h.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) setError(true); });
+      h.loadSource(src);
+      h.attachMedia(v);
+      hls.current = h;
+    }
+    void v.play().catch(() => {}); // interrumpido (pausa, salir de la página): no es un error
+  };
+
+  const toggle = () => {
+    const v = ref.current;
+    if (!v) return;
+    if (!started) void start();
+    else if (v.paused) void v.play();
+    else v.pause();
+    wake();
+  };
+
+  const seek = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const v = ref.current;
+    if (!v || !time.total) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * time.total;
+    wake();
+  };
+
+  const fullscreen = () => {
+    const v = ref.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else if (box.current?.requestFullscreen) void box.current.requestFullscreen().catch(() => {});
+    else v?.webkitEnterFullscreen?.(); // iPhone
+  };
+
+  const progress = time.total ? (time.now / time.total) * 100 : 0;
+  const hide = started && playing && idle;
+
+  return (
+    <div
+      ref={box}
+      className={`story${started ? ' is-started' : ''}${started && playing ? ' is-playing' : ''}${hide ? ' is-idle' : ''}`}
+      data-no-arrows
+      onPointerMove={started ? wake : undefined}
+    >
+      <video
+        ref={ref}
+        className="story__video"
+        poster={`${base}/poster.webp`}
+        playsInline
+        preload="none"
+        onClick={started ? toggle : undefined}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onWaiting={() => setWaiting(true)}
+        onPlaying={() => { setWaiting(false); setError(false); }}
+        onError={() => setError(true)}
+        onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
+        onLoadedMetadata={(e) => setTime({ now: e.currentTarget.currentTime, total: e.currentTarget.duration })}
+        onTimeUpdate={(e) => setTime({ now: e.currentTarget.currentTime, total: e.currentTarget.duration })}
+        onEnded={() => setIdle(false)}
+      />
+
+      {!started && (
+        <div className="video reveal">
+          <button type="button" className="play play--on-image" onClick={toggle} aria-label={`Reproducir ${title}`}>
+            <PlayGlyph />
+          </button>
+          <p className="video__title story__title">{title}</p>
+        </div>
+      )}
+
+      {started && waiting && !error && <span className="pano__spinner story__spinner" role="status" aria-label="Cargando" />}
+      {error && <p className="notice notice--float" role="alert">No se pudo cargar el video. Revisa la conexión e inténtalo de nuevo.</p>}
+
+      {started && (
+        <div className="pano__controls story__controls" onPointerMove={wake}>
+          <button type="button" onClick={toggle} aria-label={playing ? 'Pausar' : 'Reproducir'}>
+            {playing ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" /></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M4 2.5v11l9-5.5Z" /></svg>
+            )}
+          </button>
+          <span className="pano__time">{fmt(time.now)}</span>
+          <div
+            className="pano__track"
+            role="slider"
+            aria-label="Posición del video"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(time.total) || 0}
+            aria-valuenow={Math.round(time.now)}
+            aria-valuetext={`${fmt(time.now)} de ${fmt(time.total)}`}
+            onPointerDown={seek}
+          >
+            <span style={{ width: `${progress}%` }} />
+          </div>
+          <span className="pano__time">{fmt(time.total)}</span>
+          <button type="button" onClick={() => { if (ref.current) ref.current.muted = !muted; wake(); }} aria-label={muted ? 'Activar sonido' : 'Silenciar'}>
+            <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 8v4h3l4 3V5L6 8Z" />
+              {muted ? <path d="m13 8 4 4m0-4-4 4" /> : <path d="M13 7.5c1.2 1.4 1.2 3.6 0 5M15.5 5.5c2.3 2.6 2.3 6.4 0 9" />}
+            </svg>
+          </button>
+          <button type="button" onClick={fullscreen} aria-label="Pantalla completa">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" /></svg>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

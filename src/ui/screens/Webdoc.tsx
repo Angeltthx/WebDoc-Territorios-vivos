@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { getStation, stations, transitions, voices } from '../../content/journey';
 import { pages, type PageSpec } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
-import { initAudioUnlock, isMuted, setAmbient, setMuted, setVoice } from '../../application/sound';
+import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
   Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, STATION_PAGE, SiteMenu, SocialLinks,
@@ -23,15 +23,19 @@ export function Webdoc() {
   const [seen, setSeen] = useState(() => new Set([active]));
 
   const [muted, setMutedState] = useState(isMuted);
+  const first = useRef(true);
 
   useEffect(() => initAudioUnlock(), []);
 
   useEffect(() => {
     setSeen((s) => (s.has(active) ? s : new Set(s).add(active)));
     document.title = `Territorios Vivos · ${active + 1} / ${pages.length}`;
-    // Ambiente de marea en su escena y voz de Chachita en la portada, las transiciones y el Viche.
-    // Al cambiar de página no suena ningún efecto: cada video de transición trae su propio sonido.
+    // Ola corta al cambiar de página (no al cargar), salvo al entrar a una transición con video,
+    // que trae su propio sonido (con la voz de Chachita). Ambiente de marea en su escena y voz de
+    // Chachita antes del Viche.
     const spec = pages[active];
+    if (first.current) first.current = false;
+    else if (!(spec.kind === 'transition' && transitions[spec.index].video)) playTransition();
     setAmbient(spec.kind === 'silence' ? spec.tide : null);
     setVoice(voiceOf(spec));
   }, [active]);
@@ -84,7 +88,6 @@ export function Webdoc() {
 }
 
 function voiceOf(spec: PageSpec): string | null {
-  if (spec.kind === 'welcome') return voices.welcome;
   if (spec.kind === 'transition') return transitions[spec.index].voice ?? null;
   if (spec.id === 'pangui-viche') return voices.viche;
   return null;
@@ -134,7 +137,7 @@ function PageView({ spec, playing, near, muted, openGuide }: {
     case 'video':
       return (
         <div className="screen" aria-label={spec.label}>
-          <div className="screen__content"><VideoPanel video={spec.video} bar={spec.bar} /></div>
+          <div className="screen__content"><VideoPanel video={spec.video} bar={spec.bar} active={playing} /></div>
           <TopBar label={spec.label} />
           {spec.tabs && <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>}
         </div>
@@ -167,11 +170,11 @@ function PageView({ spec, playing, near, muted, openGuide }: {
       const t = transitions[spec.index];
       const onPhoto = !!(t.background || t.video);
       return (
-        <div className="screen screen--transition" style={{ background: t.color }} aria-label={`Transición ${t.number}: de ${t.from} a ${t.to}`}>
+        <div className="screen screen--transition" style={{ background: t.color }} aria-label={t.label ?? `Transición ${t.number}: de ${t.from} a ${t.to}`}>
           {t.video && <TransitionVideo id={t.video} playing={playing} near={near} muted={muted} shade={t.lines.length > 0} />}
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
-          <TopBar plain={onPhoto} label={<>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
+          <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
           <div className="transition">
             {!t.video && <TransitionSymbol kind={t.symbol} />}
             {t.lines.map((line, i) => (
@@ -244,6 +247,10 @@ function PortadaVideo({ playing }: { playing: boolean }) {
   );
 }
 
+/** Versión de los videos de transición: los archivos conservan su nombre y /media se guarda en caché
+ *  un año, así que al recibir videos nuevos se cambia este valor para que el navegador los vuelva a pedir. */
+const TRANSITIONS_VERSION = '2026-10-05';
+
 /**
  * Video de una transición, con su propio sonido. Empieza desde el inicio cada vez que se llega
  * a la transición y se pausa al salir. Si el navegador no permite sonido todavía (sin gesto del
@@ -270,13 +277,13 @@ function TransitionVideo({ id, playing, near, muted, shade }: { id: string; play
     const v = ref.current;
     if (v && playing) v.muted = muted;
   }, [muted, playing]);
-  const poster = `/media/transiciones/${id}-poster.webp`;
+  const poster = `/media/transiciones/${id}-poster.webp?v=${TRANSITIONS_VERSION}`;
   return (
     <div className="backdrop" aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
       <video
         ref={ref}
         className="backdrop__video"
-        src={`/media/transiciones/${id}-${small ? 720 : 1080}.mp4`}
+        src={`/media/transiciones/${id}-${small ? 720 : 1080}.mp4?v=${TRANSITIONS_VERSION}`}
         poster={poster}
         muted
         loop

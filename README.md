@@ -13,6 +13,7 @@ npm run media:video  # video de portada → public/media/video/ (desde ../Conten
 npm run media:audio  # olas de transición → public/media/audio/ (desde ../Contenido)
 npm run media:360    # video 360 del manglar → HLS en 3 calidades en public/media/360/ (varios minutos)
 npm run media:transiciones  # videos de transición (Contenido/Transiciones) → 1080p y 720p en public/media/transiciones/
+npm run media:historias    # videos de HISTORIA de cada estación → HLS 1080/720/480 en public/media/historias/ (varios minutos)
 npm run dev     # http://localhost:5173
 npm run build   # verificación de tipos + build de producción en dist/
 ```
@@ -38,7 +39,7 @@ Flechas, AvPág y espacio avanzan una página.
 - Menú fijo (arriba a la derecha) y redes sociales siempre visibles. Opciones y enlaces en
   `src/content/site.ts`; las que aún no tienen destino se muestran como "Próximamente".
 - Pestañas de cada estación: Pensamiento, Historia, Galería… llevan a su página.
-- La URL refleja la página visible (`/`, `/2` … `/22`) para compartir un punto exacto.
+- La URL refleja la página visible (`/`, `/2` … `/26`) para compartir un punto exacto.
 - Sonido con grabaciones reales (`src/application/sound.ts`, botón para silenciar junto a las
   redes): una ola corta en cada cambio de página (`ola-1/2/3.mp3`, alternándose; `?ola=N` fija
   una) y ambiente de marea en bucle solo en Marea alta y Marea baja (`marea-alta.mp3`,
@@ -51,6 +52,9 @@ Flechas, AvPág y espacio avanzan una página.
   Arrastrar para mirar, rueda o pellizco para acercar, flechas del teclado y, en celular, mover el
   teléfono (giroscopio). Corre en bucle con su sonido. Se carga solo al abrirla
   (`src/ui/components/Panorama360.tsx`).
+- **Videos de transición** (`npm run media:transiciones`, desde `Contenido/Transiciones`): Intro
+  después de la portada, transiciones 1 a 4 y Cierre, con la voz de Chachita ya integrada en cada
+  video (05/10/2026). Solo el Viche conserva una voz aparte.
 - La portada es el video
   `panguí_v1` (1080p/720p sin audio en `public/media/video/`), que se pausa al quedar
   cubierto y continúa desde el mismo punto al volver.
@@ -73,9 +77,8 @@ docs/                      Ampliación de arquitectura a plataforma
 
 ## Pendiente (no incluido en Demo 1)
 
-- Videos de las secciones Historia, Video canción y Viche (siguiente rama; el reproductor
-  muestra estado "pendiente").
-- Transición después de la portada y nueva frase de la transición 1 (del Canva del cliente).
+- Videos de Historia de la estación 4 y del Viche (el reproductor muestra estado "pendiente").
+  Ya están: Historia de las estaciones 1 a 3 y Video canción (`npm run media:historias`).
 - Enlaces de YouTube, Instagram y TikTok; destinos de Equipo, Making of, Blog, Llévate Nuquí,
   Vive y Reserva y Cuéntanos tu historia.
 - Voz de Chachita, ambientes y cantos (coordinador de medios en el hito M02).
