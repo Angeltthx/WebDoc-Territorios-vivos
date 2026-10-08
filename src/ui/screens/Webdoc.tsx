@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getStation, stations, transitions, voices } from '../../content/journey';
-import { pages, type PageSpec } from '../../content/pages';
+import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
 import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
@@ -63,7 +63,7 @@ export function Webdoc() {
               aria-hidden={i !== active ? true : undefined}
               inert={i !== active ? true : undefined}
             >
-              <PageView spec={spec} playing={i === active} near={Math.abs(i - active) <= 1} muted={muted} openGuide={() => setGuideOpen(true)} />
+              <PageView spec={spec} next={pages[i + 1]?.id} playing={i === active} near={Math.abs(i - active) <= 1} muted={muted} openGuide={() => setGuideOpen(true)} />
             </section>
           );
         })}
@@ -93,8 +93,10 @@ function voiceOf(spec: PageSpec): string | null {
   return null;
 }
 
-function PageView({ spec, playing, near, muted, openGuide }: {
+function PageView({ spec, next, playing, near, muted, openGuide }: {
   spec: PageSpec;
+  /** Página siguiente del recorrido (para la invitación a seguir bajando). */
+  next?: string;
   playing: boolean;
   /** Página visible o vecina: sus videos se precargan. */
   near: boolean;
@@ -130,7 +132,7 @@ function PageView({ spec, playing, near, muted, openGuide }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><QuotePanel station={getStation(spec.station)!} /></div>
           <TopBar label={spec.label} right={<GuideButton onOpen={openGuide} />} />
-          <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
+          <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
 
@@ -139,7 +141,7 @@ function PageView({ spec, playing, near, muted, openGuide }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><VideoPanel video={spec.video} bar={spec.bar} active={playing} /></div>
           <TopBar label={spec.label} />
-          {spec.tabs && <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>}
+          {spec.tabs && <StationFoot tabs={spec.tabs} next={next} />}
         </div>
       );
 
@@ -149,10 +151,9 @@ function PageView({ spec, playing, near, muted, openGuide }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><GalleryPanel gallery={gallery} /></div>
           <TopBar plain label={spec.label} />
-          <footer className="page-foot">
-            <PageTabs tabs={spec.tabs} />
+          <StationFoot tabs={spec.tabs} next={next}>
             <p className="page-foot__note">{gallery.intro.toLowerCase()} · deslizar →</p>
-          </footer>
+          </StationFoot>
         </div>
       );
     }
@@ -162,7 +163,7 @@ function PageView({ spec, playing, near, muted, openGuide }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><RecipePanel recipe={getStation('chori')!.recipe!} /></div>
           <TopBar label={spec.label} />
-          <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
+          <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
 
@@ -198,7 +199,7 @@ function PageView({ spec, playing, near, muted, openGuide }: {
         <div className="screen" aria-label={`${spec.label}: ${spec.title}`}>
           <div className="screen__content"><SilencePanel tide={spec.tide} title={spec.title} hint={spec.hint} photo={spec.photo} /></div>
           <TopBar label={spec.label} />
-          <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
+          <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
 
@@ -207,13 +208,30 @@ function PageView({ spec, playing, near, muted, openGuide }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><SongsPanel songs={getStation('pangui')!.songs!} /></div>
           <TopBar plain label={spec.label} />
-          <footer className="page-foot"><PageTabs tabs={spec.tabs} /></footer>
+          <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
 
     case 'closing':
       return <ClosingPage onRestart={() => scrollToIndex(0)} onStation={(id) => scrollToPage(STATION_PAGE[id])} />;
   }
+}
+
+/** Pie de las páginas de estación: invitación a seguir bajando y pestañas. */
+function StationFoot({ tabs, next, children }: { tabs: Tabs; next?: string; children?: ReactNode }) {
+  const { scrollToPage } = useJourneyNav();
+  return (
+    <footer className="page-foot">
+      {next && (
+        <button type="button" className="scroll-hint" onClick={() => scrollToPage(next)} aria-label="Seguir bajando">
+          Sigue bajando
+          <Arrow dir="down" />
+        </button>
+      )}
+      <PageTabs tabs={tabs} />
+      {children}
+    </footer>
+  );
 }
 
 /**

@@ -2,7 +2,8 @@
 // (29/09/2026): "Cita" → "Pensamiento", "El corto" → "Historia" y sección "Video canción" en la estación 4;
 // (30/09/2026): transición en video después del intro y galería en la estación 4;
 // videos de HISTORIA de las estaciones 1 a 3 en streaming (public/media/historias);
-// (05/10/2026): video del intro después de la portada, cierre en video y Video canción en streaming.
+// (05/10/2026): video del intro después de la portada, cierre en video y Video canción en streaming;
+// (08/10/2026): "Historia" → "Tráiler historia" y sección "Video canción" en la estación 3.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { Photo, StationId, VideoAsset } from '../domain/types';
@@ -26,7 +27,7 @@ const chori = (active: string): Tabs => ({
   active,
   items: [
     { label: 'Pensamiento', to: 'chori-pensamiento' },
-    { label: 'Historia', to: 'chori-historia' },
+    { label: 'Tráiler historia', to: 'chori-historia' },
     { label: 'Galería', to: 'chori-galeria' },
     { label: 'Receta', to: 'chori-receta' },
   ],
@@ -35,7 +36,7 @@ const atrato = (active: string): Tabs => ({
   active,
   items: [
     { label: 'Pensamiento', to: 'atrato-pensamiento' },
-    { label: 'Historia', to: 'atrato-historia' },
+    { label: 'Tráiler historia', to: 'atrato-historia' },
     { label: 'Galería', to: 'atrato-galeria' },
   ],
 });
@@ -44,7 +45,8 @@ const nuqui = (active: string): Tabs => ({
   items: [
     { label: 'Scrolly', to: 'nuqui-scrolly' },
     { label: 'Pensamiento', to: 'nuqui-pensamiento' },
-    { label: 'Historia', to: 'nuqui-historia' },
+    { label: 'Tráiler historia', to: 'nuqui-historia' },
+    { label: 'Video canción', to: 'nuqui-video-cancion' },
     { label: 'Galería', to: 'nuqui-galeria' },
   ],
 });
@@ -53,7 +55,7 @@ const pangui = (active: string): Tabs => ({
   items: [
     { label: 'Marea alta', to: 'pangui-marea-alta' },
     { label: 'Marea baja', to: 'pangui-marea-baja' },
-    { label: 'Historia', to: 'pangui-historia' },
+    { label: 'Tráiler historia', to: 'pangui-historia' },
     { label: 'Galería', to: 'pangui-galeria' },
     { label: '360 · Cantos', to: 'pangui-cantos' },
     { label: 'Video canción', to: 'pangui-video-cancion' },
@@ -83,9 +85,9 @@ export const pages: PageSpec[] = [
   {
     id: 'chori-historia',
     kind: 'video',
-    label: 'Estación 1 · Historia',
+    label: 'Estación 1 · Tráiler historia',
     video: { title: 'El latido', stream: 'estacion-1' },
-    tabs: chori('Historia'),
+    tabs: chori('Tráiler historia'),
   },
   { id: 'chori-galeria', kind: 'gallery', station: 'chori', label: 'Estación 1 · Galería', tabs: chori('Galería') },
   { id: 'chori-receta', kind: 'recipe', label: 'Estación 1 · Receta', tabs: chori('Receta') },
@@ -95,9 +97,9 @@ export const pages: PageSpec[] = [
   {
     id: 'atrato-historia',
     kind: 'video',
-    label: 'Estación 2 · Historia',
+    label: 'Estación 2 · Tráiler historia',
     video: { title: 'Gente del río', stream: 'estacion-2' },
-    tabs: atrato('Historia'),
+    tabs: atrato('Tráiler historia'),
   },
   { id: 'atrato-galeria', kind: 'gallery', station: 'atrato', label: 'Estación 2 · Galería', tabs: atrato('Galería') },
   { id: 'transicion-2', kind: 'transition', index: 3 },
@@ -112,9 +114,18 @@ export const pages: PageSpec[] = [
   {
     id: 'nuqui-historia',
     kind: 'video',
-    label: 'Estación 3 · Historia',
-    video: { title: 'El baile de las olas', stream: 'estacion-3' },
-    tabs: nuqui('Historia'),
+    label: 'Estación 3 · Tráiler historia',
+    // Tráiler nuevo pendiente de integrar (enlace de Drive del cliente, 08/10/2026).
+    video: { title: 'El baile de las olas', poster: p('6i3a3497-mejorado-nr', 'El grupo de danza reunido', { focus: '50% 40%' }) },
+    tabs: nuqui('Tráiler historia'),
+  },
+  {
+    id: 'nuqui-video-cancion',
+    kind: 'video',
+    label: 'Estación 3 · Video canción',
+    // El video que estaba en Historia pasa a Video canción (08/10/2026).
+    video: { title: 'El baile de las olas · Video canción', stream: 'estacion-3' },
+    tabs: nuqui('Video canción'),
   },
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },
   { id: 'transicion-3', kind: 'transition', index: 4 },
@@ -143,9 +154,9 @@ export const pages: PageSpec[] = [
   {
     id: 'pangui-historia',
     kind: 'video',
-    label: 'Estación 4 · Historia',
+    label: 'Estación 4 · Tráiler historia',
     video: { title: 'Marea alta, marea baja', duration: '12:30', tint: '#58509a' },
-    tabs: pangui('Historia'),
+    tabs: pangui('Tráiler historia'),
   },
   { id: 'pangui-galeria', kind: 'gallery', station: 'pangui', label: 'Estación 4 · Galería', tabs: pangui('Galería') },
   { id: 'pangui-cantos', kind: 'songs', label: 'Estación 4 · 360 · Cantos', tabs: pangui('360 · Cantos') },

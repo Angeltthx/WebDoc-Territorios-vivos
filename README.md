@@ -39,7 +39,7 @@ Flechas, AvPág y espacio avanzan una página.
 - Menú fijo (arriba a la derecha) y redes sociales siempre visibles. Opciones y enlaces en
   `src/content/site.ts`; las que aún no tienen destino se muestran como "Próximamente".
 - Pestañas de cada estación: Pensamiento, Historia, Galería… llevan a su página.
-- La URL refleja la página visible (`/`, `/2` … `/26`) para compartir un punto exacto.
+- La URL refleja la página visible (`/`, `/2` … `/27`) para compartir un punto exacto.
 - Sonido con grabaciones reales (`src/application/sound.ts`, botón para silenciar junto a las
   redes): una ola corta en cada cambio de página (`ola-1/2/3.mp3`, alternándose; `?ola=N` fija
   una) y ambiente de marea en bucle solo en Marea alta y Marea baja (`marea-alta.mp3`,

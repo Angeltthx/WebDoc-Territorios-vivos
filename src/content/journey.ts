@@ -66,7 +66,7 @@ export const stations: Station[] = [
     },
     sections: [
       { kind: 'pensamiento', label: 'Pensamiento' },
-      { kind: 'historia', label: 'Historia' },
+      { kind: 'historia', label: 'Tráiler historia' },
       { kind: 'galeria', label: 'Galería' },
       { kind: 'receta', label: 'Receta' },
     ],
@@ -105,7 +105,7 @@ export const stations: Station[] = [
     },
     sections: [
       { kind: 'pensamiento', label: 'Pensamiento' },
-      { kind: 'historia', label: 'Historia' },
+      { kind: 'historia', label: 'Tráiler historia' },
       { kind: 'galeria', label: 'Galería' },
     ],
     video: {
@@ -135,7 +135,8 @@ export const stations: Station[] = [
     sections: [
       { kind: 'scrolly', label: 'Scrolly' },
       { kind: 'pensamiento', label: 'Pensamiento' },
-      { kind: 'historia', label: 'Historia' },
+      { kind: 'historia', label: 'Tráiler historia' },
+      { kind: 'video-cancion', label: 'Video canción' },
       { kind: 'galeria', label: 'Galería' },
     ],
     video: {
@@ -171,9 +172,10 @@ export const stations: Station[] = [
     },
     sections: [
       { kind: 'silencio', label: 'Silencio' },
-      { kind: 'historia', label: 'Historia' },
+      { kind: 'historia', label: 'Tráiler historia' },
       { kind: 'galeria', label: 'Galería' },
       { kind: 'cantos', label: '360 · Cantos' },
+      { kind: 'video-cancion', label: 'Video canción' },
       { kind: 'viche', label: 'Viche' },
     ],
     silence: {

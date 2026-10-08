@@ -24,7 +24,7 @@ export function QuotePanel({ station }: { station: Station }) {
 
 const toSeconds = (t: string) => t.split(':').reduce((acc, n) => acc * 60 + Number(n), 0);
 
-/** Pestaña Historia: el video en streaming si ya existe; si no, el estado pendiente. */
+/** Pestañas Tráiler historia y Video canción: el video en streaming si ya existe; si no, el estado pendiente. */
 export function VideoPanel({ video, bar, active = false }: { video: VideoAsset; bar?: string; active?: boolean }) {
   if (video.stream) return <StoryPlayer id={video.stream} title={video.title} active={active} />;
   return <PendingVideo video={video} bar={bar} />;

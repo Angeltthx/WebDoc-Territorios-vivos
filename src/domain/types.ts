@@ -10,6 +10,7 @@ export type SectionKind =
   | 'scrolly'
   | 'silencio'
   | 'cantos'
+  | 'video-cancion'
   | 'viche';
 
 /** Referencia a una imagen optimizada en public/media (sin extensión). */
