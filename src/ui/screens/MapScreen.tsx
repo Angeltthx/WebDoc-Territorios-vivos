@@ -13,6 +13,8 @@ import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/ma
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
+const INVITE_SEEN = 'mapa-invitacion-vista';
+
 export default function MapScreen() {
   const stage = useRef<HTMLDivElement>(null);
   const globeStage = useRef<HTMLDivElement>(null);
@@ -23,6 +25,23 @@ export default function MapScreen() {
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
+  // La invitación a bajar solo aparece la primera vez: después de entrar una vez, ya no se repite.
+  const [invite, setInvite] = useState(() => {
+    try {
+      return !localStorage.getItem(INVITE_SEEN);
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    if (phase !== 'diving' || !invite) return;
+    setInvite(false);
+    try {
+      localStorage.setItem(INVITE_SEEN, '1');
+    } catch {
+      // Sin almacenamiento: se volverá a ver la próxima vez, no pasa nada.
+    }
+  }, [phase, invite]);
 
   // Página de prueba: que los buscadores no la indexen.
   useEffect(() => {
@@ -107,7 +126,7 @@ export default function MapScreen() {
           <span className="poster-title__big">Nuquí</span>
           <span className="poster-title__script">Chocó</span>
         </p>
-        <p className="globe-title__hint">Toca el Chocó o acércate para entrar</p>
+        {invite && <p className="globe-title__hint">El sol se está poniendo sobre Nuquí. Toca el Chocó y baja a la costa.</p>}
       </div>
 
       <TopBar
