@@ -853,38 +853,30 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   };
 
   /**
-   * Evita que los rótulos se pisen: si uno choca con otro más importante (pueblos, luego el elegido,
-   * luego los cercanos), sube un escalón unido a su alfiler por una línea; si no cabe, se oculta.
+   * Evita que los rótulos se pisen: si uno choca con otro más importante (pueblos, luego el elegido, luego los
+   * cercanos), se desvanece y queda solo su alfiler. Los rótulos no saltan de sitio: el que ya está a la vista
+   * conserva su lugar frente a uno nuevo, así no parpadean al mover la cámara.
    */
-  const GAP = { x: 14, y: 8 };
+  const GAP = { x: 12, y: 6 };
   const declutter = () => {
     const order = [...pins].sort((a, b) => rank(a) - rank(b));
-    const taken: { l: number; r: number; t: number; b: number }[] = [];
+    const taken: DOMRect[] = [];
     for (const { el } of order) {
       const far = Number(el.dataset.far ?? 1);
-      const lift = Number(el.dataset.lift ?? 0);
       const box = el.getBoundingClientRect();
-      const step = box.height + 10;
-      let placedAt = -1;
-      // A lo sumo dos pisos: una torre de rótulos se ve revuelta; si no cabe, queda solo su alfiler.
-      for (let k = 0; far > 0.2 && k < 2 && placedAt < 0; k++) {
-        const t = box.top + lift - k * step;
-        const hit = taken.some((o) => box.left < o.r + GAP.x && box.right > o.l - GAP.x && t < o.b + GAP.y && t + box.height > o.t - GAP.y);
-        if (!hit) {
-          placedAt = k;
-          taken.push({ l: box.left, r: box.right, t, b: t + box.height });
-        }
-      }
-      const show = placedAt >= 0;
-      const newLift = show ? placedAt * step : 0;
-      el.dataset.lift = String(newLift);
-      el.style.setProperty('--lift', `${newLift}px`);
+      const show = far > 0.2 && !taken.some((o) => box.left < o.right + GAP.x && box.right > o.left - GAP.x && box.top < o.bottom + GAP.y && box.bottom > o.top - GAP.y);
+      if (show) taken.push(box);
+      el.dataset.shown = show ? '1' : '';
       el.style.opacity = show ? String(far) : '0';
       el.style.pointerEvents = show ? '' : 'none';
     }
   };
   const rank = (p: (typeof pins)[number]) =>
-    p.place.kind === 'town' ? 0 : p.place.id === selected ? 1 : (p.place.kind === 'site' ? 2 : 3) + p.pin.position.distanceTo(camera.position) / 1e4;
+    p.place.kind === 'town'
+      ? 0
+      : p.place.id === selected
+        ? 1
+        : (p.place.kind === 'site' ? 2 : 3) - (p.el.dataset.shown ? 0.5 : 0) + p.pin.position.distanceTo(camera.position) / 1e4;
   loop();
   // En pausa no se dibuja, pero se dejan listos los sombreadores para que la entrada no se trabe.
   if (paused) {

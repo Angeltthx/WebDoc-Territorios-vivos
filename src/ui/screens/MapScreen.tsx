@@ -102,6 +102,7 @@ export default function MapScreen() {
       </div>
 
       <TopBar
+        plain
         label={onMap ? 'Mapa · Nuquí, Chocó' : 'Mapa · Pacífico colombiano'}
         right={
           <>
