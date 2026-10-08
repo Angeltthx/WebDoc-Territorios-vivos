@@ -10,7 +10,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Webdoc />} />
-        <Route path="/mapa" element={<Suspense fallback={null}><MapScreen /></Suspense>} />
+        <Route path="/mapa" element={<Suspense fallback={<p className="map-loading">Cargando el mapa…</p>}><MapScreen /></Suspense>} />
         <Route path="/:page" element={<Webdoc />} />
         <Route path="*" element={<Webdoc />} />
       </Routes>

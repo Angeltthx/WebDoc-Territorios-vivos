@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
 import { TopBar } from '../components/Chrome';
-import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/MapScene';
+import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
 
 export default function MapScreen() {
   const stage = useRef<HTMLDivElement>(null);
@@ -13,17 +13,28 @@ export default function MapScreen() {
   const [place, setPlace] = useState<MapPlace | null>(null);
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const h = createMapScene(stage.current!, {
-      onSelect: (p) => {
-        setPlace(p);
-        if (p?.kind === 'town') setTown(p.id);
-      },
-      onInteract: () => setHint(false),
-    });
-    handle.current = h;
-    return () => h.dispose();
+    // Armar la escena toma un momento: primero se pinta el aviso de carga y luego se construye.
+    let h: MapSceneHandle | null = null;
+    let live = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!live) return;
+      h = createMapScene(stage.current!, {
+        onSelect: (p) => {
+          setPlace(p);
+          if (p?.kind === 'town') setTown(p.id);
+        },
+        onInteract: () => setHint(false),
+      });
+      handle.current = h;
+      setReady(true);
+    }));
+    return () => {
+      live = false;
+      h?.dispose();
+    };
   }, []);
 
   const goTown = (id: string) => {
@@ -36,6 +47,7 @@ export default function MapScreen() {
   return (
     <main className="map-screen">
       <div ref={stage} className="map-stage" />
+      <p className={`map-loading${ready ? ' is-hidden' : ''}`}>Cargando el mapa…</p>
 
       <TopBar
         label="Mapa · Nuquí, Chocó"
@@ -51,8 +63,9 @@ export default function MapScreen() {
           <button type="button" className="map-card__close" aria-label="Cerrar" onClick={() => handle.current?.select(null)}>
             ×
           </button>
-          <p className="eyebrow">{place.kind === 'town' ? 'Pueblo' : `Cerca de ${place.near}`}</p>
+          <p className="eyebrow">{place.kind === 'town' ? 'Pueblo' : place.kind === 'nature' ? 'Naturaleza del Pacífico' : `Cerca de ${place.near}`}</p>
           <h2 className="map-card__title">{place.name}</h2>
+          {place.scientific && <p className="map-card__sci">{place.scientific}</p>}
           {place.handle && (
             <a className="map-card__handle" href={`https://www.instagram.com/${place.handle}/`} target="_blank" rel="noopener noreferrer">
               @{place.handle}

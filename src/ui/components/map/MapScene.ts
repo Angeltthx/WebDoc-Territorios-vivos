@@ -1,186 +1,67 @@
 // Escena 3D del mapa de prueba: la costa de Nuquí vista desde un barco, a unos 250 m de altura.
-// Todo se genera con código (relieve, mar, cielo, casas y árboles), sin imágenes ni modelos:
+// Todo se genera con código (relieve, mar, cielo, selva, fauna, casas y lanchas), sin imágenes ni modelos:
 // cuando llegue el GLB del diseñador, se reemplaza `buildLand` y se conservan mar, cielo, cámara y marcadores.
 //
-// Coordenadas: x apunta tierra adentro (este), z hacia el sur. La cámara mira desde el mar hacia la costa,
-// así que el norte (Jurubidá) queda a la izquierda y el sur (Coquí) a la derecha, como en el afiche.
+// La cámara mira desde el mar hacia la costa, así que el norte (Jurubidá) queda a la izquierda
+// y el sur (Coquí) a la derecha, como en el afiche. Ver `terrain.ts` para las coordenadas.
 
 import {
-  BackSide, Color, ConeGeometry, CylinderGeometry, DataTexture, DirectionalLight, DodecahedronGeometry,
-  Float32BufferAttribute, FloatType, Fog, Group, HemisphereLight, IcosahedronGeometry, InstancedMesh, MathUtils,
-  Mesh, MeshStandardMaterial, NearestFilter, Object3D, PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster,
-  RedFormat, SRGBColorSpace, Scene, ShaderMaterial, SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer, BoxGeometry,
+  BackSide, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute, FloatType,
+  Fog, Group, HemisphereLight, IcosahedronGeometry, MathUtils, Mesh, MeshStandardMaterial, NearestFilter, Object3D,
+  PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster, RedFormat, SRGBColorSpace, Scene, ShaderMaterial,
+  SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { COAST, MAP_PLACES, type MapPlace } from '../../content/map';
+import type { MapPlace } from '../../../content/map';
+import { buildFauna, NATURE_LABEL_HEIGHT } from './fauna';
+import { buildFlora, buildMist } from './flora';
+import { buildPlaces } from './places';
+import {
+  COAST_SOFT, GRID, HEIGHTS, K, Z_LIMIT, coastAt, coastX, nature, placed, rng, smoothstep, valueNoise, zOf, type PlacedPlace,
+} from './terrain';
 
-/** Unidades de la escena por píxel del afiche (≈ metros a escala libre). */
-const K = 2.6;
-/** Altura del afiche que queda en z = 0 (Nuquí). */
-const PY0 = 880;
-const PX0 = 600;
-
-const Z_LIMIT = { min: (40 - PY0) * K, max: (1330 - PY0) * K };
-const DIST = { min: 380, max: 1700, start: 950 };
+const DIST = { min: 300, max: 1700, start: 950 };
 const PITCH = { min: 5, max: 38, start: 10 };
 
 const SUN_DIR = new Vector3(1, 0.21, 0.26).normalize();
 const HORIZON = new Color('#d4ecf2');
+const ZENITH = new Color('#3d8ed8');
 /** Punto de vista inicial aproximado (frente a Nuquí), para dejar el sol despejado. */
 const START_VIEW = new Vector3(-1300, 200, -500);
-const ZENITH = new Color('#3d8ed8');
-
-const smoothstep = MathUtils.smoothstep;
-const zOf = (py: number) => (py - PY0) * K;
-
-// ───────── Línea de costa ─────────
-
-const PY_MIN = -600;
-const PY_MAX = 1900;
-
-/** Interpolación lineal de la costa del afiche, suavizada con una media móvil de `radius` píxeles. */
-function coastTable(radius: number) {
-  const raw = new Float32Array(PY_MAX - PY_MIN + 1);
-  for (let i = 0; i < raw.length; i++) {
-    const py = PY_MIN + i;
-    let j = 0;
-    while (j < COAST.length - 2 && COAST[j + 1][0] < py) j++;
-    const [y0, x0] = COAST[j];
-    const [y1, x1] = COAST[j + 1];
-    raw[i] = x0 + (x1 - x0) * MathUtils.clamp((py - y0) / (y1 - y0), 0, 1);
-  }
-  const out = new Float32Array(raw.length);
-  for (let i = 0; i < raw.length; i++) {
-    let sum = 0;
-    let n = 0;
-    for (let k = -radius; k <= radius; k++) {
-      const v = raw[i + k];
-      if (v !== undefined) { sum += v; n++; }
-    }
-    out[i] = sum / n;
-  }
-  return out;
-}
-
-const COAST_FINE = coastTable(18);
-const COAST_SOFT = coastTable(140);
-
-/** x de la costa (unidades de escena) para una z dada. */
-function coastAt(table: Float32Array, z: number) {
-  const f = MathUtils.clamp(z / K + PY0 - PY_MIN, 0, table.length - 1);
-  const i = Math.floor(f);
-  const a = table[i];
-  const b = table[Math.min(i + 1, table.length - 1)];
-  return (a + (b - a) * (f - i) - PX0) * K;
-}
-const coastX = (z: number) => coastAt(COAST_FINE, z);
-
-// ───────── Ruido para el relieve ─────────
-
-function hash(x: number, y: number) {
-  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return s - Math.floor(s);
-}
-function valueNoise(x: number, y: number) {
-  const xi = Math.floor(x);
-  const yi = Math.floor(y);
-  const xf = x - xi;
-  const yf = y - yi;
-  const u = xf * xf * (3 - 2 * xf);
-  const v = yf * yf * (3 - 2 * yf);
-  const a = hash(xi, yi);
-  const b = hash(xi + 1, yi);
-  const c = hash(xi, yi + 1);
-  const d = hash(xi + 1, yi + 1);
-  return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) * 2 - 1;
-}
-function fbm(x: number, y: number) {
-  let sum = 0;
-  let amp = 0.55;
-  let f = 1;
-  for (let o = 0; o < 4; o++) {
-    sum += valueNoise(x * f, y * f) * amp;
-    f *= 2.03;
-    amp *= 0.5;
-  }
-  return sum;
-}
-
-/** Pseudoaleatorio con semilla: el mapa sale igual en cada visita. */
-function rng(seed: number) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
-}
-
-// ───────── Lugares ─────────
-
-interface PlacedPlace extends MapPlace {
-  pos: Vector3;
-}
-
-const placed: PlacedPlace[] = MAP_PLACES.map((p) => {
-  const z = zOf(p.py);
-  return { ...p, pos: new Vector3(coastX(z) + p.inland * K, 0, z) };
-});
-
-/** Relieve sin aplanar: playa, llanura costera y la serranía del Baudó al fondo. */
-function rawHeight(x: number, z: number) {
-  const d = x - coastX(z);
-  if (d < 0) return Math.max(d * 0.06, -30);
-  const beach = 1.5 + Math.min(d, 50) * 0.15;
-  const ridge = Math.pow(smoothstep(d, 120, 2300), 1.2) * 300;
-  const n = fbm(x * 0.0024, z * 0.0024);
-  const amp = (14 + smoothstep(d, 150, 1100) * 110) * smoothstep(d, 40, 260);
-  return Math.max(beach + ridge + n * amp, beach);
-}
-
-const flats = placed.map((p) => ({ x: p.pos.x, z: p.pos.z, h: rawHeight(p.pos.x, p.pos.z), r: p.id === 'kipara-te' ? 80 : 50 }));
-
-/** Relieve final: se aplana un poco alrededor de cada lugar para que se lea con claridad. */
-function heightAt(x: number, z: number) {
-  let h = rawHeight(x, z);
-  for (const f of flats) {
-    const dist = Math.hypot(x - f.x, z - f.z);
-    if (dist < f.r * 2) h = MathUtils.lerp(f.h, h, smoothstep(dist, f.r * 0.6, f.r * 2));
-  }
-  return h;
-}
-
-for (const p of placed) p.pos.y = heightAt(p.pos.x, p.pos.z);
 
 // ───────── Construcción de la escena ─────────
 
 const LAND_COLORS = {
   sand: new Color('#efdcab'),
-  low: new Color('#96c96b'),
-  mid: new Color('#5ea95a'),
-  high: new Color('#2f7b4c'),
-  peak: new Color('#3b6f57'),
+  bank: new Color('#cdbb86'),
+  low: new Color('#8cc466'),
+  mid: new Color('#4f9850'),
+  high: new Color('#2f7347'),
+  peak: new Color('#376a52'),
   seabed: new Color('#6fc7bd'),
 };
 
 function buildLand() {
-  const geo = new PlaneGeometry(7200, 7600, 300, 316);
+  // La malla usa la misma grilla que `heightAt` (vértice i = fila * (nx + 1) + columna, de norte a sur).
+  const geo = new PlaneGeometry(GRID.w, GRID.d, GRID.nx, GRID.nz);
   geo.rotateX(-Math.PI / 2);
-  geo.translate(400, 0, -400);
+  geo.translate(GRID.x0 + GRID.w / 2, 0, GRID.z0 + GRID.d / 2);
   const pos = geo.attributes.position;
   const colors = new Float32Array(pos.count * 3);
   const c = new Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    const h = heightAt(x, z);
+    const h = HEIGHTS[i];
     pos.setY(i, h);
     const d = x - coastX(z);
-    if (d < 0) c.copy(LAND_COLORS.seabed);
+    if (d < 0 || h < -0.5) c.copy(LAND_COLORS.seabed);
+    else if (h < 2.2 && d > 60) c.copy(LAND_COLORS.bank);
     else if (d < 34 + valueNoise(z * 0.02, 3) * 10) c.copy(LAND_COLORS.sand);
     else {
       const t = MathUtils.clamp(h / 300, 0, 1);
-      if (t < 0.25) c.lerpColors(LAND_COLORS.low, LAND_COLORS.mid, t / 0.25);
-      else if (t < 0.7) c.lerpColors(LAND_COLORS.mid, LAND_COLORS.high, (t - 0.25) / 0.45);
+      if (t < 0.12) c.lerpColors(LAND_COLORS.low, LAND_COLORS.mid, t / 0.12);
+      else if (t < 0.7) c.lerpColors(LAND_COLORS.mid, LAND_COLORS.high, (t - 0.12) / 0.58);
       else c.lerpColors(LAND_COLORS.high, LAND_COLORS.peak, (t - 0.7) / 0.3);
       c.offsetHSL(0, 0, valueNoise(x * 0.01, z * 0.01) * 0.035);
     }
@@ -191,7 +72,7 @@ function buildLand() {
   return new Mesh(geo, new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }));
 }
 
-/** Mar con olas suaves, agua clara cerca de la orilla y espuma en la línea de playa. */
+/** Mar con olas suaves, agua clara cerca de la orilla, espuma en la playa y ríos en calma. */
 function buildSea() {
   // Tabla de la costa por z, para que el sombreador sepa a qué distancia de la orilla está cada punto.
   const W = 4096;
@@ -208,30 +89,38 @@ function buildSea() {
     uCoast: { value: coastTex },
     uZRange: { value: new Vector2(zMin, zMax) },
   };
+  // Distancia mar adentro desde la orilla (negativa tierra adentro, es decir, en los ríos).
+  const coastGlsl = `uniform float uTime;
+    uniform sampler2D uCoast;
+    uniform vec2 uZRange;
+    varying vec3 vSea;
+    float seaOff(vec3 w) { return texture2D(uCoast, vec2((w.z - uZRange.x) / (uZRange.y - uZRange.x), 0.5)).r - w.x; }`;
   const mat = new MeshStandardMaterial({ color: '#1b6f8a', flatShading: true, roughness: 0.32, metalness: 0.05 });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec3 vSea;')
+      .replace('#include <common>', `#include <common>\n${coastGlsl}`)
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
         vec4 seaW = modelMatrix * vec4(transformed, 1.0);
-        transformed.z += sin(seaW.x * 0.011 + uTime * 0.8) * 1.8 + sin(seaW.z * 0.016 - uTime * 0.6) * 1.3
-          + sin((seaW.x + seaW.z) * 0.031 + uTime * 1.4) * 0.6;
+        float calm = mix(0.15, 1.0, smoothstep(-40.0, 30.0, seaOff(seaW.xyz)));
+        transformed.z += calm * (sin(seaW.x * 0.011 + uTime * 0.8) * 1.8 + sin(seaW.z * 0.016 - uTime * 0.6) * 1.3
+          + sin((seaW.x + seaW.z) * 0.031 + uTime * 1.4) * 0.6);
         vSea = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
       );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform sampler2D uCoast;\nuniform vec2 uZRange;\nvarying vec3 vSea;')
+      .replace('#include <common>', `#include <common>\n${coastGlsl}`)
       .replace(
         'vec4 diffuseColor = vec4( diffuse, opacity );',
-        `float coastX = texture2D(uCoast, vec2((vSea.z - uZRange.x) / (uZRange.y - uZRange.x), 0.5)).r;
-        float off = coastX - vSea.x;
+        `float off = seaOff(vSea);
         vec3 sea = mix(vec3(0.07, 0.36, 0.50), vec3(0.20, 0.66, 0.68), 1.0 - smoothstep(0.0, 520.0, off));
         float swirl = sin(vSea.x * 0.018 + sin(vSea.z * 0.009 + uTime * 0.15) * 3.0 + uTime * 0.25);
         sea += smoothstep(0.9, 1.0, swirl) * 0.03;
         float foam = (1.0 - smoothstep(0.0, 24.0, off + sin(vSea.z * 0.06 + uTime * 1.6) * 5.0)) * smoothstep(-12.0, 0.0, off);
         sea = mix(sea, vec3(0.93, 0.97, 0.95), foam * 0.85);
+        // Ríos: agua verdosa y quieta.
+        sea = mix(sea, vec3(0.24, 0.52, 0.48), smoothstep(-10.0, -60.0, off));
         vec4 diffuseColor = vec4(sea, opacity);`,
       );
   };
@@ -274,12 +163,12 @@ function buildSky() {
   return sky;
 }
 
-/** Pocas nubes bajas y redondeadas. */
+/** Nubes redondeadas que se mueven despacio. */
 function buildClouds(rand: () => number) {
   const group = new Group();
   const mat = new MeshStandardMaterial({ color: '#ffffff', emissive: '#dfeefa', emissiveIntensity: 0.55, flatShading: true, roughness: 1 });
   const geo = new IcosahedronGeometry(1, 1);
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 10; i++) {
     const cloud = new Group();
     const puffs = 4 + Math.floor(rand() * 3);
     for (let j = 0; j < puffs; j++) {
@@ -293,124 +182,13 @@ function buildClouds(rand: () => number) {
     // Ninguna nube delante del sol.
     const fromView = cloud.position.clone().sub(START_VIEW).normalize();
     if (fromView.dot(SUN_DIR) > 0.96) cloud.position.z += 2400;
+    cloud.userData.z = cloud.position.z;
     group.add(cloud);
   }
-  return group;
-}
-
-const WALLS = ['#f4e6c8', '#efb7a0', '#a9d8cc', '#f6d58d', '#e0957a', '#c8d7ef'];
-const ROOFS = ['#b4523b', '#7a4c3a', '#c96f45'];
-
-/** Caseríos de los pueblos y las chozas de la etnoaldea. */
-function buildSettlements(rand: () => number) {
-  const group = new Group();
-  const box = new BoxGeometry(12, 8, 10);
-  const roof = new ConeGeometry(9.5, 6, 4);
-  roof.rotateY(Math.PI / 4);
-  const hutWall = new CylinderGeometry(6, 6.5, 6, 10);
-  const hutRoof = new ConeGeometry(10, 9, 10);
-  const mats = new Map<string, MeshStandardMaterial>();
-  const mat = (color: string) => {
-    if (!mats.has(color)) mats.set(color, new MeshStandardMaterial({ color, flatShading: true, roughness: 0.9 }));
-    return mats.get(color)!;
+  const update = (t: number) => {
+    for (const c of group.children) c.position.z = c.userData.z + Math.sin(t * 0.01 + c.userData.z) * 300;
   };
-
-  for (const p of placed) {
-    if (p.kind === 'town') {
-      for (let i = 0; i < 11; i++) {
-        const z = p.pos.z + (rand() - 0.5) * 170;
-        const x = coastX(z) + 22 + rand() * 70;
-        const y = heightAt(x, z);
-        const house = new Group();
-        const walls = new Mesh(box, mat(WALLS[Math.floor(rand() * WALLS.length)]));
-        walls.position.y = 4;
-        const top = new Mesh(roof, mat(ROOFS[Math.floor(rand() * ROOFS.length)]));
-        top.position.y = 11;
-        top.scale.set(1, 1, 0.85);
-        house.add(walls, top);
-        house.position.set(x, y, z);
-        house.rotation.y = (rand() - 0.5) * 0.5;
-        const s = 0.85 + rand() * 0.4;
-        house.scale.setScalar(s);
-        group.add(house);
-      }
-    } else if (p.id === 'kipara-te') {
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 7) * Math.PI * 2;
-        const x = p.pos.x + Math.cos(a) * 34;
-        const z = p.pos.z + Math.sin(a) * 34;
-        const y = heightAt(x, z);
-        const w = new Mesh(hutWall, mat('#cfa66a'));
-        w.position.set(x, y + 3, z);
-        const r = new Mesh(hutRoof, mat('#a8803e'));
-        r.position.set(x, y + 10.5, z);
-        group.add(w, r);
-      }
-    }
-  }
-  return group;
-}
-
-/** Árboles dispersos (pocos, a propósito) y algunas palmas en la playa. */
-function buildTrees(rand: () => number) {
-  const free = (x: number, z: number) => placed.every((p) => Math.hypot(x - p.pos.x, z - p.pos.z) > (p.kind === 'town' ? 140 : 70));
-  const dummy = new Object3D();
-  const group = new Group();
-
-  const trunkGeo = new CylinderGeometry(1.2, 1.9, 10, 5);
-  trunkGeo.translate(0, 5, 0);
-  const crownGeo = new IcosahedronGeometry(9, 0);
-  const trunks = new InstancedMesh(trunkGeo, new MeshStandardMaterial({ color: '#7a5a3c', flatShading: true }), 120);
-  const crowns = new InstancedMesh(crownGeo, new MeshStandardMaterial({ flatShading: true, roughness: 0.9 }), 120);
-  const greens = ['#3f8f4f', '#4f9e52', '#2e7a46', '#6aae58'].map((c) => new Color(c));
-  let n = 0;
-  for (let tries = 0; n < 120 && tries < 2000; tries++) {
-    const z = Z_LIMIT.min - 600 + rand() * (Z_LIMIT.max - Z_LIMIT.min + 1200);
-    const x = coastX(z) + 60 + Math.pow(rand(), 1.6) * 1100;
-    if (!free(x, z)) continue;
-    const y = heightAt(x, z);
-    const s = 1 + rand() * 0.9;
-    dummy.position.set(x, y - 1, z);
-    dummy.rotation.set(0, rand() * Math.PI, 0);
-    dummy.scale.setScalar(s);
-    dummy.updateMatrix();
-    trunks.setMatrixAt(n, dummy.matrix);
-    dummy.position.y = y - 1 + 15 * s;
-    dummy.scale.set(s, s * (0.9 + rand() * 0.4), s);
-    dummy.updateMatrix();
-    crowns.setMatrixAt(n, dummy.matrix);
-    crowns.setColorAt(n, greens[Math.floor(rand() * greens.length)]);
-    n++;
-  }
-  trunks.count = crowns.count = n;
-
-  const palmTrunk = new CylinderGeometry(0.8, 1.3, 16, 5);
-  palmTrunk.translate(0, 8, 0);
-  const palmLeaves = new ConeGeometry(11, 4, 7);
-  const pTrunks = new InstancedMesh(palmTrunk, trunks.material, 50);
-  const pLeaves = new InstancedMesh(palmLeaves, new MeshStandardMaterial({ color: '#3e8d47', flatShading: true }), 50);
-  let m = 0;
-  for (let tries = 0; m < 50 && tries < 1000; tries++) {
-    const z = Z_LIMIT.min - 400 + rand() * (Z_LIMIT.max - Z_LIMIT.min + 800);
-    const x = coastX(z) + 14 + rand() * 40;
-    if (!free(x, z)) continue;
-    const y = heightAt(x, z);
-    const lean = (rand() - 0.5) * 0.35;
-    dummy.position.set(x, y - 0.5, z);
-    dummy.rotation.set(lean, rand() * Math.PI, -0.15 - rand() * 0.15);
-    dummy.scale.setScalar(1);
-    dummy.updateMatrix();
-    pTrunks.setMatrixAt(m, dummy.matrix);
-    const tip = new Vector3(0, 16, 0).applyEuler(dummy.rotation).add(dummy.position);
-    dummy.position.copy(tip);
-    dummy.updateMatrix();
-    pLeaves.setMatrixAt(m, dummy.matrix);
-    m++;
-  }
-  pTrunks.count = pLeaves.count = m;
-
-  group.add(trunks, crowns, pTrunks, pLeaves);
-  return group;
+  return { group, update };
 }
 
 /** Morros: islotes de roca con copete verde frente a la costa. */
@@ -464,7 +242,11 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
   const rand = rng(20261008);
   const sky = buildSky();
   const { sea, uniforms } = buildSea();
-  scene.add(sky, sea, buildLand(), buildSettlements(rand), buildTrees(rand), buildRocks(rand), buildClouds(rand));
+  const clouds = buildClouds(rand);
+  const mist = buildMist(rand);
+  const places = buildPlaces(rand);
+  const fauna = buildFauna(rand);
+  scene.add(sky, sea, buildLand(), buildRocks(rand), buildFlora(rand), clouds.group, mist.group, places.group, fauna.group);
 
   scene.add(new HemisphereLight('#d2ecff', '#4a6a44', 1.25));
   const key = new DirectionalLight('#fff1d6', 2.3);
@@ -473,17 +255,28 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
 
   // Marcadores: alfiler rosado para los sitios, rótulo blanco para los pueblos.
   const pinMat = new MeshStandardMaterial({ color: '#e2456f', emissive: '#7a1630', emissiveIntensity: 0.35, roughness: 0.5 });
-  const pinHead = new SphereGeometry(7, 16, 12);
-  const pinTip = new ConeGeometry(4.6, 13, 12);
+  const pinHead = new SphereGeometry(5.5, 16, 12);
+  const pinTip = new ConeGeometry(3.6, 10, 12);
   pinTip.rotateX(Math.PI);
-  pinTip.translate(0, -8.5, 0);
+  pinTip.translate(0, -6.6, 0);
   const pins: { place: PlacedPlace; pin: Group; label: CSS2DObject; el: HTMLButtonElement }[] = [];
+  /** Altura del alfiler: encima de lo que haya construido en el sitio. */
+  const pinBase = (place: PlacedPlace) => place.pos.y + (places.heights.get(place.id) ?? 10) + 16;
 
-  for (const place of placed) {
+  for (const place of [...placed, ...nature]) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = `map-label map-label--${place.kind}`;
-    el.textContent = place.name;
+    if (place.kind === 'nature') {
+      const name = document.createElement('span');
+      name.textContent = place.name;
+      el.append(name);
+      if (place.scientific) {
+        const sci = document.createElement('em');
+        sci.textContent = place.scientific;
+        el.append(sci);
+      }
+    } else el.textContent = place.name;
     el.addEventListener('pointerdown', (e) => e.stopPropagation());
     el.addEventListener('click', () => select(place.id));
     const label = new CSS2DObject(el);
@@ -492,10 +285,12 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
     const pin = new Group();
     if (place.kind === 'site') {
       pin.add(new Mesh(pinHead, pinMat), new Mesh(pinTip, pinMat));
-      pin.position.copy(place.pos).setY(place.pos.y + 24);
+      pin.position.copy(place.pos).setY(pinBase(place));
       label.position.set(0, 12, 0);
+    } else if (place.kind === 'town') {
+      pin.position.copy(place.pos).setY(place.pos.y + (places.heights.get(place.id) ?? 20) + 40);
     } else {
-      pin.position.copy(place.pos).setY(place.pos.y + 62);
+      pin.position.copy(place.pos).setY(place.pos.y + (NATURE_LABEL_HEIGHT[place.id] ?? 30));
     }
     pin.userData.id = place.id;
     pin.add(label);
@@ -612,10 +407,10 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
   function select(id: string | null) {
     selected = id;
     for (const p of pins) p.el.classList.toggle('is-selected', p.place.id === id);
-    const place = placed.find((p) => p.id === id) ?? null;
+    const place = [...placed, ...nature].find((p) => p.id === id) ?? null;
     if (place) {
       goal.z = place.pos.z;
-      goal.dist = Math.min(goal.dist, place.kind === 'town' ? 760 : 620);
+      goal.dist = Math.min(goal.dist, place.kind === 'town' ? 760 : 560);
       clampGoal();
     }
     onSelect(place);
@@ -658,15 +453,19 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
     view.pitch += (goal.pitch - view.pitch) * ease;
     placeCamera();
     uniforms.uTime.value = t;
+    clouds.update(t);
+    mist.update(t);
+    places.update(t, dt);
+    fauna.update(t, dt);
 
     for (const { place, pin, el } of pins) {
       if (place.kind === 'site') {
-        pin.position.y = place.pos.y + 24 + Math.sin(t * 2 + place.pos.z * 0.01) * 2.5;
+        pin.position.y = pinBase(place) + Math.sin(t * 2 + place.pos.z * 0.01) * 2.5;
         pin.quaternion.multiply(bob.setFromAxisAngle(tmp.set(0, 1, 0), dt * 0.8));
         pin.scale.setScalar(place.id === selected ? 1.45 : 1);
       }
       // Los rótulos de los sitios lejanos se desvanecen para no amontonarse.
-      const far = place.kind === 'site' ? 1 - smoothstep(pin.position.distanceTo(camera.position), 1500, 2300) : 1;
+      const far = place.kind === 'town' ? 1 : 1 - smoothstep(pin.position.distanceTo(camera.position), 1500, 2300);
       el.dataset.far = String(far);
     }
 
@@ -705,7 +504,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract }: MapS
     }
   };
   const rank = (p: (typeof pins)[number]) =>
-    p.place.kind === 'town' ? 0 : p.place.id === selected ? 1 : 2 + p.pin.position.distanceTo(camera.position) / 1e4;
+    p.place.kind === 'town' ? 0 : p.place.id === selected ? 1 : (p.place.kind === 'site' ? 2 : 3) + p.pin.position.distanceTo(camera.position) / 1e4;
   loop();
 
   return {

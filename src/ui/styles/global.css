@@ -584,6 +584,20 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   background: #e2456f; pointer-events: none;
 }
 /* El renderizador de rótulos ocupa `transform`; el realce usa `translate` y `scale`. */
+/* Fauna y flora: recuadro azul con el nombre científico en cursiva, como en el afiche. */
+.map-label--nature {
+  margin-top: calc(var(--lift, 0px) * -1); display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 3px 9px 4px; border-radius: 4px; background: #6f9fd0; color: #fff;
+  font: 600 10px var(--sans); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.map-label--nature em { font: italic 400 10px var(--serif); letter-spacing: 0; text-transform: none; opacity: 0.95; }
+.map-label--nature::after {
+  content: ''; position: absolute; left: 50%; top: 100%; width: 1.5px; height: var(--lift, 0px);
+  background: #6f9fd0; pointer-events: none;
+}
+.map-label--nature.is-selected { background: #3f6fa6; }
+.map-card__sci { margin-top: 2px; font: italic 15px var(--serif); opacity: 0.85; }
+
 .map-label:hover, .map-label.is-selected { translate: 0 -3px; scale: 1.06; }
 .map-label--site.is-selected { background: #b8264e; }
 .map-label--town.is-selected { background: var(--gold); }
@@ -604,6 +618,15 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   background: none; font-size: 22px; line-height: 1;
 }
 .map-card__close:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Aviso mientras se arma la escena (tarda unos segundos la primera vez). */
+.map-loading {
+  position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; margin: 0;
+  background: linear-gradient(#3d8ed8, #d4ecf2 55%, #2b8a8f 56%, #1b6f8a);
+  font: italic 500 clamp(18px, 2.4vw, 26px) var(--serif); color: #fff; text-shadow: 0 2px 14px rgba(0, 40, 60, 0.4);
+  transition: opacity 0.8s ease, visibility 0.8s;
+}
+.map-loading.is-hidden { opacity: 0; visibility: hidden; }
 
 .map-hint {
   position: absolute; z-index: 4; left: 50%; top: 72px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);

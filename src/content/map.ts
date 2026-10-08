@@ -6,7 +6,8 @@
 export interface MapPlace {
   id: string;
   name: string;
-  kind: 'town' | 'site';
+  /** Pueblo, sitio turístico o especie (fauna y flora) del afiche. */
+  kind: 'town' | 'site' | 'nature';
   /** Altura en el afiche (norte → sur). */
   py: number;
   /** Distancia tierra adentro, en píxeles del afiche. */
@@ -15,6 +16,8 @@ export interface MapPlace {
   handle?: string;
   /** Pueblo más cercano. */
   near?: string;
+  /** Nombre científico, tal como aparece en el afiche. */
+  scientific?: string;
 }
 
 /** Línea de costa del afiche: pares [py, px] (px = borde entre mar y tierra). */
@@ -54,4 +57,23 @@ export const MAP_PLACES: MapPlace[] = [
   { id: 'escombros-coqui', name: 'Escombros del Mar', kind: 'site', py: 1205, inland: 34, handle: 'escombrosdelmarhostal', near: 'Coquí' },
   { id: 'posada-sonona', name: 'Posada Sonona', kind: 'site', py: 1260, inland: 70, handle: 'sononaecolodge', near: 'Coquí' },
   { id: 'coqui', name: 'Coquí', kind: 'town', py: 1310, inland: 12 },
+];
+
+/** Fauna y flora ilustradas en el afiche. `inland` negativo = en el mar. */
+export const MAP_NATURE: MapPlace[] = [
+  { id: 'ballena', name: 'Ballena jorobada', kind: 'nature', py: 190, inland: -95, scientific: 'Megaptera novaeangliae' },
+  { id: 'cangrejo', name: 'Cangrejo fantasma rojo', kind: 'nature', py: 590, inland: 6, scientific: 'Ocypode gaudichaudii' },
+  { id: 'tortuga', name: 'Tortuga golfina', kind: 'nature', py: 770, inland: -120, scientific: 'Lepidochelys olivacea' },
+  { id: 'pava', name: 'Pava del Baudó', kind: 'nature', py: 760, inland: 250, scientific: 'Penelope ortoni' },
+  { id: 'rana', name: 'Rana arlequín', kind: 'nature', py: 1120, inland: 170, scientific: 'Oophaga solanensis' },
+  { id: 'manglar', name: 'Manglar', kind: 'nature', py: 1165, inland: 10 },
+  { id: 'cacao', name: 'Cacao', kind: 'nature', py: 1290, inland: 120 },
+];
+
+/** Ríos que bajan al mar: puntos [py, inland] desde la desembocadura; `width` en unidades de la escena. */
+export const MAP_RIVERS: { id: string; width: number; path: [number, number][] }[] = [
+  { id: 'jurubida', width: 26, path: [[102, -12], [106, 40], [92, 100], [84, 160], [70, 230]] },
+  { id: 'tribuga', width: 48, path: [[475, -14], [470, 30], [484, 80], [466, 140], [478, 200], [458, 270]] },
+  { id: 'nuqui', width: 34, path: [[896, -12], [899, 40], [886, 100], [902, 160], [890, 240]] },
+  { id: 'coqui', width: 26, path: [[1236, -12], [1233, 30], [1246, 80], [1230, 140]] },
 ];
