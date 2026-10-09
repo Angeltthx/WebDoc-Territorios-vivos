@@ -8,9 +8,10 @@ import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
 import { TopBar } from '../components/Chrome';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
+import { createFlatGlobe } from '../components/map/FlatGlobe';
 import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
-import { TIER, TIER_LABEL, rememberCrash } from '../components/map/quality';
+import { QUALITY, TIER, TIER_LABEL, rememberCrash } from '../components/map/quality';
 import { SOLO, lastSteps, step } from '../components/map/diag';
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
@@ -18,7 +19,7 @@ type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 const INVITE_SEEN = 'mapa-invitacion-vista';
 /** En equipos modestos, el planeta se suelta al llegar a la costa (y se vuelve a armar al regresar): así nunca están
  * las dos escenas 3D en memoria más que durante el cambio. */
-const RELEASE_GLOBE = TIER === 'baja' || TIER === 'minima';
+const RELEASE_GLOBE = TIER === 'baja' || TIER === 'minima' || TIER === 'segura';
 
 export default function MapScreen() {
   const stage = useRef<HTMLDivElement>(null);
@@ -92,7 +93,8 @@ export default function MapScreen() {
       });
     makeGlobe.current = () =>
       new Promise<GlobeHandle>((resolve) => {
-        const g = createGlobe(globeStage.current!, {
+        // En la versión 5 el planeta es un dibujo plano: una sola escena 3D en la página (la costa).
+        const g = (QUALITY.flatGlobe ? createFlatGlobe : createGlobe)(globeStage.current!, {
           onReady: () => {
             if (!live) return;
             resolve(g);

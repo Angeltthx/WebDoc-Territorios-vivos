@@ -6,20 +6,22 @@
 //   baja    teléfonos sencillos: menos de todo, sin bordes, mar y relieve más simples, sin cielo pintado en 3D.
 //   minima  lo justo para que corra en cualquier teléfono o con mala señal: lo básico del mapa, figuras dibujadas en
 //           lugar de los modelos animados (no se descargan), muy pocas aves, texturas pequeñas.
+//   segura  (v5) como la mínima, pero con una sola escena 3D: el planeta de la entrada es un dibujo plano (2D). Para
+//           las tarjetas gráficas que se caen aun con la mínima.
 //
 // Se mira: la tarjeta gráfica (su nombre), la memoria, los núcleos, la pantalla y la conexión. Y la página aprende: si
 // en este equipo el 3D se cayó, la próxima vez entra un nivel más abajo (ver `rememberCrash`).
-// Para probar a mano: ?v=1 (alta) · ?v=2 (media) · ?v=3 (baja) · ?v=4 (mínima) en la dirección. Es un código neutro a
+// Para probar a mano: ?v=1 (alta) · ?v=2 (media) · ?v=3 (baja) · ?v=4 (mínima) · ?v=5 (segura) en la dirección. Es un código neutro a
 // propósito: quien vea la dirección o el diagnóstico no lee que le tocó una versión «reducida».
 
 import { MeshLambertMaterial, MeshStandardMaterial, type MeshStandardMaterialParameters } from 'three';
 
-export type Tier = 'alta' | 'media' | 'baja' | 'minima';
-const ORDER: Tier[] = ['minima', 'baja', 'media', 'alta'];
+export type Tier = 'alta' | 'media' | 'baja' | 'minima' | 'segura';
+const ORDER: Tier[] = ['segura', 'minima', 'baja', 'media', 'alta'];
 const below = (a: Tier, b: Tier) => ORDER.indexOf(a) < ORDER.indexOf(b);
 const STORE = 'mapa-perfil';
 /** Código neutro de cada nivel (en la dirección y en el diagnóstico). */
-const CODE: Record<Tier, string> = { alta: '1', media: '2', baja: '3', minima: '4' };
+const CODE: Record<Tier, string> = { alta: '1', media: '2', baja: '3', minima: '4', segura: '5' };
 
 /** Nombre de la tarjeta gráfica (p. ej. «Mali-G52», «Adreno (TM) 610», «Apple GPU»); null si no hay 3D. */
 function gpuInfo() {
@@ -68,7 +70,7 @@ function detect(): { tier: Tier; why: string[] } {
   };
 
   const gpu = gpuInfo();
-  if (!gpu) return { tier: 'minima', why: ['sin 3D'] };
+  if (!gpu) return { tier: 'segura', why: ['sin 3D'] };
   const apple = /apple/i.test(gpu.name);
   cap(gpuCap(gpu.name), gpu.name);
   if (gpu.maxTexture < 4096) cap('minima', `texturas de ${gpu.maxTexture}`);
@@ -125,19 +127,25 @@ export function rememberCrash(): boolean {
 const LEVELS = {
   alta: {
     pixelRatio: 2, minPixelRatio: 0.6, antialias: true, plants: 1, birds: 1, butterflies: 1, clouds: 1, mist: true,
-    outlines: true, waves: 5, stars: 1, galaxy: true, fewAnimals: false, models: true, landStep: 1, world: 1, region: 1,
+    outlines: true, waves: 5, stars: 1, galaxy: true, fewAnimals: false, models: true, landStep: 1, world: 1, region: 1, flatGlobe: false,
   },
   media: {
     pixelRatio: 1.5, minPixelRatio: 0.6, antialias: true, plants: 0.75, birds: 0.75, butterflies: 0.75, clouds: 1, mist: true,
-    outlines: true, waves: 5, stars: 0.7, galaxy: true, fewAnimals: false, models: true, landStep: 1, world: 0.5, region: 0.8,
+    outlines: true, waves: 5, stars: 0.7, galaxy: true, fewAnimals: false, models: true, landStep: 1, world: 0.5, region: 0.8, flatGlobe: false,
   },
   baja: {
     pixelRatio: 1, minPixelRatio: 0.6, antialias: false, plants: 0.45, birds: 0.45, butterflies: 0.45, clouds: 0.7, mist: true,
-    outlines: false, waves: 3, stars: 0.45, galaxy: false, fewAnimals: true, models: true, landStep: 2, world: 0.5, region: 0.6,
+    outlines: false, waves: 3, stars: 0.45, galaxy: false, fewAnimals: true, models: true, landStep: 2, world: 0.5, region: 0.6, flatGlobe: false,
   },
   minima: {
     pixelRatio: 1, minPixelRatio: 0.5, antialias: false, plants: 0.25, birds: 0.2, butterflies: 0, clouds: 0.4, mist: false,
     outlines: false, waves: 2, stars: 0.15, galaxy: false, fewAnimals: true, models: false, landStep: 3, world: 0.25, region: 0.4,
+    flatGlobe: false,
+  },
+  segura: {
+    pixelRatio: 1, minPixelRatio: 0.5, antialias: false, plants: 0.25, birds: 0.2, butterflies: 0, clouds: 0.4, mist: false,
+    outlines: false, waves: 2, stars: 0.15, galaxy: false, fewAnimals: true, models: false, landStep: 3, world: 0.25, region: 0.4,
+    flatGlobe: true,
   },
 } as const;
 
