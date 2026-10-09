@@ -5,13 +5,14 @@
 // Ballenas, tortugas, cangrejos, pava y ranas empiezan con figuras dibujadas con código y, cuando llegan los modelos
 // animados de la diseñadora (ver animals.ts), cada una se cambia por su modelo (`swap`).
 
-import { type BufferGeometry, Group, MathUtils, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three';
-import type { Animal, AnimalKit } from './animals';
+import { type BufferGeometry, Group, InstancedMesh, MathUtils, Matrix4, Mesh, Object3D, type Skeleton, type SkinnedMesh, Vector3 } from 'three';
+import type { Animal, AnimalKit, Species } from './animals';
 import { SplashPool } from './splash';
-import { BALL, BLADE, CONE, ORB, merge, paint, part, pole, solid, sticker } from './kit';
+import { BALL, BLADE, CONE, Instancer, ORB, type Pace, merge, paint, part, pole, solid, sticker } from './kit';
 import {
   RAIL, RIVER_MOUTHS, S, doorTo, facing, heightAt, nature, offshore, offshoreRaw, placeNear, placed, railAt, riverReach, shore, smoothstep,
 } from './terrain';
+import { QUALITY, litMaterial } from './quality';
 
 const TAU = Math.PI * 2;
 
@@ -23,6 +24,60 @@ export interface Living {
   update: (t: number, dt: number) => void;
   /** Cambia las figuras dibujadas por los modelos animados que hayan llegado. */
   swap?: (kit: AnimalKit) => void;
+}
+
+/** Dónde está la cámara (lo actualiza el mapa en cada cuadro), para animar con menos detalle lo que está lejos. */
+export const VIEWER = new Vector3();
+let tickFrame = 0;
+let tickSlots = 0;
+const tickPos = new Vector3();
+/**
+ * Avanza la animación de un animal. Los que están lejos de la cámara (más de 1,6 km) se animan uno de cada cuatro
+ * cuadros, con el tiempo acumulado (no se desfasan); en los demás cuadros three.js ni siquiera recalcula sus huesos.
+ * De lejos no se nota y, con una docena de animales con esqueleto, ahorra buena parte del trabajo de cada cuadro.
+ */
+function animate(a: Animal, dt: number) {
+  const s = a as Animal & { owed?: number; slot?: number; skeletons?: Skeleton[] };
+  s.slot ??= tickSlots++;
+  if (!s.skeletons) {
+    const set = new Set<Skeleton>();
+    a.root.traverse((o) => (o as SkinnedMesh).isSkinnedMesh && set.add((o as SkinnedMesh).skeleton));
+    s.skeletons = [...set];
+    // Se envuelve una sola vez: así el esqueleto se puede saltar sin cambiar la forma del objeto en cada cuadro.
+    for (const sk of s.skeletons) {
+      const update = sk.update.bind(sk);
+      sk.update = () => {
+        if (!(sk as Skeleton & { skip?: boolean }).skip) update();
+      };
+    }
+  }
+  tickPos.setFromMatrixPosition(a.root.matrixWorld);
+  const far = tickPos.distanceToSquared(VIEWER) > 1600 * 1600;
+  const frozen = far && (tickFrame + s.slot) % 4 !== 0;
+  // Congelado: el esqueleto tampoco se recalcula ni se vuelve a subir a la tarjeta gráfica (three.js lo hace en cada
+  // cuadro con todo animal a la vista, aunque no se haya movido).
+  for (const sk of s.skeletons) (sk as Skeleton & { skip?: boolean }).skip = frozen;
+  a.root.matrixWorldAutoUpdate = !frozen;
+  if (frozen) {
+    s.owed = (s.owed ?? 0) + dt;
+    return;
+  }
+  a.mixer.update(dt + (s.owed ?? 0));
+  s.owed = 0;
+}
+
+
+/**
+ * Borde de calcomanía para las figuras dibujadas con código que esperan su modelo animado. Calcularlo cuesta (en un
+ * teléfono modesto, casi un segundo entre todas) y casi nunca se ve: el modelo llega antes de que se baje a la costa.
+ * Se calcula solo si el modelo de esa especie no se pudo cargar (ver `buildFauna`).
+ */
+const stickerLater = new Map<Species, (() => void)[]>();
+function fallbackSticker<T extends Object3D>(species: Species, root: T, width: number): T {
+  const list = stickerLater.get(species) ?? [];
+  list.push(() => sticker(root, width));
+  stickerLater.set(species, list);
+  return root;
 }
 
 /** Un `Living` cuyo comportamiento se puede reemplazar (al llegar los modelos). */
@@ -52,16 +107,23 @@ const byId = (id: string) => nature.find((n) => n.id === id)!;
 // ───────── Salpicaduras y soplos ─────────
 
 class Spray {
-  private drops: { m: Mesh; v: Vector3; life: number; size: number }[] = [];
+  // Todas las gotas son una sola malla instanciada (un solo dibujo): las que no están en el aire quedan en tamaño 0.
+  private drops: { p: Vector3; v: Vector3; life: number; size: number }[] = [];
+  private mesh: InstancedMesh;
+  private live = 0;
+  private m = new Matrix4();
   readonly group = new Group();
   constructor(count: number) {
-    const mat = new MeshStandardMaterial({ color: '#f4fbff', emissive: '#cfe8f2', emissiveIntensity: 0.4, flatShading: true, roughness: 1 });
+    const mat = litMaterial({ color: '#f4fbff', emissive: '#cfe8f2', emissiveIntensity: 0.4, flatShading: true, roughness: 1 });
+    this.mesh = new InstancedMesh(BALL, mat, count);
+    this.mesh.frustumCulled = false;
+    this.mesh.visible = false;
+    const zero = new Matrix4().makeScale(0, 0, 0);
     for (let i = 0; i < count; i++) {
-      const m = new Mesh(BALL, mat);
-      m.visible = false;
-      this.group.add(m);
-      this.drops.push({ m, v: new Vector3(), life: 0, size: 1 });
+      this.mesh.setMatrixAt(i, zero);
+      this.drops.push({ p: new Vector3(), v: new Vector3(), life: 0, size: 1 });
     }
+    this.group.add(this.mesh);
   }
   emit(at: Vector3, n: number, { spread = 14, up = 30, size = 3 } = {}) {
     let k = 0;
@@ -69,23 +131,30 @@ class Spray {
       if (d.life > 0) continue;
       const a = Math.random() * TAU;
       const s = Math.random() * spread;
-      d.m.position.copy(at);
+      d.p.copy(at);
       d.v.set(Math.cos(a) * s, up * (0.6 + Math.random() * 0.6), Math.sin(a) * s);
       d.life = 1;
       d.size = size * (0.6 + Math.random() * 0.8);
-      d.m.visible = true;
+      this.live++;
       if (++k >= n) break;
     }
   }
   update(dt: number) {
-    for (const d of this.drops) {
-      if (d.life <= 0) continue;
+    this.mesh.visible = this.live > 0;
+    if (!this.live) return;
+    this.drops.forEach((d, i) => {
+      if (d.life <= 0) return;
       d.life -= dt * 0.75;
       d.v.y -= 32 * dt;
-      d.m.position.addScaledVector(d.v, dt);
-      d.m.scale.setScalar(Math.max(d.life, 0) * d.size);
-      if (d.life <= 0 || d.m.position.y < -2) { d.life = 0; d.m.visible = false; }
-    }
+      d.p.addScaledVector(d.v, dt);
+      if (d.life <= 0 || d.p.y < -2) {
+        d.life = 0;
+        this.live--;
+      }
+      const s = Math.max(d.life, 0) * d.size;
+      this.mesh.setMatrixAt(i, this.m.makeScale(s, s, s).setPosition(d.p));
+    });
+    this.mesh.instanceMatrix.needsUpdate = true;
   }
 }
 
@@ -117,9 +186,9 @@ function buildWhales(spray: Spray, splashes: SplashPool, onSplash: OnSplash, ran
   const base = byId('ballena').pos.clone();
   const group = new Group();
   const mother = new Group();
-  mother.add(sticker(whaleBody(), 0.6));
+  mother.add(fallbackSticker('ballena', whaleBody(), 0.6));
   const calf = new Group();
-  calf.add(sticker(whaleBody(), 0.6));
+  calf.add(fallbackSticker('ballena', whaleBody(), 0.6));
   calf.scale.setScalar(0.5);
   group.add(mother, calf);
   // Lancha de avistamiento, a distancia respetuosa.
@@ -174,7 +243,7 @@ function whalePod(make: (length: number) => Animal, spray: Spray, splashes: Spla
     { c: main.clone(), r: 160, len: 96, first: 16 },
     { c: offshore(town('nuqui').s + 0.1 * S, 330), r: 120, len: 88, first: 6.5 },
     { c: offshore(town('pangui').s + 0.4 * S, 800), r: 200, len: 90, first: 28 },
-  ];
+  ].slice(0, QUALITY.fewAnimals ? 2 : 3); // en equipos modestos, sin la de Panguí
   const whales: Whale[] = spots.map((sp, i) => ({
     a: make(sp.len), length: sp.len, c: sp.c, r: sp.r, flat: 0.55, ang: rand() * TAU, dir: i % 2 ? -1 : 1, speed: 9 + rand() * 3,
     breaching: -1, elapsed: 0, nextBreach: sp.first + rand() * 2, nextBlow: 1 + rand() * 4,
@@ -200,7 +269,7 @@ function whalePod(make: (length: number) => Animal, spray: Spray, splashes: Spla
   const head = new Vector3();
   const update = (t: number, dt: number) => {
     for (const w of whales) {
-      w.a.mixer.update(dt);
+      animate(w.a, dt);
       if (w.breaching >= 0) {
         const before = w.elapsed;
         w.elapsed += dt;
@@ -283,7 +352,7 @@ function buildTurtle(): Living {
     turtle.add(f);
     flippers.push(f);
   }
-  sticker(turtle, 0.4);
+  fallbackSticker('tortuga', turtle, 0.4);
   turtle.scale.setScalar(1.4);
   const update = (t: number) => {
     const a = t * 0.12;
@@ -304,7 +373,7 @@ function turtles(make: (length: number) => Animal): Living {
     { c: byId('tortuga').pos.clone(), r: 55 },
     { c: offshore(town('nuqui').s + 0.9 * S, 260), r: 70 },
     { c: offshore(town('tribuga').s + 0.3 * S, 300), r: 60 },
-  ];
+  ].slice(0, QUALITY.fewAnimals ? 2 : 3);
   const list = spots.map((sp, i) => {
     const a = make(i === 0 ? 26 : 22);
     a.play('Swin');
@@ -314,7 +383,7 @@ function turtles(make: (length: number) => Animal): Living {
   });
   const update = (t: number, dt: number) => {
     for (const u of list) {
-      u.a.mixer.update(dt);
+      animate(u.a, dt);
       if (t > u.until) {
         u.floating = !u.floating;
         u.a.play(u.floating ? 'Idle' : 'Swin', { fade: 0.8 });
@@ -348,7 +417,7 @@ function buildCrab(): Living {
     }
   }
   const crab = new Group();
-  crab.add(sticker(solid(g), 0.35));
+  crab.add(fallbackSticker('cangrejo', solid(g), 0.35));
   crab.scale.setScalar(1.5);
   const update = (t: number) => {
     const k = Math.sin(t * 0.5) * 28;
@@ -380,7 +449,8 @@ function crabs(make: (length: number) => Animal): Living {
     beach('coqui', -0.35, [0]),
     beach('tribuga', -0.45, [-10, 18]),
   ];
-  const list = spots.flatMap((sp) => sp.offs.map((off, i) => {
+  // En equipos modestos, un cangrejo por playa.
+  const list = spots.flatMap((sp) => (QUALITY.fewAnimals ? sp.offs.slice(0, 1) : sp.offs).map((off, i) => {
     const a = make(20 + (i % 2) * 3);
     a.play('Idle', { speed: 0.9 + Math.random() * 0.2 });
     a.mixer.setTime(Math.random() * 1.3);
@@ -393,7 +463,7 @@ function crabs(make: (length: number) => Animal): Living {
   }));
   const update = (t: number, dt: number) => {
     for (const c of list) {
-      c.a.mixer.update(dt);
+      animate(c.a, dt);
       if (t > c.until) {
         c.walking = !c.walking;
         if (c.walking) c.dir = c.off > 22 ? -1 : c.off < -22 ? 1 : Math.random() < 0.5 ? -1 : 1;
@@ -446,7 +516,7 @@ function buildPava(): Living {
     part(ORB, '#f0e6d8', { p: [-1.2, 0.4, 1], s: 0.45 }),
   ]));
   bird.add(head);
-  sticker(bird, 0.3);
+  fallbackSticker('pava', bird, 0.3);
   bird.position.set(-13, 29.5, 1.6);
   bird.rotation.y = -Math.PI / 2 + 0.4;
   bird.scale.setScalar(1.25);
@@ -471,7 +541,7 @@ function buildPava(): Living {
     return {
       group: new Group(),
       update: (t: number, dt: number) => {
-        a.mixer.update(dt);
+        animate(a, dt);
         if (t > next) {
           a.play('Sing', { once: true, fade: 0.4 });
           next = t + 4.7 + 14 + Math.random() * 10;
@@ -521,7 +591,7 @@ function buildFrog(): Living {
     g.push(part(ORB, '#2a1a14', { p: [side * 3.6, 1.6, -1.8], s: [1.6, 1.3, 3.6] }), part(ORB, '#e8452c', { p: [side * 3.9, 2.4, -1.4], s: 0.7 }));
     g.push(pole('#2a1a14', [side * 2.6, 2.2, 3], [side * 3.2, 0, 4.4], 0.6));
   }
-  frog.add(sticker(solid(g), 0.3));
+  frog.add(fallbackSticker('rana', solid(g), 0.3));
   frog.scale.setScalar(0.7);
   frog.position.set(-6, 9.6, 0); // sobre la cara de la hoja
   frog.rotation.y = -Math.PI / 2;
@@ -546,7 +616,7 @@ function buildFrog(): Living {
     const frogs = [
       { at: frog.position.clone(), yaw: frog.rotation.y, holder: group },
       { at: new Vector3(-5.1, 9.6, 0), yaw: -Math.PI / 2, holder: second },
-    ].map(({ at, yaw, holder }, i) => {
+    ].slice(0, QUALITY.fewAnimals ? 1 : 2).map(({ at, yaw, holder }, i) => {
       const a = make(5.5);
       a.root.position.copy(at);
       a.root.rotation.y = yaw;
@@ -566,7 +636,7 @@ function buildFrog(): Living {
       group: new Group(),
       update: (_t: number, dt: number) => {
         for (const f of frogs) {
-          f.a.mixer.update(dt);
+          animate(f.a, dt);
           if (f.busy) continue;
           f.wait -= dt;
           if (f.wait > 0) continue;
@@ -737,7 +807,7 @@ function buildBirds(rand: () => number, spray: Spray): Living {
     const t = placed.find((p) => p.id === id)!;
     return t.pos.clone().addScaledVector(t.sea, 120);
   });
-  const frigates = Array.from({ length: 15 }, (_, i) => {
+  const frigates = Array.from({ length: Math.round(15 * QUALITY.birds) }, (_, i) => {
     const b = frigatebird();
     const home = homes[i % homes.length];
     const state = {
@@ -748,7 +818,6 @@ function buildBirds(rand: () => number, spray: Spray): Living {
       alt: 130 + rand() * 120,
       ph: rand() * 100,
     };
-    group.add(b.bird);
     return { ...b, state };
   });
 
@@ -770,9 +839,8 @@ function buildBirds(rand: () => number, spray: Spray): Living {
     return offshoreRaw(RAIL.min - Math.sin(a) * R * 0.6, lane + 2 * R - R * (1 - Math.cos(a)));
   };
   const pelicanStart = placed.find((p) => p.id === 'tribuga')!.s - RAIL.min;
-  const pelicans = Array.from({ length: 7 }, (_, i) => {
+  const pelicans = Array.from({ length: Math.round(7 * QUALITY.birds) }, (_, i) => {
     const b = pelican();
-    group.add(b.bird);
     return { ...b, i };
   });
 
@@ -781,9 +849,8 @@ function buildBirds(rand: () => number, spray: Spray): Living {
   const boobies = spots.flatMap(([id, along, off]) => {
     const t = placed.find((p) => p.id === id)!;
     const c = offshoreRaw(t.s + along * 110, off);
-    return Array.from({ length: 3 }, () => {
+    return Array.from({ length: Math.max(1, Math.round(3 * QUALITY.birds)) }, () => {
       const b = booby();
-      group.add(b.bird);
       return { ...b, c, r: 35 + rand() * 35, ph: rand() * 30, w: (rand() < 0.5 ? -1 : 1) * (0.3 + rand() * 0.15), dived: -1 };
     });
   });
@@ -802,9 +869,12 @@ function buildBirds(rand: () => number, spray: Spray): Living {
     }
     e.bird.rotation.y = rand() * TAU;
     e.bird.userData.ph = rand() * 20;
-    group.add(e.bird);
     return e;
   }));
+
+  // Todas las aves en una sola llamada de dibujo (en vez de cinco por ave).
+  const flocks = [new Instancer([...frigates, ...pelicans, ...boobies, ...egrets].map((b) => b.bird), { viewer: VIEWER, far: 1500 })];
+  for (const f of flocks) group.add(f.group);
 
   const update = (t: number, dt: number) => {
     for (const f of frigates) {
@@ -882,6 +952,7 @@ function buildBirds(rand: () => number, spray: Spray): Living {
       const c = (t + (e.bird.userData.ph as number)) % 9;
       e.head.rotation.x = c > 7 && c < 7.8 ? Math.sin(((c - 7) / 0.8) * Math.PI) * 1.1 : Math.sin(t * 0.8) * 0.05;
     }
+    for (const f of flocks) f.sync();
   };
   return { group, update };
 }
@@ -896,7 +967,7 @@ function buildButterflies(rand: () => number): Living {
     part(ORB, color, { p: [side * 1.6, 0, -1.4], s: [1.5, 0.12, 1.2] }),
     part(ORB, '#1d1a17', { p: [side * 3.8, 0.05, 1.2], s: [0.5, 0.14, 0.5] }),
   ]);
-  const flies = Array.from({ length: 46 }, () => {
+  const flies = Array.from({ length: Math.round(46 * QUALITY.birds) }, () => {
     const color = rand() < 0.75 ? '#f39a2c' : '#f7cf3d';
     const fly = new Group();
     fly.add(new Mesh(merge([part(ORB, '#2a2420', { s: [0.35, 0.35, 1.6] })]), paint));
@@ -909,9 +980,11 @@ function buildButterflies(rand: () => number): Living {
     const a = anchors[Math.floor(rand() * anchors.length)];
     fly.userData = { ax: a.x + (rand() - 0.5) * 120, az: a.z + (rand() - 0.5) * 120, r: 10 + rand() * 25, ph: rand() * TAU, sp: 0.4 + rand() * 0.5 };
     fly.scale.setScalar(1.3);
-    group.add(fly);
-    return { fly, wings };
+    return { fly, wings, color };
   });
+  // Todas las mariposas en una sola llamada de dibujo (en vez de tres por mariposa).
+  const swarms = [new Instancer(flies.map((f) => f.fly), { viewer: VIEWER, far: 700, hideBeyond: 1200 })];
+  for (const s of swarms) group.add(s.group);
   const update = (t: number) => {
     for (const { fly, wings } of flies) {
       const { ax, az, r, ph, sp } = fly.userData as Record<string, number>;
@@ -922,6 +995,7 @@ function buildButterflies(rand: () => number): Living {
       fly.rotation.y = -a;
       for (const w of wings) w.rotation.z = w.userData.side * Math.sin(t * 16 + ph) * 0.9;
     }
+    for (const s of swarms) s.sync();
   };
   return { group, update };
 }
@@ -933,21 +1007,32 @@ export const NATURE_LABEL_HEIGHT: Record<string, number> = {
   ballena: 70, tortuga: 22, cangrejo: 26, pava: 84, rana: 30, manglar: 30, cacao: 34,
 };
 
-export function buildFauna(rand: () => number, onSplash: OnSplash = () => {}): Living {
+export async function buildFauna(rand: () => number, pace: Pace, onSplash: OnSplash = () => {}): Promise<Living> {
   const spray = new Spray(200);
   const splashes = new SplashPool();
-  const parts: Living[] = [buildWhales(spray, splashes, onSplash, rand), buildTurtle(), buildCrab(), buildPava(), buildFrog(), buildBirds(rand, spray), buildButterflies(rand)];
+  const builders: (() => Living)[] = [
+    () => buildWhales(spray, splashes, onSplash, rand), buildTurtle, buildCrab, buildPava, buildFrog, () => buildBirds(rand, spray), () => buildButterflies(rand),
+  ];
+  const parts: Living[] = [];
+  for (const build of builders) {
+    await pace();
+    parts.push(build());
+  }
   const group = new Group();
   group.add(spray.group, splashes.group, buildCacao(rand), buildPosterMangrove(), ...parts.map((p) => p.group));
   return {
     group,
     update: (t, dt) => {
+      tickFrame++;
       for (const p of parts) p.update(t, dt);
       spray.update(dt);
       splashes.update(dt);
     },
     swap: (kit) => {
       for (const p of parts) p.swap?.(kit);
+      // Las especies cuyo modelo no llegó siguen con su figura dibujada: ahora sí, con su borde.
+      for (const [species, list] of stickerLater) if (!kit[species]) for (const run of list) run();
+      stickerLater.clear();
     },
   };
 }

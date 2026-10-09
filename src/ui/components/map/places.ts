@@ -3,7 +3,7 @@
 // También las embarcaciones: lanchas que van y vienen entre pueblos y champas (canoas) de pescadores.
 
 import { type BufferGeometry, Group, Mesh, MeshBasicMaterial, Object3D, Vector3 } from 'three';
-import { BOX, CONE, CYL, ORB, merge, paint, part, person, pole, solid, stiltHouse, sticker } from './kit';
+import { BOX, CONE, CYL, Instancer, ORB, type Pace, bake, merge, paint, part, person, pole, solid, stiltHouse, sticker } from './kit';
 import type { Living } from './fauna';
 import type { TownId } from '../../../content/map';
 import { RAIL, doorTo, heightAt, offshore, placeNear, placed, railAt, riverReach, shore } from './terrain';
@@ -224,7 +224,9 @@ function site(id: string): Built {
       drum.position.set(3.6, 0, -6);
       for (const who of [woman.group, man.group, drummer.group]) sticker(who, 0.3);
       base.add(woman.group, man.group, drummer.group, drum);
-      group.add(base);
+      // Los tres (y el tambor) por lotes: unas pocas llamadas de dibujo en vez de una por pieza y por borde.
+      const dancers = new Instancer([base]);
+      group.add(dancers.group);
       update = (t) => {
         const a = t * 0.9;
         woman.group.position.set(Math.cos(a) * 4.5, 0, Math.sin(a) * 4.5);
@@ -236,6 +238,7 @@ function site(id: string): Built {
         man.armR.rotation.z = 2 + Math.sin(t * 4) * 0.5;
         drummer.armL.rotation.x = -0.8 + Math.sin(t * 9) * 0.4;
         drummer.armR.rotation.x = -0.8 + Math.sin(t * 9 + Math.PI) * 0.4;
+        dancers.sync();
       };
       height = 22;
       break;
@@ -258,10 +261,12 @@ function site(id: string): Built {
       sticker(chachita.group, 0.3);
       chachita.group.scale.setScalar(1.3);
       at(chachita.group, -10, -4, FACE_SEA);
-      group.add(chachita.group);
+      const figure = new Instancer([chachita.group]);
+      group.add(figure.group);
       update = (t) => {
         chachita.armR.rotation.z = 2.4 + Math.sin(t * 5) * 0.45;
         chachita.armL.rotation.z = -0.15;
+        figure.sync();
       };
       height = 22;
       break;
@@ -301,9 +306,11 @@ function traffic(rand: () => number): Living {
     const s = RAIL.min + ((i + 0.3 + rand() * 0.4) / 8) * (RAIL.max - RAIL.min);
     const p = offshore(s, 60 + rand() * 150);
     c.boat.userData = { x: p.x, z: p.z, ph: rand() * TAU, ry: rand() * TAU };
-    group.add(c.boat);
     return c;
   });
+  // Todas las champas (canoa, pescador y remo) en una sola llamada de dibujo.
+  const fleet = new Instancer(fishers.map((c) => c.boat));
+  group.add(fleet.group);
   const pos = (r: (typeof routes)[number], t: number) => {
     const u = (t / r.period) % 1;
     const k = u < 0.5 ? u * 2 : 2 - u * 2;
@@ -325,19 +332,28 @@ function traffic(rand: () => number): Living {
       boat.rotation.set(0, ry + Math.sin(t * 0.05 + ph) * 0.3, Math.sin(t * 1.3 + ph) * 0.06);
       paddle.rotation.x = Math.sin(t * 1.8 + ph) * 0.7;
     }
+    fleet.sync();
   };
   return { group, update };
 }
 
 // ───────── Todo junto ─────────
 
-export function buildPlaces(rand: () => number) {
+export async function buildPlaces(rand: () => number, pace: Pace) {
   const group = new Group();
   const heights = new Map<string, number>();
   const updates: ((t: number) => void)[] = [];
   for (const p of placed) {
+    await pace();
     const built = p.kind === 'town' ? town(p.id as TownId, rand) : site(p.id);
-    group.add(built.object);
+    // Lo que no se mueve se funde en pocas mallas (ver bake): el pueblo entero cuesta un par de dibujos.
+    if (built.update) group.add(built.object);
+    else {
+      const still = bake(built.object);
+      still.updateMatrixWorld(true);
+      still.matrixWorldAutoUpdate = false;
+      group.add(still);
+    }
     heights.set(p.id, built.height);
     if (built.update) updates.push(built.update);
   }

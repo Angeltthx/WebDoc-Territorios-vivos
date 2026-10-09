@@ -6,15 +6,16 @@
 // y el sur (Coquí) a la derecha, como en el afiche. Ver `terrain.ts` para las coordenadas.
 
 import {
-  BackSide, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
-  Fog, Group, HemisphereLight, IcosahedronGeometry, MathUtils, Mesh, MeshStandardMaterial, LinearFilter, Object3D, UnsignedByteType,
+  BackSide, type BufferGeometry, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
+  Fog, Group, HemisphereLight, Matrix4, IcosahedronGeometry, MathUtils, Mesh, LinearFilter, Object3D, UnsignedByteType,
   PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster, RedFormat, SRGBColorSpace, Scene, ShaderMaterial,
   SphereGeometry, Timer, UniformsLib, UniformsUtils, Vector2, Vector3, Vector4, WebGLRenderer, type Texture, type WebGLProgramParametersWithUniforms,
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MapPlace } from '../../../content/map';
-import { buildFauna, NATURE_LABEL_HEIGHT } from './fauna';
-import { sticker } from './kit';
+import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
+import { Batch, type Pace, clearKitCache, pacer, sticker } from './kit';
 import { buildFlora, buildMist } from './flora';
 import { buildPlaces } from './places';
 import { loadAnimals } from './animals';
@@ -24,6 +25,7 @@ import {
   ARRIVAL, BOUNDS, FAR_GRID, FAR_SHORE_FIELD, GRID, HEIGHTS, RAIL, SHORE_FIELD, farVertex, nature, placeNear, placed, railAt, rng, SUN_DIR,
   shore, smoothstep, toScene, valueNoise, type PlacedPlace,
 } from './terrain';
+import { QUALITY, litMaterial, pixelRatioCap } from './quality';
 
 const DIST = { min: 300, max: 1700, start: DIVE.mapDist };
 const PITCH = { min: 5, max: 38, start: 10 };
@@ -141,7 +143,7 @@ const REGION_GLSL = `uniform sampler2D uRegion;
  * `hole` (x0, z0, x1, z1) deja un hueco donde ya está el relieve fino.
  */
 function landMaterial(region: RegionUniforms, flatShading: boolean, hole?: Vector4) {
-  const mat = new MeshStandardMaterial({ vertexColors: true, flatShading, roughness: 1 });
+  const mat = litMaterial({ vertexColors: true, flatShading, roughness: 1 });
   mat.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     Object.assign(shader.uniforms, region, { uHole: { value: hole ?? new Vector4(0, 0, 0, 0) } });
     shader.vertexShader = shader.vertexShader
@@ -169,18 +171,39 @@ function jungleColor(c: Color, h: number, x: number, z: number, top: number) {
   return c.offsetHSL(0, 0, valueNoise(x * 0.01, z * 0.01) * 0.035);
 }
 
-function buildLand(region: RegionUniforms) {
-  // La malla usa la misma grilla que `heightAt` (vértice i = fila * (nx + 1) + columna, de norte a sur).
-  const geo = new PlaneGeometry(GRID.w, GRID.d, GRID.nx, GRID.nz);
+/**
+ * El mar es opaco: el fondo que queda del todo bajo el agua nunca se ve. Se sacan del índice los triángulos con los
+ * tres vértices sumergidos (la mitad de la grilla es mar), así la tarjeta gráfica no los procesa.
+ */
+function dropSubmerged(geo: BufferGeometry, hole?: Vector4, below = -0.6) {
+  const index = geo.index!;
+  const p = geo.attributes.position;
+  const inHole = (i: number) => !!hole && p.getX(i) > hole.x && p.getX(i) < hole.z && p.getZ(i) > hole.y && p.getZ(i) < hole.w;
+  const kept: number[] = [];
+  for (let i = 0; i < index.count; i += 3) {
+    const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
+    // En el relieve de fondo, además, lo que cae entero dentro del hueco del relieve fino (ya lo tapa la otra malla).
+    if (Math.max(p.getY(a), p.getY(b), p.getY(c)) > below && !(inHole(a) && inHole(b) && inHole(c))) kept.push(a, b, c);
+  }
+  geo.setIndex(kept);
+}
+
+async function buildLand(region: RegionUniforms, pace: Pace) {
+  // La malla usa la misma grilla que `heightAt` (vértice i = fila * (nx + 1) + columna, de norte a sur). En equipos
+  // modestos, uno de cada dos puntos (la cuarta parte de los triángulos; a la distancia de la cámara no se nota).
+  const step = QUALITY.landStep;
+  const cols = GRID.nx / step + 1;
+  const geo = new PlaneGeometry(GRID.w, GRID.d, GRID.nx / step, GRID.nz / step);
   geo.rotateX(-Math.PI / 2);
   geo.translate(GRID.x0 + GRID.w / 2, 0, GRID.z0 + GRID.d / 2);
   const pos = geo.attributes.position;
   const colors = new Float32Array(pos.count * 3);
   const c = new Color();
   for (let i = 0; i < pos.count; i++) {
+    if ((i & 4095) === 0) await pace();
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    const h = HEIGHTS[i];
+    const h = HEIGHTS[Math.floor(i / cols) * step * (GRID.nx + 1) + (i % cols) * step];
     pos.setY(i, h);
     const d = shore(x, z);
     if (h < 0.2) c.copy(LAND_COLORS.seabed);
@@ -193,6 +216,7 @@ function buildLand(region: RegionUniforms) {
   }
   geo.setAttribute('color', new Float32BufferAttribute(colors, 3));
   geo.computeVertexNormals();
+  dropSubmerged(geo);
   return new Mesh(geo, landMaterial(region, true));
 }
 
@@ -200,7 +224,7 @@ function buildLand(region: RegionUniforms) {
  * El resto del Chocó, de fondo: la costa sigue al norte y al sur, y tierra adentro vienen el valle del Atrato y la
  * cordillera Occidental. Es una grilla gruesa (≈ 2,8 km) con un hueco donde está el relieve fino de la costa.
  */
-function buildFarLand(region: RegionUniforms) {
+async function buildFarLand(region: RegionUniforms, pace: Pace) {
   const { x0, z0, dx, dz, cols, rows } = FAR_GRID;
   const geo = new PlaneGeometry((cols - 1) * dx, (rows - 1) * dz, cols - 1, rows - 1);
   geo.rotateX(-Math.PI / 2);
@@ -209,6 +233,7 @@ function buildFarLand(region: RegionUniforms) {
   const colors = new Float32Array(pos.count * 3);
   const c = new Color();
   for (let i = 0; i < pos.count; i++) {
+    if ((i & 4095) === 0) await pace();
     const h = farVertex(i % cols, Math.floor(i / cols));
     pos.setY(i, h);
     if (h < 0) c.copy(LAND_COLORS.sand);
@@ -219,6 +244,7 @@ function buildFarLand(region: RegionUniforms) {
   geo.computeVertexNormals();
   const m = 150;
   const hole = new Vector4(BOUNDS.x0 + m, BOUNDS.z0 + m, BOUNDS.x1 - m, BOUNDS.z1 - m);
+  dropSubmerged(geo, hole);
   return new Mesh(geo, landMaterial(region, false, hole));
 }
 
@@ -329,7 +355,8 @@ function buildSea(region: RegionUniforms) {
         float scale = 14.0;
         float amp = 0.11;
         float ang = 0.4;
-        for (int i = 0; i < 5; i++) {
+        // En equipos modestos, menos capas (las más finas casi no se ven desde lejos).
+        for (int i = 0; i < ${QUALITY.waves}; i++) {
           mat2 r = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
           vec2 dir = vec2(cos(ang * 1.7), sin(ang * 1.7));
           vec2 q = r * p / scale + dir * t * (1.4 / sqrt(scale));
@@ -476,8 +503,8 @@ function buildSky() {
 
 /** Nubes redondeadas que se mueven despacio. */
 function buildClouds(rand: () => number) {
-  const group = new Group();
-  const mat = new MeshStandardMaterial({ color: '#ffe2cc', emissive: '#f0957c', emissiveIntensity: 0.5, flatShading: true, roughness: 1, transparent: true });
+  const clouds: Group[] = [];
+  const mat = litMaterial({ color: '#ffe2cc', emissive: '#f0957c', emissiveIntensity: 0.5, flatShading: true, roughness: 1, transparent: true });
   const geo = new IcosahedronGeometry(1, 1);
   for (let i = 0; i < 10; i++) {
     const cloud = new Group();
@@ -494,10 +521,16 @@ function buildClouds(rand: () => number) {
     const fromView = cloud.position.clone().sub(START_VIEW).normalize();
     if (fromView.dot(SUN_DIR) > 0.96) cloud.position.z += 2400;
     cloud.userData.z = cloud.position.z;
-    group.add(cloud);
+    clouds.push(cloud);
   }
+  // Todas las bocanadas en una sola llamada de dibujo.
+  const batch = new Batch(clouds);
+  const group = batch.group;
+  let frame = 0;
   const update = (t: number) => {
-    for (const c of group.children) c.position.z = c.userData.z + Math.sin(t * 0.01 + c.userData.z) * 300;
+    for (const c of clouds) c.position.z = c.userData.z + Math.sin(t * 0.01 + c.userData.z) * 300;
+    // Se mueven unas pocas unidades por segundo: basta actualizarlas uno de cada tres cuadros.
+    if (group.visible && frame++ % 3 === 0) batch.sync();
   };
   /** Se desvanecen cuando la cámara está muy alta (al llegar desde el planeta). */
   const setOpacity = (o: number) => {
@@ -510,8 +543,8 @@ function buildClouds(rand: () => number) {
 /** Morros: islotes de roca con copete verde frente a la costa. */
 function buildRocks(rand: () => number) {
   const group = new Group();
-  const rockMat = new MeshStandardMaterial({ color: '#7c8a80', flatShading: true, roughness: 1 });
-  const topMat = new MeshStandardMaterial({ color: '#4f9a52', flatShading: true });
+  const rockMat = litMaterial({ color: '#7c8a80', flatShading: true, roughness: 1 });
+  const topMat = litMaterial({ color: '#4f9a52', flatShading: true });
   // Frente al golfo de Tribugá, a Nuquí, a Panguí y a la entrada de la ensenada de Coquí.
   const spots = [['tribuga', 0.6, -0.9], ['tribuga', 1.6, -0.6], ['nuqui', -1.7, -0.8], ['nuqui', 1.8, -0.7], ['pangui', 0.7, -0.6], ['coqui', -2.4, -0.4]] as const;
   for (const [town, along, inland] of spots) {
@@ -551,19 +584,34 @@ export interface MapSceneOptions {
   onZoomOut?: () => void;
   /** Cuánto se ha estirado el alejamiento más allá del máximo (0–1), para avisarle que siga si quiere ir al planeta. */
   onPull?: (amount: number) => void;
+  /** El navegador quitó el 3D (por ejemplo, el equipo se quedó sin memoria). */
+  onLost?: () => void;
 }
 
-export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull }: MapSceneOptions): MapSceneHandle {
-  const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+/** Cede el turno a la página entre las etapas pesadas: en un teléfono modesto, armar todo de corrido la congela. */
+const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
+
+/**
+ * Arma la costa por etapas (cediendo el turno entre una y otra, así el planeta de la entrada sigue respondiendo) y
+ * compila sus sombreadores sin congelar la página. Se resuelve cuando ya se puede llegar a ella.
+ */
+export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost }: MapSceneOptions): Promise<MapSceneHandle> {
+  const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(pixelRatioCap());
   renderer.outputColorSpace = SRGBColorSpace;
   host.appendChild(renderer.domElement);
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    onLost?.();
+  });
 
   const labels = new CSS2DRenderer();
   labels.domElement.className = 'map-labels';
   host.appendChild(labels.domElement);
 
   const scene = new Scene();
+  // Solo en desarrollo: para medir el rendimiento desde la consola.
+  if (import.meta.env.DEV) Object.assign(window, { __map: { renderer, scene } });
   const fog = new Fog(HAZE, FOG.near, FOG.far);
   scene.fog = fog;
   const camera = new PerspectiveCamera(52, 1, 5, 60000);
@@ -574,15 +622,31 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   const { sea, uniforms } = buildSea(region);
   const clouds = buildClouds(rand);
   const mist = buildMist(rand);
-  const places = buildPlaces(rand);
+  // Cada etapa cede el turno a la página a menudo (ver `pacer`).
+  const pace = pacer();
+  await pace();
+  const places = await buildPlaces(rand, pace);
   // Cuando la ballena rompe el agua, el mar lo registra (ver `uSplash`).
   let splashSlot = 0;
-  const fauna = buildFauna(rand, (x, z, size, strength) => {
+  const fauna = await buildFauna(rand, pace, (x, z, size, strength) => {
     uniforms.uSplash.value[splashSlot++ % 4].set(x, z, uniforms.uTime.value, size * (0.55 + 0.45 * strength));
   });
+  await pace();
   const rocks = buildRocks(rand);
-  const flora = buildFlora(rand);
-  scene.add(sky, sea, buildLand(region), buildFarLand(region), rocks, flora, clouds.group, mist.group, places.group, fauna.group);
+  const flora = await buildFlora(rand, pace);
+  const land = await buildLand(region, pace);
+  await breathe();
+  const farLand = await buildFarLand(region, pace);
+  // Ya se armó todo lo que repite piezas: se suelta lo memorizado (ver kit.ts).
+  clearKitCache();
+  await breathe();
+  scene.add(sky, sea, land, farLand, rocks, flora, clouds.group, mist.group, places.group, fauna.group);
+  // Lo que nunca se mueve se ubica una vez y three.js deja de recorrerlo en cada cuadro.
+  for (const still of [sea, land, farLand, rocks, flora]) {
+    still.updateMatrixWorld(true);
+    still.matrixAutoUpdate = false;
+    still.matrixWorldAutoUpdate = false;
+  }
   /** Lo que solo se ve de cerca: desde muy alto se esconde (no se alcanza a ver y ensuciaría el dibujo del planeta). */
   const details = [rocks, flora, places.group, fauna.group];
 
@@ -593,12 +657,16 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   scene.add(key);
 
   // Marcadores: alfiler rosado para los sitios, rótulo blanco para los pueblos.
-  const pinMat = new MeshStandardMaterial({ color: '#e2456f', emissive: '#7a1630', emissiveIntensity: 0.35, roughness: 0.5 });
-  const pinHead = new SphereGeometry(5.5, 16, 12);
+  const pinMat = litMaterial({ color: '#e2456f', emissive: '#7a1630', emissiveIntensity: 0.35, roughness: 0.5 });
   const pinTip = new ConeGeometry(3.6, 10, 12);
   pinTip.rotateX(Math.PI);
   pinTip.translate(0, -6.6, 0);
+  // Cabeza y punta en una sola pieza: un dibujo por alfiler (y otro para su borde).
+  const pinGeo = mergeGeometries([new SphereGeometry(5.5, 16, 12), pinTip])!;
   const pins: { place: PlacedPlace; pin: Group; label: CSS2DObject; el: HTMLButtonElement }[] = [];
+  // Todos los marcadores en un grupo: el renderizador de rótulos recorre solo este grupo, no la escena entera.
+  const pinGroup = new Group();
+  scene.add(pinGroup);
   /** Altura del alfiler: encima de lo que haya construido en el sitio. */
   const pinBase = (place: PlacedPlace) => place.pos.y + (places.heights.get(place.id) ?? 10) + 16;
 
@@ -623,7 +691,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
 
     const pin = new Group();
     if (place.kind === 'site') {
-      pin.add(new Mesh(pinHead, pinMat), new Mesh(pinTip, pinMat));
+      pin.add(new Mesh(pinGeo, pinMat));
       sticker(pin, 1.1);
       pin.position.copy(place.pos).setY(pinBase(place));
       label.position.set(0, 12, 0);
@@ -634,7 +702,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     }
     pin.userData.id = place.id;
     pin.add(label);
-    scene.add(pin);
+    pinGroup.add(pin);
     pins.push({ place, pin, label, el });
   }
 
@@ -788,11 +856,22 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
 
   // ───────── Tamaño y bucle ─────────
   let aspect = 1;
+  /** Tamaño de cada rótulo (se mide una vez; se vuelve a medir al cambiar el tamaño de la pantalla). */
+  const sizeOf = new Map<HTMLElement, { w: number; h: number }>();
+  // Si se midieron con la letra de reemplazo, se vuelven a medir cuando llega la del sitio (es más ancha).
+  void document.fonts?.ready.then(() => sizeOf.clear());
+  const onFonts = () => sizeOf.clear();
+  document.fonts?.addEventListener('loadingdone', onFonts);
+  /** Tamaño de la vista (leerlo de la página en cada cuadro la obliga a recalcular el diseño). */
+  const viewSize = { w: 1, h: 1 };
   const resize = () => {
     const w = host.clientWidth;
     const h = host.clientHeight;
+    viewSize.w = w;
+    viewSize.h = h;
     renderer.setSize(w, h);
     labels.setSize(w, h);
+    sizeOf.clear();
     aspect = w / Math.max(h, 1);
     camera.aspect = aspect;
     // En pantallas verticales se abre el campo de visión para que quepa más costa.
@@ -809,6 +888,25 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   let frame = 0;
   // Contador propio: el id de requestAnimationFrame lo comparten todos los bucles de la página.
   let ticks = 0;
+  // Resolución que se adapta al equipo: si no alcanza ~38 cuadros por segundo, se dibuja con menos píxeles (hasta el
+  // 60 % del tope); si le sobra, vuelve a subir. La diferencia casi no se nota y la fluidez sí.
+  const prCap = pixelRatioCap();
+  let pr = prCap;
+  let spent = 0;
+  let frames = 0;
+  const adaptResolution = (dt: number) => {
+    spent += dt;
+    frames++;
+    if (spent < 1.5) return;
+    const avg = spent / frames;
+    spent = 0;
+    frames = 0;
+    const next = avg > 1 / 38 ? Math.max(prCap * 0.6, pr * 0.85) : avg < 1 / 55 ? Math.min(prCap, pr * 1.1) : pr;
+    if (Math.abs(next - pr) > 0.01) renderer.setPixelRatio((pr = next));
+  };
+  const lastCam = new Matrix4();
+  /** Qué tan visible es cada rótulo según la distancia (1 cerca, 0 lejos). */
+  const farOf = new Map<HTMLElement, number>();
   let active = !paused;
   /** Llegada desde el planeta en curso. */
   let intro: { handoff: Handoff; fromDist: number; onLanded: () => void } | null = null;
@@ -820,6 +918,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     if (!active) return;
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.1);
+    adaptResolution(dt);
     const t = timer.getElapsed();
     if (intro) {
       // La misma curva de bajada del planeta (ver dive.ts): primero mirando hacia abajo, al final se inclina hacia la costa.
@@ -878,6 +977,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     clouds.update(t);
     mist.update(t);
     places.update(t, dt);
+    VIEWER.copy(camera.position);
     fauna.update(t, dt);
 
     for (const { place, pin, el } of pins) {
@@ -887,12 +987,16 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
         pin.scale.setScalar(place.id === selected ? 1.45 : 1);
       }
       // Los rótulos de los sitios lejanos se desvanecen para no amontonarse.
-      const far = place.kind === 'town' ? 1 : 1 - smoothstep(pin.position.distanceTo(camera.position), 1300, 1900);
-      el.dataset.far = String(far);
+      farOf.set(el, place.kind === 'town' ? 1 : 1 - smoothstep(pin.position.distanceTo(camera.position), 1300, 1900));
     }
 
     renderer.render(scene, camera);
-    labels.render(scene, camera);
+    // Los rótulos son elementos de la página: moverlos cuesta. Con la cámara quieta basta uno de cada tres cuadros.
+    const moved = !lastCam.equals(camera.matrixWorld);
+    if (moved || ticks % 3 === 0) {
+      labels.render(pinGroup as unknown as Scene, camera); // basta un grupo: solo recorre lo que se le da
+      lastCam.copy(camera.matrixWorld);
+    }
     if (ticks++ % 6 === 0) declutter();
   };
 
@@ -902,17 +1006,43 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
    * conserva su lugar frente a uno nuevo, así no parpadean al mover la cámara.
    */
   const GAP = { x: 12, y: 6 };
+  const shown = new Set<HTMLElement>();
+  const lastStyle = new Map<HTMLElement, string>();
+  const anchor = new Vector3();
   const declutter = () => {
     const order = [...pins].sort((a, b) => rank(a) - rank(b));
-    const taken: DOMRect[] = [];
-    for (const { el } of order) {
-      const far = Number(el.dataset.far ?? 1);
-      const box = el.getBoundingClientRect();
-      const show = far > 0.2 && !taken.some((o) => box.left < o.right + GAP.x && box.right > o.left - GAP.x && box.top < o.bottom + GAP.y && box.bottom > o.top - GAP.y);
-      if (show) taken.push(box);
-      el.dataset.shown = show ? '1' : '';
-      el.style.opacity = show ? String(far) : '0';
-      el.style.pointerEvents = show ? '' : 'none';
+    const taken: { l: number; r: number; t: number; b: number }[] = [];
+    const { w: W, h: H } = viewSize;
+    for (const { el, label } of order) {
+      const far = farOf.get(el) ?? 1;
+      // El renderizador de rótulos esconde (display: none) los que quedan detrás de la cámara: ni se miden.
+      if (el.style.display === 'none') {
+        shown.delete(el);
+        continue;
+      }
+      // La caja se calcula proyectando el alfiler a la pantalla, sin preguntarle a la página (eso la obliga a
+      // recalcular el diseño en cada consulta).
+      let size = sizeOf.get(el);
+      if (!size) {
+        size = { w: el.offsetWidth, h: el.offsetHeight };
+        // Todavía sin dibujar (ancho 0): se vuelve a medir la próxima vez.
+        if (size.w > 0) sizeOf.set(el, size);
+      }
+      label.getWorldPosition(anchor).project(camera);
+      const x = ((anchor.x + 1) / 2) * W;
+      const y = ((1 - anchor.y) / 2) * H;
+      const box = { l: x - size.w / 2, r: x + size.w / 2, t: y - size.h, b: y };
+      const show = far > 0.2 && anchor.z < 1 && !taken.some((o) => box.l < o.r + GAP.x && box.r > o.l - GAP.x && box.t < o.b + GAP.y && box.b > o.t - GAP.y);
+      if (show) {
+        taken.push(box);
+        shown.add(el);
+      } else shown.delete(el);
+      const style = show ? far.toFixed(2) : '0';
+      if (lastStyle.get(el) !== style) {
+        lastStyle.set(el, style);
+        el.style.opacity = style;
+        el.style.pointerEvents = show ? '' : 'none';
+      }
     }
   };
   const rank = (p: (typeof pins)[number]) =>
@@ -920,12 +1050,12 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
       ? 0
       : p.place.id === selected
         ? 1
-        : (p.place.kind === 'site' ? 2 : 3) - (p.el.dataset.shown ? 0.5 : 0) + p.pin.position.distanceTo(camera.position) / 1e4;
+        : (p.place.kind === 'site' ? 2 : 3) - (shown.has(p.el) ? 0.5 : 0) + p.pin.position.distanceTo(camera.position) / 1e4;
   loop();
   // En pausa no se dibuja, pero se dejan listos los sombreadores para que la entrada no se trabe.
   if (paused) {
     placeCamera();
-    renderer.compile(scene, camera);
+    await renderer.compileAsync(scene, camera).catch(() => {});
   }
 
   // Los animales de la diseñadora llegan después: cada uno reemplaza a su figura dibujada.
@@ -933,7 +1063,7 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
   loadAnimals().then((kit) => {
     if (disposed) return;
     fauna.swap?.(kit);
-    if (!active) renderer.compile(scene, camera);
+    if (!active) void renderer.compileAsync(scene, camera).catch(() => {});
   });
 
   return {
@@ -962,6 +1092,8 @@ export function createMapScene(host: HTMLElement, { onSelect, onInteract, paused
     },
     dispose: () => {
       disposed = true;
+      document.fonts?.removeEventListener('loadingdone', onFonts);
+      clearKitCache();
       cancelAnimationFrame(frame);
       ro.disconnect();
       window.removeEventListener('keydown', onKey);

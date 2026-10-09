@@ -25,6 +25,7 @@ export default function MapScreen() {
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
+  const [lost, setLost] = useState(false);
   // La invitación a bajar solo aparece la primera vez: después de entrar una vez, ya no se repite.
   const [invite, setInvite] = useState(() => {
     try {
@@ -53,14 +54,13 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    // Armar las escenas toma un momento: primero se pinta el aviso de carga y luego se construyen.
-    // La costa queda lista (en pausa) detrás del planeta, para que la llegada sea inmediata.
+    // Primero el planeta (lo que se ve al entrar) y, cuando ya está listo, la costa se arma por detrás, en pausa, sin
+    // congelar la página: así se puede girar el planeta mientras tanto y la llegada es inmediata.
     let live = true;
-    let map: MapSceneHandle | null = null;
+    let map: Promise<MapSceneHandle> | null = null;
     let earth: GlobeHandle | null = null;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (!live) return;
-      map = createMapScene(stage.current!, {
+    const buildMap = () =>
+      createMapScene(stage.current!, {
         paused: true,
         onSelect: (p) => {
           setPlace(p);
@@ -69,23 +69,37 @@ export default function MapScreen() {
         onInteract: () => setHint(false),
         onZoomOut: () => leave.current(),
         onPull: setPull,
+        onLost: () => setLost(true),
+      }).then((m) => {
+        handle.current = m;
+        return m;
       });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!live) return;
       earth = createGlobe(globeStage.current!, {
+        onReady: () => {
+          if (!live) return;
+          setPhase('globe');
+          map = buildMap();
+        },
+        onLost: () => setLost(true),
         onDive: () => setPhase('diving'),
         onHandoff: (handoff) => {
           // El mapa sigue bajando desde donde va el planeta; el planeta se desvanece encima y luego deja de dibujarse.
-          map?.land(handoff, () => setPhase('map'));
-          setPhase('landing');
-          setTimeout(() => earth?.setActive(false), DIVE.fade * 1000 + 200);
+          // (Si alguien entró muy rápido y la costa aún se está armando, la llegada espera a que esté lista.)
+          void (map ??= buildMap()).then((m) => {
+            if (!live) return;
+            m.land(handoff, () => setPhase('map'));
+            setPhase('landing');
+            setTimeout(() => earth?.setActive(false), DIVE.fade * 1000 + 200);
+          });
         },
       });
-      handle.current = map;
       globe.current = earth;
-      setPhase('globe');
     }));
     return () => {
       live = false;
-      map?.dispose();
+      void map?.then((m) => m.dispose());
       earth?.dispose();
     };
   }, []);
@@ -119,6 +133,14 @@ export default function MapScreen() {
       <div ref={stage} className="map-stage" />
       <div ref={globeStage} className="globe-stage" aria-hidden={onMap} />
       <p className={`map-loading${phase !== 'loading' ? ' is-hidden' : ''}`}>Cargando el mapa…</p>
+      {lost && (
+        <div className="map-lost" role="alert">
+          <p>Este equipo se quedó sin memoria para el mapa 3D.</p>
+          <p className="map-lost__hint">Cierra otras pestañas o aplicaciones y vuelve a intentarlo.</p>
+          <button type="button" className="btn btn--dark" onClick={() => location.reload()}>↻ Volver a intentar</button>
+          <Link className="ghost-link" to="/">← Volver al recorrido</Link>
+        </div>
+      )}
 
       {/* Título como el del afiche, sobre el planeta. */}
       <div className="globe-title" aria-hidden={onMap}>

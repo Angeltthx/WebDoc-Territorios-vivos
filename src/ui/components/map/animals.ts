@@ -8,7 +8,7 @@
 //   pava: Idle y Sing (canta) · rana: Walk y Jump (salto, 5,4 s)
 // El salto de la ballena y el de la rana se adaptan como en el proyecto de realidad aumentada (ver tameBreach).
 
-import { type AnimationAction, AnimationClip, AnimationMixer, Box3, Group, type KeyframeTrack, LoopOnce, LoopRepeat, type Object3D, Vector3 } from 'three';
+import { type AnimationAction, AnimationClip, AnimationMixer, Box3, Group, type KeyframeTrack, LoopOnce, LoopRepeat, type Object3D, type SkinnedMesh, Vector3 } from 'three';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -221,8 +221,16 @@ async function loadOne(loader: GLTFLoader, species: Species): Promise<Template> 
 function maker(t: Template) {
   return (length: number): Animal => {
     const model = cloneSkinned(t.scene);
-    // Con esqueleto, three recorta con la caja de la pose de reposo: en pleno salto la ballena desaparecería.
-    model.traverse((o) => { o.frustumCulled = false; });
+    // Con esqueleto, three recorta con la esfera de la pose de reposo: en pleno salto la ballena desaparecería. Se le da
+    // una esfera holgada (cuatro veces la figura): así se sigue recortando cuando el animal no está a la vista, y su
+    // esqueleto no se recalcula ni se sube a la tarjeta gráfica en vano.
+    model.traverse((o) => {
+      const m = o as SkinnedMesh;
+      if (!m.isSkinnedMesh) return;
+      m.geometry.computeBoundingSphere();
+      m.boundingSphere = m.geometry.boundingSphere!.clone();
+      m.boundingSphere.radius *= 4;
+    });
     stickerSkinned(model, 0.012);
     model.position.copy(t.offset);
     const fit = new Group();

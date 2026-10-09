@@ -4,6 +4,7 @@
 
 import { CanvasTexture, SRGBColorSpace } from 'three';
 import { COUNTRIES, DEPARTMENTS, LAND } from '../../../content/map-world';
+import { textureScale } from './quality';
 
 /** Paleta del afiche. */
 export const POSTER = {
@@ -227,10 +228,13 @@ export function worldCanvas() {
   if (world) return world;
   const w = 4096;
   const h = 2048;
+  // Se dibuja siempre en 4096 × 2048 "lógicos"; en pantallas chicas el lienzo real es la mitad (ver textureScale).
+  const k = textureScale();
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = w * k;
+  canvas.height = h * k;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(k, k);
   const v: View = { lon0: -180, lat1: 90, lonSpan: 360, latSpan: 180, w, h };
   drawSea(ctx, w, h, 1, 7);
   const land = LAND.map(unpack);
@@ -264,10 +268,13 @@ export function regionCanvas() {
   if (region) return region;
   const w = 2560;
   const h = 2560;
+  // La región se ve de cerca al cambiar de escena: se reduce menos que el planeta (2048 en vez de 2560).
+  const k = textureScale() < 1 ? 0.8 : 1;
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = w * k;
+  canvas.height = h * k;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(k, k);
   const v: View = { lon0: REGION.lonMin, lat1: REGION.latMax, lonSpan: REGION.lonMax - REGION.lonMin, latSpan: REGION.latMax - REGION.latMin, w, h };
   const scale = 2.2;
   drawSea(ctx, w, h, scale, 3);

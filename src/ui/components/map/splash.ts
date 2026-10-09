@@ -5,14 +5,22 @@
 //   3. deja ONDAS: anillos tumbados sobre el mar que se abren.
 // Además, el mar mismo reacciona (anillos de espuma, una mancha blanca y olas que se abren): ver `uSplash` en
 // el sombreador del mar de MapScene.ts. Todo se mide en "tamaños de animal" (`size`).
+//
+// Rendimiento: las gotas y la espuma de cada salpicón son UNA sola nube de puntos (un solo dibujo). El sombreador
+// estira y gira cada punto para que la gota siga siendo un trazo en la dirección en que viaja.
 
-import { CanvasTexture, DoubleSide, Group, Mesh, MeshBasicMaterial, RingGeometry, Sprite, SpriteMaterial, type Texture, Vector3 } from 'three';
+import {
+  BufferAttribute, BufferGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, NormalBlending, Points, RingGeometry,
+  ShaderMaterial, Vector2, Vector3, type WebGLRenderer,
+} from 'three';
 
 const LIFE = 3.2;
 const GRAVITY = 1.15; // en tamaños de animal por segundo²
+const DROPS = 108; // 90 de la corona y 18 de la columna
+const FOAM = 22;
+const N = DROPS + FOAM;
 
 interface Particle {
-  sprite: Sprite;
   v: Vector3;
   p0: Vector3;
   size: number;
@@ -20,48 +28,61 @@ interface Particle {
   life: number;
 }
 
-function disc(stops: [number, string][]) {
-  const n = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = n;
-  const ctx = canvas.getContext('2d')!;
-  const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-  for (const [o, c] of stops) g.addColorStop(o, c);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, n, n);
-  return new CanvasTexture(canvas);
-}
-
-let textures: { drop: Texture; foam: Texture } | null = null;
-const sharedTextures = () =>
-  (textures ??= {
-    drop: disc([[0, 'rgba(255,255,255,1)'], [0.55, 'rgba(236,250,255,0.95)'], [0.8, 'rgba(195,235,248,0.5)'], [1, 'rgba(195,235,248,0)']]),
-    foam: disc([[0, 'rgba(255,255,255,0.95)'], [0.5, 'rgba(250,254,255,0.65)'], [1, 'rgba(255,255,255,0)']]),
-  });
+/** Material compartido: cada punto es un disco (gota) o una mancha suave (espuma), estirado y girado. */
+let shared: ShaderMaterial | null = null;
+const material = () =>
+  (shared ??= new ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: NormalBlending,
+    uniforms: { uHalfH: { value: 400 } },
+    vertexShader: `attribute vec2 aScale; attribute float aAlpha; attribute float aAngle; attribute float aFoam;
+      uniform float uHalfH;
+      varying vec2 vShape; varying float vAlpha; varying float vAngle; varying float vFoam;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mv;
+        float side = max(aScale.x, aScale.y);
+        gl_PointSize = aAlpha > 0.0 ? side * projectionMatrix[1][1] * uHalfH / -mv.z : 0.0;
+        vShape = side / aScale;
+        vAlpha = aAlpha; vAngle = aAngle; vFoam = aFoam;
+      }`,
+    fragmentShader: `varying vec2 vShape; varying float vAlpha; varying float vAngle; varying float vFoam;
+      void main() {
+        vec2 p = gl_PointCoord - 0.5;
+        float c = cos(vAngle), s = sin(vAngle);
+        p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) * vShape;
+        float d = length(p) * 2.0;
+        if (d > 1.0) discard;
+        // Gota: blanca al centro y celeste translúcida al borde. Espuma: blanca y suave.
+        vec3 drop = mix(vec3(1.0), vec3(0.76, 0.92, 0.97), smoothstep(0.55, 1.0, d));
+        float dropA = 1.0 - smoothstep(0.55, 1.0, d) * 0.9 - smoothstep(0.8, 1.0, d) * 0.1;
+        vec3 foam = mix(vec3(1.0), vec3(0.98, 0.995, 1.0), d);
+        float foamA = 0.95 - 0.3 * smoothstep(0.0, 0.5, d) - 0.65 * smoothstep(0.5, 1.0, d);
+        gl_FragColor = vec4(mix(drop, foam, vFoam), vAlpha * mix(dropA, foamA, vFoam));
+        #include <colorspace_fragment>
+      }`,
+  }));
 
 class Splash {
   readonly group = new Group();
-  private drops: Particle[] = [];
-  private foam: Particle[] = [];
+  private parts: Particle[] = [];
+  private geo = new BufferGeometry();
+  private pos = new Float32Array(N * 3);
+  private scale = new Float32Array(N * 2);
+  private alpha = new Float32Array(N);
+  private angle = new Float32Array(N);
   private rings: Mesh<RingGeometry, MeshBasicMaterial>[] = [];
   private t = LIFE;
   private k = 1;
   private size = 1;
 
   constructor() {
-    const { drop, foam } = sharedTextures();
-    const sprite = (map: Texture) => {
-      const s = new Sprite(new SpriteMaterial({ map, transparent: true, depthWrite: false, opacity: 0 }));
-      s.visible = false;
-      this.group.add(s);
-      return s;
-    };
     // Corona: gotas que salen hacia arriba y hacia afuera, en todas direcciones.
     for (let i = 0; i < 90; i++) {
       const a = (i / 90) * Math.PI * 2 + Math.random() * 0.2;
       const out = 0.25 + Math.random() * 0.3;
-      this.drops.push({
-        sprite: sprite(drop),
+      this.parts.push({
         p0: new Vector3(Math.cos(a) * 0.18, 0, Math.sin(a) * 0.18),
         v: new Vector3(Math.cos(a) * out, 0.75 + Math.random() * 0.55, Math.sin(a) * out),
         size: 0.025 + Math.random() * 0.04,
@@ -72,8 +93,7 @@ class Splash {
     // Columna: gotas grandes que suben casi rectas y más alto.
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * Math.PI * 2;
-      this.drops.push({
-        sprite: sprite(drop),
+      this.parts.push({
         p0: new Vector3(Math.cos(a) * 0.05, 0, Math.sin(a) * 0.05),
         v: new Vector3(Math.cos(a) * 0.08, 1.25 + Math.random() * 0.45, Math.sin(a) * 0.08),
         size: 0.05 + Math.random() * 0.05,
@@ -82,10 +102,9 @@ class Splash {
       });
     }
     // Espuma: se abre a ras del agua y se deshace despacio.
-    for (let i = 0; i < 22; i++) {
-      const a = (i / 22) * Math.PI * 2;
-      this.foam.push({
-        sprite: sprite(foam),
+    for (let i = 0; i < FOAM; i++) {
+      const a = (i / FOAM) * Math.PI * 2;
+      this.parts.push({
         p0: new Vector3(Math.cos(a) * 0.1, 0.02, Math.sin(a) * 0.1),
         v: new Vector3(Math.cos(a) * (0.3 + Math.random() * 0.2), 0.05 + Math.random() * 0.08, Math.sin(a) * (0.3 + Math.random() * 0.2)),
         size: 0.22 + Math.random() * 0.14,
@@ -93,6 +112,19 @@ class Splash {
         life: 2.6 + Math.random() * 0.5,
       });
     }
+    const foam = new Float32Array(N);
+    foam.fill(1, DROPS);
+    this.geo.setAttribute('position', new BufferAttribute(this.pos, 3));
+    this.geo.setAttribute('aScale', new BufferAttribute(this.scale, 2));
+    this.geo.setAttribute('aAlpha', new BufferAttribute(this.alpha, 1));
+    this.geo.setAttribute('aAngle', new BufferAttribute(this.angle, 1));
+    this.geo.setAttribute('aFoam', new BufferAttribute(foam, 1));
+    const points = new Points(this.geo, material());
+    points.frustumCulled = false;
+    points.onBeforeRender = (renderer: WebGLRenderer) => {
+      material().uniforms.uHalfH.value = renderer.getDrawingBufferSize(halfH).y / 2;
+    };
+    this.group.add(points);
     // Anillos tumbados sobre el agua.
     for (let i = 0; i < 3; i++) {
       const ring = new Mesh(
@@ -123,34 +155,40 @@ class Splash {
   update(dt: number) {
     if (!this.busy) return;
     this.t += dt;
-    const { k, size } = this;
+    const { k, size, pos, scale, alpha, angle } = this;
     const reach = size * Math.sqrt(k);
-    for (const d of this.drops) {
+    for (let i = 0; i < DROPS; i++) {
+      const d = this.parts[i];
       const t = this.t - d.delay;
       const u = t / d.life;
-      d.sprite.visible = t > 0 && u < 1;
-      if (!d.sprite.visible) continue;
+      alpha[i] = 0;
+      if (t <= 0 || u >= 1) continue;
       const vy = d.v.y * k - GRAVITY * k * t;
       const y = (d.v.y * t - 0.5 * GRAVITY * t * t) * k;
-      if (y < -0.02) { d.sprite.visible = false; continue; }
-      d.sprite.position.set((d.p0.x + d.v.x * t) * reach, y * size, (d.p0.z + d.v.z * t) * reach);
+      if (y < -0.02) continue;
+      pos.set([(d.p0.x + d.v.x * t) * reach, y * size, (d.p0.z + d.v.z * t) * reach], i * 3);
       // Una gota en vuelo es un trazo, no un punto.
       const speed = Math.hypot(Math.hypot(d.v.x, d.v.z), vy);
-      d.sprite.scale.set(d.size * size, d.size * size * (1 + Math.min(speed, 1.5) * 0.9), 1);
-      d.sprite.material.rotation = Math.atan2(vy, Math.hypot(d.v.x, d.v.z)) - Math.PI / 2;
-      d.sprite.material.opacity = u < 0.6 ? 0.95 : 0.95 * (1 - (u - 0.6) / 0.4);
+      scale[i * 2] = d.size * size;
+      scale[i * 2 + 1] = d.size * size * (1 + Math.min(speed, 1.5) * 0.9);
+      angle[i] = Math.atan2(vy, Math.hypot(d.v.x, d.v.z)) - Math.PI / 2;
+      alpha[i] = u < 0.6 ? 0.95 : 0.95 * (1 - (u - 0.6) / 0.4);
     }
-    for (const f of this.foam) {
+    for (let i = DROPS; i < N; i++) {
+      const f = this.parts[i];
       const t = this.t - f.delay;
       const u = t / f.life;
-      f.sprite.visible = t > 0 && u < 1;
-      if (!f.sprite.visible) continue;
+      alpha[i] = 0;
+      if (t <= 0 || u >= 1) continue;
       const e = 1 - (1 - u) ** 2.2;
-      f.sprite.position.set((f.p0.x + f.v.x * e) * reach, (f.p0.y + f.v.y * e) * size * k, (f.p0.z + f.v.z * e) * reach);
+      pos.set([(f.p0.x + f.v.x * e) * reach, (f.p0.y + f.v.y * e) * size * k, (f.p0.z + f.v.z * e) * reach], i * 3);
       const s = f.size * (0.6 + e * 1.1) * size * k;
-      f.sprite.scale.set(s * 1.4, s, 1);
-      f.sprite.material.opacity = u < 0.1 ? (u / 0.1) * 0.95 : 0.95 * (1 - u) ** 1.2;
+      scale[i * 2] = s * 1.4;
+      scale[i * 2 + 1] = s;
+      angle[i] = 0;
+      alpha[i] = u < 0.1 ? (u / 0.1) * 0.95 : 0.95 * (1 - u) ** 1.2;
     }
+    for (const name of ['position', 'aScale', 'aAlpha', 'aAngle']) this.geo.getAttribute(name).needsUpdate = true;
     this.rings.forEach((ring, i) => {
       const t = this.t - i * 0.35;
       const u = t / (LIFE - i * 0.35);
@@ -163,6 +201,7 @@ class Splash {
     if (!this.busy) this.group.visible = false;
   }
 }
+const halfH = new Vector2();
 
 /** Varios salpicones a la vez (cada ballena puede estar saltando por su lado). */
 export class SplashPool {

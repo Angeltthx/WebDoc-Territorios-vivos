@@ -3,13 +3,14 @@
 // viaje al mapa de la costa (ver dive.ts).
 
 import {
-  AdditiveBlending, BackSide, BufferGeometry, CanvasTexture, Sprite, SpriteMaterial, Float32BufferAttribute, Group, MathUtils, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Points, Quaternion,
+  AdditiveBlending, BackSide, BufferGeometry, CanvasTexture, CubeCamera, HalfFloatType, WebGLCubeRenderTarget, Sprite, SpriteMaterial, Float32BufferAttribute, Group, MathUtils, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Points, Quaternion,
   Raycaster, SRGBColorSpace, Scene, ShaderMaterial, SphereGeometry, Timer, Vector2, Vector3, WebGLRenderer,
 } from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ASCENT, DIVE, diveAltitude, fovs, type Handoff } from './dive';
 import { ARRIVAL } from './terrain';
 import { DUSK_GLSL, REGION, isChoco, posterTexture, regionCanvas, worldCanvas } from './posterArt';
+import { QUALITY, pixelRatioCap } from './quality';
 
 const R = 1;
 const DEG = Math.PI / 180;
@@ -56,36 +57,59 @@ const GALAXY = new Vector3(0.35, 1, 0.2).normalize();
 /**
  * La Vía Láctea y nebulosas muy tenues, pintadas por dentro de una esfera lejana: una franja de luz lechosa con
  * nubes de polvo oscuras en el medio y manchas de color apenas visibles en el resto del cielo.
+ *
+ * Rendimiento: el cielo procedural (varias capas de ruido por píxel) se pinta UNA vez en una textura de cubo al
+ * cargar; en cada cuadro solo se lee esa textura. Así no pesa en las tarjetas gráficas modestas.
  */
+const GALAXY_GLSL = `uniform vec3 uBand; varying vec3 vDir;
+  ${NOISE3}
+  void main() {
+    vec3 d = normalize(vDir);
+    float b = dot(d, uBand);
+    float n = fbm3(d * 4.0);
+    float wide = exp(-b * b / 0.05) * (0.35 + 0.65 * n);
+    float core = exp(-b * b / 0.008) * smoothstep(0.35, 0.8, fbm3(d * 6.0 + 2.0));
+    float dust = smoothstep(0.45, 0.72, fbm3(d * 7.0 + 10.0)) * exp(-b * b / 0.004);
+    vec3 col = mix(vec3(0.16, 0.2, 0.34), vec3(0.62, 0.58, 0.66), fbm3(d * 9.0 + 3.0)) * wide * 0.3;
+    col += vec3(0.85, 0.8, 0.72) * core * 0.18;
+    col *= 1.0 - dust * 0.85;
+    col += vec3(0.32, 0.12, 0.42) * smoothstep(0.58, 0.95, fbm3(d * 2.2 + 7.0)) * 0.07;
+    col += vec3(0.06, 0.22, 0.28) * smoothstep(0.6, 0.95, fbm3(d * 2.8 + 21.0)) * 0.07;
+    gl_FragColor = vec4(col, 1.0);
+  }`;
+const SKY_VERTEX = `varying vec3 vDir;
+  void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
 function buildGalaxy() {
-  return new Mesh(
-    new SphereGeometry(60, 64, 32),
+  const cube = new WebGLCubeRenderTarget(512, { type: HalfFloatType, generateMipmaps: false });
+  const mesh = new Mesh(
+    new SphereGeometry(60, 32, 16),
     new ShaderMaterial({
       side: BackSide,
       transparent: true,
       depthWrite: false,
       blending: AdditiveBlending,
-      uniforms: { uBand: { value: GALAXY } },
-      vertexShader: `varying vec3 vDir;
-        void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform vec3 uBand; varying vec3 vDir;
-        ${NOISE3}
-        void main() {
-          vec3 d = normalize(vDir);
-          float b = dot(d, uBand);
-          float n = fbm3(d * 4.0);
-          float wide = exp(-b * b / 0.05) * (0.35 + 0.65 * n);
-          float core = exp(-b * b / 0.008) * smoothstep(0.35, 0.8, fbm3(d * 6.0 + 2.0));
-          float dust = smoothstep(0.45, 0.72, fbm3(d * 7.0 + 10.0)) * exp(-b * b / 0.004);
-          vec3 col = mix(vec3(0.16, 0.2, 0.34), vec3(0.62, 0.58, 0.66), fbm3(d * 9.0 + 3.0)) * wide * 0.3;
-          col += vec3(0.85, 0.8, 0.72) * core * 0.18;
-          col *= 1.0 - dust * 0.85;
-          col += vec3(0.32, 0.12, 0.42) * smoothstep(0.58, 0.95, fbm3(d * 2.2 + 7.0)) * 0.07;
-          col += vec3(0.06, 0.22, 0.28) * smoothstep(0.6, 0.95, fbm3(d * 2.8 + 21.0)) * 0.07;
-          gl_FragColor = vec4(col, 1.0);
-        }`,
+      uniforms: { uSky: { value: cube.texture } },
+      vertexShader: SKY_VERTEX,
+      fragmentShader: `uniform samplerCube uSky; varying vec3 vDir;
+        void main() { gl_FragColor = vec4(textureCube(uSky, normalize(vDir)).rgb, 1.0); }`,
     }),
   );
+  /** Pinta el cielo procedural en la textura de cubo (compilando sin congelar la página) y suelta lo temporal. */
+  const bake = async (renderer: WebGLRenderer) => {
+    const sky = new Scene();
+    const source = new Mesh(
+      new SphereGeometry(10, 64, 32),
+      new ShaderMaterial({ side: BackSide, depthWrite: false, uniforms: { uBand: { value: GALAXY } }, vertexShader: SKY_VERTEX, fragmentShader: GALAXY_GLSL }),
+    );
+    sky.add(source);
+    const cam = new CubeCamera(0.1, 100, cube);
+    await renderer.compileAsync(sky, cam.children[0] as PerspectiveCamera);
+    cam.update(renderer, sky);
+    source.geometry.dispose();
+    source.material.dispose();
+  };
+  return { mesh, bake, dispose: () => cube.dispose() };
 }
 
 /**
@@ -112,10 +136,10 @@ function buildStars(pixelRatio: number) {
   };
   // Brillo: casi todas tenues y unas pocas muy brillantes.
   const magnitude = () => 0.45 + 4.2 * rand() ** 9 + 0.6 * rand() ** 2;
-  for (let i = 0; i < 7000; i++) add(v.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).clone(), magnitude());
+  for (let i = 0; i < Math.round(7000 * QUALITY.stars); i++) add(v.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).clone(), magnitude());
   const a = new Vector3(1, 0, 0).cross(GALAXY).normalize();
   const b = GALAXY.clone().cross(a).normalize();
-  for (let i = 0; i < 6000; i++) {
+  for (let i = 0; i < Math.round(6000 * QUALITY.stars); i++) {
     const t = rand() * Math.PI * 2;
     const off = (rand() + rand() + rand() + rand() - 2) * 0.16;
     const dir = a.clone().multiplyScalar(Math.cos(t)).addScaledVector(b, Math.sin(t)).addScaledVector(GALAXY, off);
@@ -238,6 +262,10 @@ export interface GlobeOptions {
   onDive: () => void;
   /** El planeta llegó a la altura de la posta: el mapa sigue el viaje desde aquí, con el mismo encuadre. */
   onHandoff: (handoff: Handoff) => void;
+  /** Ya se puede dibujar (el cielo está pintado y los sombreadores compilados). */
+  onReady?: () => void;
+  /** El navegador quitó el 3D (por ejemplo, el equipo se quedó sin memoria). */
+  onLost?: () => void;
 }
 
 /**
@@ -254,11 +282,15 @@ function faceQ(lat: number, lon: number, bearing: number) {
   return new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(right, up, out)).invert();
 }
 
-export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptions): GlobeHandle {
-  const renderer = new WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onLost }: GlobeOptions): GlobeHandle {
+  const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, alpha: true });
+  renderer.setPixelRatio(pixelRatioCap());
   renderer.outputColorSpace = SRGBColorSpace;
   host.appendChild(renderer.domElement);
+  renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    onLost?.();
+  });
   const labels = new CSS2DRenderer();
   labels.domElement.className = 'globe-labels';
   host.appendChild(labels.domElement);
@@ -306,9 +338,9 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
   // El cielo gira con el planeta al arrastrarlo, como si la cámara le diera la vuelta.
   const stars = buildStars(renderer.getPixelRatio());
   const galaxy = buildGalaxy();
-  galaxy.renderOrder = -2;
+  galaxy.mesh.renderOrder = -2;
   stars.points.renderOrder = -1;
-  globe.add(galaxy, stars.points, buildSun());
+  globe.add(galaxy.mesh, stars.points, buildSun());
   const haloSun = (halo.material as ShaderMaterial).uniforms.uSun.value as Vector3;
 
   // Marcador del Chocó: el alfiler rosado del afiche, clavado justo en la costa de Nuquí (la punta del alfiler es el
@@ -508,7 +540,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
   const tmp = new Vector3();
   const loop = () => {
     frame = requestAnimationFrame(loop);
-    if (!state.active) return;
+    if (!state.active || !ready) return;
     timer.update();
     const dt = Math.min(timer.getDelta(), 0.1);
     stars.uniforms.uTime.value = timer.getElapsed();
@@ -567,6 +599,17 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
     renderer.render(scene, camera);
     labels.render(scene, camera);
   };
+  // Antes del primer cuadro: el cielo se pinta en su textura y los sombreadores se compilan en paralelo (sin congelar
+  // la página, si el navegador lo permite). Mientras tanto se ve el aviso de carga.
+  let ready = false;
+  void galaxy
+    .bake(renderer)
+    .then(() => renderer.compileAsync(scene, camera))
+    .catch(() => {})
+    .then(() => {
+      ready = true;
+      onReady?.();
+    });
   loop();
 
   return {
@@ -595,6 +638,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff }: GlobeOptio
         mat?.map?.dispose();
         mat?.dispose();
       });
+      galaxy.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       labels.domElement.remove();
