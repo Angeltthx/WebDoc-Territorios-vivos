@@ -7,7 +7,7 @@
 //   minima  lo justo para que corra en cualquier teléfono o con mala señal: lo básico del mapa, figuras dibujadas en
 //           lugar de los modelos animados (no se descargan), muy pocas aves, texturas pequeñas.
 //   segura  (v5) como la mínima, pero con una sola escena 3D: el planeta de la entrada es un dibujo plano (2D). Para
-//           las tarjetas gráficas que se caen aun con la mínima.
+//           las tarjetas gráficas que se caen aun con la mínima (Adreno 610 y anteriores entran directo aquí).
 //
 // Se mira: la tarjeta gráfica (su nombre), la memoria, los núcleos, la pantalla y la conexión. Y la página aprende: si
 // en este equipo el 3D se cayó, la próxima vez entra un nivel más abajo (ver `rememberCrash`).
@@ -42,8 +42,11 @@ function gpuInfo() {
 /** Tope según la tarjeta gráfica de los teléfonos (las de computador y las de Apple no ponen tope). */
 function gpuCap(name: string): Tier {
   const n = name.toLowerCase();
-  // Muy modestas: Mali de la serie T y G31–G52; Adreno 3xx–5xx y 610; PowerVR (GE8xxx).
-  if (/mali-(t\d|g31|g51|g52)|adreno\D*([345]\d\d|610)\b|powervr|ge8\d{3}/.test(n)) return 'minima';
+  // Adreno 3xx–5xx y 610: su controlador tumba el planeta 3D (probado en un Adreno 610, aun solo y con la mínima),
+  // aunque la costa sí le corre. Van directo a la versión con el planeta plano.
+  if (/adreno\D*([345]\d\d|610)\b/.test(n)) return 'segura';
+  // Muy modestas: Mali de la serie T y G31–G52; PowerVR (GE8xxx).
+  if (/mali-(t\d|g31|g51|g52)|powervr|ge8\d{3}/.test(n)) return 'minima';
   // Sencillas: Mali-G57/G68, Adreno 612–619, IMG BXM.
   if (/mali-(g57|g68)|adreno\D*61[2-9]\b|bxm/.test(n)) return 'baja';
   // Gama media de teléfono: el resto de Mali y Adreno 6xx.
