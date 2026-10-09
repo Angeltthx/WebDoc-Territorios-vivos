@@ -9,14 +9,17 @@
 //
 // Se mira: la tarjeta gráfica (su nombre), la memoria, los núcleos, la pantalla y la conexión. Y la página aprende: si
 // en este equipo el 3D se cayó, la próxima vez entra un nivel más abajo (ver `rememberCrash`).
-// Para probar a mano: ?calidad=alta | media | baja | minima en la dirección.
+// Para probar a mano: ?v=1 (alta) · ?v=2 (media) · ?v=3 (baja) · ?v=4 (mínima) en la dirección. Es un código neutro a
+// propósito: quien vea la dirección o el diagnóstico no lee que le tocó una versión «reducida».
 
 import { MeshLambertMaterial, MeshStandardMaterial, type MeshStandardMaterialParameters } from 'three';
 
 export type Tier = 'alta' | 'media' | 'baja' | 'minima';
 const ORDER: Tier[] = ['minima', 'baja', 'media', 'alta'];
 const below = (a: Tier, b: Tier) => ORDER.indexOf(a) < ORDER.indexOf(b);
-const STORE = 'mapa-calidad-tope';
+const STORE = 'mapa-perfil';
+/** Código neutro de cada nivel (en la dirección y en el diagnóstico). */
+const CODE: Record<Tier, string> = { alta: '1', media: '2', baja: '3', minima: '4' };
 
 /** Nombre de la tarjeta gráfica (p. ej. «Mali-G52», «Adreno (TM) 610», «Apple GPU»); null si no hay 3D. */
 function gpuInfo() {
@@ -47,8 +50,9 @@ function gpuCap(name: string): Tier {
 }
 
 function detect(): { tier: Tier; why: string[] } {
-  const forced = new URLSearchParams(location.search).get('calidad') as Tier | null;
-  if (forced && ORDER.includes(forced)) return { tier: forced, why: ['elegida a mano'] };
+  const code = new URLSearchParams(location.search).get('v');
+  const forced = ORDER.find((t) => CODE[t] === code);
+  if (forced) return { tier: forced, why: ['a mano'] };
 
   const why: string[] = [];
   let tier: Tier = 'alta';
@@ -99,7 +103,9 @@ const detected = detect();
 export const TIER: Tier = detected.tier;
 /** Por qué se eligió este nivel (se muestra en el aviso de error, para diagnosticar). */
 export const TIER_REASONS = detected.why;
-console.info(`[mapa] calidad ${TIER}${TIER_REASONS.length ? ` (${TIER_REASONS.join(', ')})` : ''}`);
+/** Para el diagnóstico: el código neutro del nivel y los motivos (p. ej. «v4 · Mali-G52 MC2 · teléfono»). */
+export const TIER_LABEL = [`v${CODE[TIER]}`, ...TIER_REASONS].join(' · ');
+console.info(`[mapa] ${TIER_LABEL}`);
 
 /**
  * El 3D se cayó en este equipo: la próxima vez se entra un nivel más abajo. Devuelve si todavía queda un nivel más

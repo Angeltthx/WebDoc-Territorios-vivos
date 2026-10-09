@@ -10,7 +10,7 @@ import { TopBar } from '../components/Chrome';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
-import { TIER, TIER_REASONS, rememberCrash } from '../components/map/quality';
+import { TIER, TIER_LABEL, rememberCrash } from '../components/map/quality';
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
@@ -175,7 +175,7 @@ export default function MapScreen() {
           <button type="button" className="btn btn--dark" onClick={() => location.reload()}>↻ Volver a intentar</button>
           <Link className="ghost-link" to="/">← Volver al recorrido</Link>
           {/* Para diagnosticar: qué nivel se usó y por qué (una captura de esto basta). */}
-          <p className="map-lost__diag">{[TIER, ...TIER_REASONS].join(' · ')}</p>
+          <p className="map-lost__diag">{TIER_LABEL}</p>
         </div>
       )}
 
