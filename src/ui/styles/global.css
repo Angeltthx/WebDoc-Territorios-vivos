@@ -558,3 +558,190 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ───────── Mapa 3D de prueba (/mapa) ─────────
+   Todo con el lenguaje del afiche: tintas planas, sin vidrio ni desenfoque. Pueblos en píldora crema con borde
+   oscuro y letra serif verde; sitios en etiqueta rosada con filete blanco; fauna en el rótulo azul de dos franjas
+   (nombre común arriba, nombre científico en cursiva abajo). */
+.map-screen {
+  --p-cream: #fdf6e3; --p-ink: #1f4a35; --p-line: #173628; --p-pink: #e2456f; --p-sky: #6b97cd; --p-navy: #3e6197;
+  --p-drop: 0 3px 0 rgba(15, 40, 30, 0.38);
+  position: fixed; inset: 0; overflow: hidden; background: #f0b08c;
+}
+.map-stage { position: absolute; inset: 0; touch-action: none; cursor: grab; }
+.map-stage:active { cursor: grabbing; }
+.map-stage canvas { display: block; }
+.map-labels { position: absolute; inset: 0; pointer-events: none; }
+.map-label {
+  pointer-events: auto; border: 0; white-space: nowrap; line-height: 1.15; cursor: pointer;
+  transition: opacity 0.35s, translate 0.25s var(--ease), scale 0.25s var(--ease), background 0.25s, color 0.25s;
+}
+.map-label--town {
+  padding: 4px 15px 5px; border: 2px solid var(--p-line); border-radius: 999px; background: var(--p-cream); color: var(--p-ink);
+  box-shadow: var(--p-drop); font: 700 clamp(12px, 1.25vw, 15px) var(--serif); letter-spacing: 0.16em; text-transform: uppercase;
+}
+.map-label--site {
+  padding: 4px 11px 5px; border-radius: 999px; background: var(--p-pink); color: #fff;
+  box-shadow: 0 2px 8px rgba(10, 40, 40, 0.22); font: 700 10.5px var(--serif); letter-spacing: 0.01em;
+}
+/* El renderizador de rótulos ocupa `transform`; el realce usa `translate` y `scale`. */
+.map-label--nature {
+  display: flex; flex-direction: column; align-items: stretch; padding: 0;
+  background: none; text-align: center; filter: drop-shadow(0 3px 0 rgba(15, 40, 30, 0.32));
+}
+.map-label--nature span {
+  padding: 3px 10px 2px; border-radius: 3px 3px 0 0; background: var(--p-sky); color: #fff;
+  font: 500 11px 'Fredoka', var(--sans); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.map-label--nature span:only-child { border-radius: 3px; }
+.map-label--nature em {
+  padding: 1px 10px 3px; border-radius: 0 0 3px 3px; background: var(--p-navy); color: #fff;
+  font: italic 400 10.5px var(--serif);
+}
+.map-label:hover, .map-label.is-selected { translate: 0 -3px; scale: 1.06; }
+.map-label--site.is-selected { background: #b8264e; }
+.map-label--town.is-selected { background: var(--p-pink); color: #fff; }
+.map-label--nature.is-selected span { background: var(--p-navy); }
+.map-label--nature.is-selected em { background: var(--p-line); }
+
+/* Barra superior, avisos y pueblos: los mismos del resto del webdoc (texto claro sobre la imagen, sin cajas). Una
+   sombra suave arriba y abajo, como la de las láminas, les da lectura sobre el cielo y el mar. */
+.map-screen::before, .map-screen::after {
+  content: ''; position: absolute; z-index: 4; left: 0; right: 0; pointer-events: none; transition: opacity 0.9s ease;
+}
+.map-screen::before { top: 0; height: 130px; background: linear-gradient(rgba(40, 22, 40, 0.4), rgba(40, 22, 40, 0.12) 60%, transparent); }
+.map-screen::after { bottom: 0; height: 120px; background: linear-gradient(transparent, rgba(20, 24, 44, 0.45)); opacity: 0; }
+.map-screen.is-map::after { opacity: 1; }
+.map-screen .topbar .ghost-link span { font-size: 14px; }
+
+/* Ficha del lugar elegido: la hoja clara de la guía del webdoc. */
+.map-card {
+  position: absolute; z-index: 6; left: var(--gutter); bottom: 86px; width: min(320px, calc(100vw - 32px));
+  padding: 16px 44px 16px 18px; border-radius: 16px; background: var(--paper-2); color: var(--ink);
+  box-shadow: 0 10px 30px rgba(6, 30, 34, 0.28); animation: rise 0.4s var(--ease) both;
+}
+.map-card .eyebrow { color: var(--muted); }
+.map-card--site .eyebrow { color: #b8264e; }
+.map-card--nature .eyebrow { color: var(--p-navy); }
+.map-card__title { margin-top: 4px; font: 700 italic 22px/1.2 var(--serif); }
+.map-card__sci { margin-top: 2px; font: italic 15px var(--serif); color: var(--muted); }
+.map-card__body { margin-top: 8px; font-size: 14px; }
+.map-card__handle { color: #b8264e; font-weight: 600; text-decoration: none; }
+.map-card__handle:hover { text-decoration: underline; }
+.map-card__close {
+  position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border: 0; border-radius: 50%;
+  background: #e8ede5; color: var(--ink); font-size: 20px; line-height: 1;
+}
+.map-card__close:hover { background: #dbe3d8; }
+
+/* Aviso mientras se arma la escena (tarda unos segundos la primera vez). */
+.map-loading {
+  position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; margin: 0;
+  background: linear-gradient(#5b68a2, #f19aa8 38%, #f2ae8a 55%, #2f6f80 56%, #1d4d68);
+  font: italic 500 clamp(18px, 2.4vw, 26px) var(--serif); color: #fff; text-shadow: 0 2px 14px rgba(0, 40, 60, 0.4);
+  transition: opacity 0.8s ease, visibility 0.8s;
+}
+.map-loading.is-hidden { opacity: 0; visibility: hidden; }
+
+.map-hint {
+  position: absolute; z-index: 5; left: 50%; bottom: 64px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
+  font: italic 13px var(--sans); text-align: center; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); opacity: 0.92;
+  pointer-events: none; transition: opacity 0.6s ease;
+}
+.map-hint.is-hidden { opacity: 0; }
+/* Aviso al alejarse más allá del máximo: si sigue, vuelve al planeta. La línea se llena con el tirón. */
+.map-pull {
+  position: absolute; z-index: 6; left: 50%; bottom: 84px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
+  margin: 0; padding-bottom: 8px; font: italic 14px var(--sans); text-align: center; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  pointer-events: none; transition: opacity 0.25s ease;
+}
+.map-pull__bar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 2px; background: #fff; transform-origin: left; transition: transform 0.15s linear;
+}
+
+.map-towns {
+  position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; justify-content: center;
+  padding: 18px var(--gutter) max(14px, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 640px) {
+  .map-card { bottom: 70px; }
+  .map-hint { bottom: 60px; font-size: 11px; }
+  .map-screen .topbar .ghost-link { white-space: nowrap; letter-spacing: 0.08em; }
+  .map-label--site { font-size: 10px; }
+  .map-screen .topbar .chip { display: none; }
+}
+
+/* ───────── Planeta de entrada del mapa (arte del afiche) ───────── */
+.globe-stage {
+  position: absolute; inset: 0; z-index: 2; touch-action: none; cursor: grab;
+  /* El espacio: casi negro, con un resplandor tenue detrás del planeta y nebulosas muy suaves. Las estrellas se
+     dibujan en el lienzo y giran con el planeta. */
+  background:
+    radial-gradient(circle at 50% 52%, rgba(40, 110, 130, 0.22), transparent 42%),
+    radial-gradient(ellipse 60% 40% at 18% 22%, rgba(88, 62, 140, 0.16), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 80%, rgba(30, 90, 120, 0.14), transparent 70%),
+    linear-gradient(#03060c, #040912 55%, #020409);
+  transition: opacity 0.9s ease-in-out, visibility 0.9s;
+}
+.globe-stage canvas { display: block; }
+.globe-stage.is-diving { cursor: default; }
+.map-screen.is-landing .globe-stage, .map-screen.is-map .globe-stage, .map-screen.is-leaving .globe-stage { opacity: 0; visibility: hidden; pointer-events: none; }
+.map-screen.is-loading .globe-stage { opacity: 0; }
+.globe-labels { position: absolute; inset: 0; pointer-events: none; }
+/* Los rótulos de la costa aparecen cuando el planeta ya se fue. */
+.map-labels { transition: opacity 0.8s ease 0.6s; }
+.map-screen:not(.is-map) .map-labels { opacity: 0; transition-delay: 0s; }
+
+.globe-label {
+  white-space: nowrap; border: 0; pointer-events: none; transition: opacity 0.4s;
+  font: 700 12px var(--serif); letter-spacing: 0.14em; text-transform: uppercase;
+}
+/* Marcador del Chocó: rótulo y alfiler rosado del afiche. La punta del alfiler es el punto de anclaje sobre la costa
+   de Nuquí, así que no se mueve de ahí; solo late un aro alrededor de la punta. */
+.globe-choco {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: auto;
+  padding: 0; border: 0; background: none; cursor: pointer; transition: opacity 0.6s ease;
+}
+.globe-choco__tag {
+  padding: 5px 14px; border-radius: 999px; background: #fdf6e3; color: #1f4a35; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  font: 700 12px var(--serif); letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; transition: background 0.2s, color 0.2s;
+}
+.globe-choco__pin { display: block; width: 20px; height: 28px; overflow: visible; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35)); }
+.globe-choco__pin path { fill: #e2456f; stroke: #fff; stroke-width: 2; }
+.globe-choco__pin circle { fill: #fff; }
+.globe-choco__ring {
+  position: absolute; left: 50%; bottom: 0; width: 26px; height: 26px; margin: 0 0 -13px -13px; border-radius: 50%;
+  border: 2px solid #fdf6e3; pointer-events: none; animation: choco-ring 2.2s ease-out infinite;
+}
+@keyframes choco-ring { from { opacity: 0.9; transform: scale(0.3); } to { opacity: 0; transform: scale(1.6); } }
+.globe-choco.is-hover .globe-choco__tag, .globe-choco:hover .globe-choco__tag, .globe-choco:focus-visible .globe-choco__tag { background: #e2456f; color: #fff; }
+.globe-stage.is-diving .globe-choco { opacity: 0; pointer-events: none; }
+.globe-label--country { color: #fdf6e3; font-size: 15px; letter-spacing: 0.3em; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+.globe-label--sea { color: #d9f2ee; font: italic 400 15px var(--serif); letter-spacing: 0.04em; text-transform: none; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+
+.globe-title {
+  position: absolute; z-index: 3; left: var(--gutter); bottom: calc(var(--gutter) + 8px); pointer-events: none;
+  transition: opacity 0.8s ease, transform 0.8s var(--ease);
+}
+.map-screen.is-diving .globe-title, .map-screen.is-landing .globe-title, .map-screen.is-leaving .globe-title, .map-screen.is-map .globe-title, .map-screen.is-loading .globe-title { opacity: 0; transform: translateY(16px); }
+.globe-title__hint { margin-top: 12px; font: italic 13px var(--sans); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); opacity: 0.9; }
+
+/* Título del afiche: "Nuquí" en letras gruesas con franjas verde, crema y naranja; "Chocó" en letra pincel. */
+.poster-title { display: flex; flex-direction: column; line-height: 0.85; }
+.poster-title__big {
+  font: 700 clamp(64px, 11vw, 150px) 'Fredoka', var(--sans); letter-spacing: 0.01em;
+  background: linear-gradient(#b9d97c 0 34%, #fdf6e3 34% 52%, #f2a46a 52% 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff)
+    drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
+}
+.poster-title__script {
+  margin: -0.15em 0 0 0.6em; font: 400 clamp(40px, 6.5vw, 92px) 'Kaushan Script', cursive; color: #fff;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 640px) {
+  .globe-title { left: 16px; bottom: 16px; }
+  .globe-label--country { font-size: 12px; }
+}
