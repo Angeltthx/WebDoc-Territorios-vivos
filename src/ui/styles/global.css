@@ -651,6 +651,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   font: italic 500 clamp(17px, 2.2vw, 22px) var(--serif); text-shadow: 0 2px 12px rgba(40, 20, 40, 0.35);
 }
 .map-lost__hint { font: 14px var(--sans); font-style: normal; opacity: 0.9; }
+.map-lost__diag { margin-top: 18px; font: 11px var(--sans); font-style: normal; opacity: 0.7; text-shadow: none; }
 
 .map-hint {
   position: absolute; z-index: 5; left: 50%; bottom: 64px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);

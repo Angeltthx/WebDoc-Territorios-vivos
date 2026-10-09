@@ -10,10 +10,14 @@ import { TopBar } from '../components/Chrome';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
+import { TIER, TIER_REASONS, rememberCrash } from '../components/map/quality';
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
 const INVITE_SEEN = 'mapa-invitacion-vista';
+/** En equipos modestos, el planeta se suelta al llegar a la costa (y se vuelve a armar al regresar): así nunca están
+ * las dos escenas 3D en memoria más que durante el cambio. */
+const RELEASE_GLOBE = TIER === 'baja' || TIER === 'minima';
 
 export default function MapScreen() {
   const stage = useRef<HTMLDivElement>(null);
@@ -25,7 +29,17 @@ export default function MapScreen() {
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
-  const [lost, setLost] = useState(false);
+  /** El navegador quitó el 3D: se reintenta un nivel más liviano o, si ya era el mínimo, se avisa. */
+  const [lost, setLost] = useState<'retry' | 'final' | null>(null);
+  const onLost = () => {
+    if (rememberCrash()) {
+      setLost('retry');
+      setTimeout(() => location.reload(), 1200);
+    } else setLost('final');
+  };
+  /** El planeta listo para usar (se vuelve a armar si se soltó, ver RELEASE_GLOBE). */
+  const globeReady = useRef<Promise<GlobeHandle> | null>(null);
+  const makeGlobe = useRef<() => Promise<GlobeHandle>>(() => Promise.reject(new Error('sin planeta')));
   // La invitación a bajar solo aparece la primera vez: después de entrar una vez, ya no se repite.
   const [invite, setInvite] = useState(() => {
     try {
@@ -69,33 +83,45 @@ export default function MapScreen() {
         onInteract: () => setHint(false),
         onZoomOut: () => leave.current(),
         onPull: setPull,
-        onLost: () => setLost(true),
+        onLost,
       }).then((m) => {
         handle.current = m;
         return m;
       });
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (!live) return;
-      earth = createGlobe(globeStage.current!, {
-        onReady: () => {
-          if (!live) return;
-          setPhase('globe');
-          map = buildMap();
-        },
-        onLost: () => setLost(true),
-        onDive: () => setPhase('diving'),
-        onHandoff: (handoff) => {
-          // El mapa sigue bajando desde donde va el planeta; el planeta se desvanece encima y luego deja de dibujarse.
-          // (Si alguien entró muy rápido y la costa aún se está armando, la llegada espera a que esté lista.)
-          void (map ??= buildMap()).then((m) => {
+    makeGlobe.current = () =>
+      new Promise<GlobeHandle>((resolve) => {
+        const g = createGlobe(globeStage.current!, {
+          onReady: () => {
             if (!live) return;
-            m.land(handoff, () => setPhase('map'));
-            setPhase('landing');
-            setTimeout(() => earth?.setActive(false), DIVE.fade * 1000 + 200);
-          });
-        },
+            resolve(g);
+            // La primera vez: se muestra el planeta y se empieza a armar la costa.
+            if (!map) {
+              setPhase('globe');
+              map = buildMap();
+            }
+          },
+          onLost,
+          onDive: () => setPhase('diving'),
+          onHandoff: (handoff) => {
+            // El mapa sigue bajando desde donde va el planeta; el planeta se desvanece encima y luego deja de dibujarse
+            // (o se suelta del todo, en equipos modestos). Si la costa aún se está armando, la llegada la espera.
+            void (map ??= buildMap()).then((m) => {
+              if (!live) return;
+              m.land(handoff, () => setPhase('map'));
+              setPhase('landing');
+              setTimeout(() => {
+                if (!RELEASE_GLOBE) return g.setActive(false);
+                g.dispose();
+                if (earth === g) earth = globe.current = globeReady.current = null;
+              }, DIVE.fade * 1000 + 200);
+            });
+          },
+        });
+        earth = g;
+        globe.current = g;
       });
-      globe.current = earth;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (live) globeReady.current = makeGlobe.current();
     }));
     return () => {
       live = false;
@@ -118,11 +144,15 @@ export default function MapScreen() {
     if (phase !== 'map') return;
     setPull(0);
     setPhase('leaving');
+    // Si el planeta se soltó al llegar, se vuelve a armar mientras la costa sube.
+    const ready = (globeReady.current ??= makeGlobe.current());
     handle.current?.ascend(() => {
-      globe.current?.setActive(true);
-      globe.current?.ascend();
-      setPhase('globe');
-      setTimeout(() => handle.current?.setActive(false), DIVE.fade * 1000 + 400);
+      void ready.then((g) => {
+        g.setActive(true);
+        g.ascend();
+        setPhase('globe');
+        setTimeout(() => handle.current?.setActive(false), DIVE.fade * 1000 + 400);
+      });
     });
   };
 
@@ -133,12 +163,19 @@ export default function MapScreen() {
       <div ref={stage} className="map-stage" />
       <div ref={globeStage} className="globe-stage" aria-hidden={onMap} />
       <p className={`map-loading${phase !== 'loading' ? ' is-hidden' : ''}`}>Cargando el mapa…</p>
-      {lost && (
+      {lost === 'retry' && (
+        <div className="map-lost" role="status">
+          <p>Ajustando el mapa a tu teléfono…</p>
+        </div>
+      )}
+      {lost === 'final' && (
         <div className="map-lost" role="alert">
           <p>Este equipo se quedó sin memoria para el mapa 3D.</p>
           <p className="map-lost__hint">Cierra otras pestañas o aplicaciones y vuelve a intentarlo.</p>
           <button type="button" className="btn btn--dark" onClick={() => location.reload()}>↻ Volver a intentar</button>
           <Link className="ghost-link" to="/">← Volver al recorrido</Link>
+          {/* Para diagnosticar: qué nivel se usó y por qué (una captura de esto basta). */}
+          <p className="map-lost__diag">{[TIER, ...TIER_REASONS].join(' · ')}</p>
         </div>
       )}
 

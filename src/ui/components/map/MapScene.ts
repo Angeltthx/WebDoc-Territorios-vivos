@@ -123,7 +123,7 @@ function regionUniforms(): RegionUniforms {
   const nw = toScene(REGION.latMax, REGION.lonMin);
   const se = toScene(REGION.latMin, REGION.lonMax);
   return {
-    uRegion: { value: posterTexture(regionCanvas()) },
+    uRegion: { value: posterTexture(regionCanvas(), 2) },
     uRegionBox: { value: new Vector4(nw.x, nw.z, se.x - nw.x, se.z - nw.z) },
     uRegionMix: { value: 0 },
   };
@@ -506,7 +506,7 @@ function buildClouds(rand: () => number) {
   const clouds: Group[] = [];
   const mat = litMaterial({ color: '#ffe2cc', emissive: '#f0957c', emissiveIntensity: 0.5, flatShading: true, roughness: 1, transparent: true });
   const geo = new IcosahedronGeometry(1, 1);
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < Math.max(2, Math.round(10 * QUALITY.clouds)); i++) {
     const cloud = new Group();
     const puffs = 4 + Math.floor(rand() * 3);
     for (let j = 0; j < puffs; j++) {
@@ -901,7 +901,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     const avg = spent / frames;
     spent = 0;
     frames = 0;
-    const next = avg > 1 / 38 ? Math.max(prCap * 0.6, pr * 0.85) : avg < 1 / 55 ? Math.min(prCap, pr * 1.1) : pr;
+    const next = avg > 1 / 38 ? Math.max(prCap * QUALITY.minPixelRatio, pr * 0.85) : avg < 1 / 55 ? Math.min(prCap, pr * 1.1) : pr;
     if (Math.abs(next - pr) > 0.01) renderer.setPixelRatio((pr = next));
   };
   const lastCam = new Matrix4();
@@ -1058,9 +1058,10 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     await renderer.compileAsync(scene, camera).catch(() => {});
   }
 
-  // Los animales de la diseñadora llegan después: cada uno reemplaza a su figura dibujada.
+  // Los animales de la diseñadora llegan después: cada uno reemplaza a su figura dibujada. En el nivel mínimo no se
+  // descargan (casi 1,5 MB con su decodificador): se quedan las figuras dibujadas, que además pesan menos.
   let disposed = false;
-  loadAnimals().then((kit) => {
+  if (QUALITY.models) loadAnimals().then((kit) => {
     if (disposed) return;
     fauna.swap?.(kit);
     if (!active) void renderer.compileAsync(scene, camera).catch(() => {});

@@ -967,7 +967,7 @@ function buildButterflies(rand: () => number): Living {
     part(ORB, color, { p: [side * 1.6, 0, -1.4], s: [1.5, 0.12, 1.2] }),
     part(ORB, '#1d1a17', { p: [side * 3.8, 0.05, 1.2], s: [0.5, 0.14, 0.5] }),
   ]);
-  const flies = Array.from({ length: Math.round(46 * QUALITY.birds) }, () => {
+  const flies = Array.from({ length: Math.round(46 * QUALITY.butterflies) }, () => {
     const color = rand() < 0.75 ? '#f39a2c' : '#f7cf3d';
     const fly = new Group();
     fly.add(new Mesh(merge([part(ORB, '#2a2420', { s: [0.35, 0.35, 1.6] })]), paint));

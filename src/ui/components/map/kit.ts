@@ -149,19 +149,22 @@ const batchMaterial = (m: Material) => {
  */
 export class Batch {
   readonly group = new Group();
-  private mesh: InstancedMesh;
+  private mesh: InstancedMesh | null = null;
   private pieces: Mesh[] = [];
   constructor(private holders: Object3D[]) {
     for (const h of holders) h.traverse((c) => (c as Mesh).isMesh && this.pieces.push(c as Mesh));
+    if (!this.pieces.length) return;
     this.mesh = new InstancedMesh(this.pieces[0].geometry, this.pieces[0].material, this.pieces.length);
     this.mesh.frustumCulled = false;
     this.group.add(this.mesh);
     this.sync();
   }
   sync() {
+    const mesh = this.mesh;
+    if (!mesh) return;
     for (const h of this.holders) h.updateMatrixWorld(true);
-    this.pieces.forEach((m, i) => this.mesh.setMatrixAt(i, m.matrixWorld));
-    this.mesh.instanceMatrix.needsUpdate = true;
+    this.pieces.forEach((m, i) => mesh.setMatrixAt(i, m.matrixWorld));
+    mesh.instanceMatrix.needsUpdate = true;
   }
 }
 

@@ -263,7 +263,8 @@ export async function buildFlora(rand: () => number, pace: Pace) {
 export function buildMist(rand: () => number) {
   const mat = new MeshBasicMaterial({ color: '#ffe0cc', transparent: true, opacity: 0.3, depthWrite: false });
   const mist: { m: Group; speed: number; base: number }[] = [];
-  for (let tries = 0; mist.length < 18 && tries < 2000; tries++) {
+  // En el nivel mínimo no hay neblina.
+  for (let tries = 0; mist.length < (QUALITY.mist ? 18 : 0) && tries < 2000; tries++) {
     const { x, z } = randomPoint(rand);
     if (shore(x, z) < 500) continue;
     const m = new Group();

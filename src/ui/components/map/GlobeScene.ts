@@ -307,7 +307,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onL
     (REGION.lonMin + 180) * DEG, (REGION.lonMax - REGION.lonMin) * DEG,
     (90 - REGION.latMax) * DEG, (REGION.latMax - REGION.latMin) * DEG,
   );
-  const patchMat = sunlit(new MeshBasicMaterial({ map: posterTexture(regionCanvas()), transparent: true, opacity: 0 }));
+  const patchMat = sunlit(new MeshBasicMaterial({ map: posterTexture(regionCanvas(), 2), transparent: true, opacity: 0 }));
   const patch = new Mesh(patchGeo, patchMat);
   globe.add(patch);
 
@@ -337,10 +337,12 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onL
   scene.add(halo);
   // El cielo gira con el planeta al arrastrarlo, como si la cámara le diera la vuelta.
   const stars = buildStars(renderer.getPixelRatio());
-  const galaxy = buildGalaxy();
-  galaxy.mesh.renderOrder = -2;
+  // En equipos modestos no se pinta la Vía Láctea en 3D (queda el fondo de la página, con sus nebulosas suaves).
+  const galaxy = QUALITY.galaxy ? buildGalaxy() : null;
+  if (galaxy) galaxy.mesh.renderOrder = -2;
   stars.points.renderOrder = -1;
-  globe.add(galaxy.mesh, stars.points, buildSun());
+  globe.add(stars.points, buildSun());
+  if (galaxy) globe.add(galaxy.mesh);
   const haloSun = (halo.material as ShaderMaterial).uniforms.uSun.value as Vector3;
 
   // Marcador del Chocó: el alfiler rosado del afiche, clavado justo en la costa de Nuquí (la punta del alfiler es el
@@ -602,8 +604,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onL
   // Antes del primer cuadro: el cielo se pinta en su textura y los sombreadores se compilan en paralelo (sin congelar
   // la página, si el navegador lo permite). Mientras tanto se ve el aviso de carga.
   let ready = false;
-  void galaxy
-    .bake(renderer)
+  void (galaxy ? galaxy.bake(renderer) : Promise.resolve())
     .then(() => renderer.compileAsync(scene, camera))
     .catch(() => {})
     .then(() => {
@@ -638,7 +639,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onL
         mat?.map?.dispose();
         mat?.dispose();
       });
-      galaxy.dispose();
+      galaxy?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       labels.domElement.remove();
