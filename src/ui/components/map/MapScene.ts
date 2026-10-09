@@ -26,6 +26,7 @@ import {
   shore, smoothstep, toScene, valueNoise, type PlacedPlace,
 } from './terrain';
 import { QUALITY, litMaterial, pixelRatioCap } from './quality';
+import { step } from './diag';
 
 const DIST = { min: 300, max: 1700, start: DIVE.mapDist };
 const PITCH = { min: 5, max: 38, start: 10 };
@@ -602,6 +603,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   host.appendChild(renderer.domElement);
   renderer.domElement.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
+    step('SE CAYÓ: costa');
     onLost?.();
   });
 
@@ -625,17 +627,22 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   // Cada etapa cede el turno a la página a menudo (ver `pacer`).
   const pace = pacer();
   await pace();
+  step('costa: lugares');
   const places = await buildPlaces(rand, pace);
   // Cuando la ballena rompe el agua, el mar lo registra (ver `uSplash`).
   let splashSlot = 0;
+  step('costa: fauna');
   const fauna = await buildFauna(rand, pace, (x, z, size, strength) => {
     uniforms.uSplash.value[splashSlot++ % 4].set(x, z, uniforms.uTime.value, size * (0.55 + 0.45 * strength));
   });
   await pace();
   const rocks = buildRocks(rand);
+  step('costa: selva');
   const flora = await buildFlora(rand, pace);
+  step('costa: relieve');
   const land = await buildLand(region, pace);
   await breathe();
+  step('costa: relieve de fondo');
   const farLand = await buildFarLand(region, pace);
   // Ya se armó todo lo que repite piezas: se suelta lo memorizado (ver kit.ts).
   clearKitCache();
@@ -888,6 +895,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   let frame = 0;
   // Contador propio: el id de requestAnimationFrame lo comparten todos los bucles de la página.
   let ticks = 0;
+  let drawn = false;
   // Resolución que se adapta al equipo: si no alcanza ~38 cuadros por segundo, se dibuja con menos píxeles (hasta el
   // 60 % del tope); si le sobra, vuelve a subir. La diferencia casi no se nota y la fluidez sí.
   const prCap = pixelRatioCap();
@@ -991,6 +999,10 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     }
 
     renderer.render(scene, camera);
+    if (!drawn) {
+      drawn = true;
+      step('costa: primer cuadro');
+    }
     // Los rótulos son elementos de la página: moverlos cuesta. Con la cámara quieta basta uno de cada tres cuadros.
     const moved = !lastCam.equals(camera.matrixWorld);
     if (moved || ticks % 3 === 0) {
@@ -1055,7 +1067,9 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   // En pausa no se dibuja, pero se dejan listos los sombreadores para que la entrada no se trabe.
   if (paused) {
     placeCamera();
+    step('costa: compilando');
     await renderer.compileAsync(scene, camera).catch(() => {});
+    step('costa: lista');
   }
 
   // Los animales de la diseñadora llegan después: cada uno reemplaza a su figura dibujada. En el nivel mínimo no se
@@ -1071,6 +1085,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     focus,
     select,
     land: (handoff, onLanded) => {
+      step('costa: llegando');
       select(null);
       intro = { handoff, fromDist: handoff.fromKm * mapUnitsPerKm(aspect), onLanded };
       if (!active) timer.reset();

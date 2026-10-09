@@ -11,6 +11,7 @@ import { ASCENT, DIVE, diveAltitude, fovs, type Handoff } from './dive';
 import { ARRIVAL } from './terrain';
 import { DUSK_GLSL, REGION, isChoco, posterTexture, regionCanvas, worldCanvas } from './posterArt';
 import { QUALITY, pixelRatioCap } from './quality';
+import { step } from './diag';
 
 const R = 1;
 const DEG = Math.PI / 180;
@@ -287,12 +288,14 @@ function faceQ(lat: number, lon: number, bearing: number) {
 }
 
 export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onLost }: GlobeOptions): GlobeHandle {
+  step('planeta: armando');
   const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, alpha: true });
   renderer.setPixelRatio(pixelRatioCap());
   renderer.outputColorSpace = SRGBColorSpace;
   host.appendChild(renderer.domElement);
   renderer.domElement.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
+    step('SE CAYÓ: planeta');
     onLost?.();
   });
   const labels = new CSS2DRenderer();
@@ -608,11 +611,13 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onL
   // Antes del primer cuadro: el cielo se pinta en su textura y los sombreadores se compilan en paralelo (sin congelar
   // la página, si el navegador lo permite). Mientras tanto se ve el aviso de carga.
   let ready = false;
+  step('planeta: compilando');
   void (galaxy ? galaxy.bake(renderer) : Promise.resolve())
     .then(() => renderer.compileAsync(scene, camera))
     .catch(() => {})
     .then(() => {
       ready = true;
+      step('planeta: listo');
       onReady?.();
     });
   loop();

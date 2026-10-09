@@ -11,6 +11,7 @@ import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
 import { TIER, TIER_LABEL, rememberCrash } from '../components/map/quality';
+import { SOLO, lastSteps, step } from '../components/map/diag';
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
@@ -75,7 +76,8 @@ export default function MapScreen() {
     let earth: GlobeHandle | null = null;
     const buildMap = () =>
       createMapScene(stage.current!, {
-        paused: true,
+        // Probando solo la costa (?solo=costa): arranca andando, sin esperar al planeta.
+        paused: SOLO !== 'costa',
         onSelect: (p) => {
           setPlace(p);
           if (p?.kind === 'town') setTown(p.id);
@@ -94,17 +96,21 @@ export default function MapScreen() {
           onReady: () => {
             if (!live) return;
             resolve(g);
-            // La primera vez: se muestra el planeta y se empieza a armar la costa.
+            // La primera vez: se muestra el planeta y se empieza a armar la costa (salvo si se prueba solo el planeta).
             if (!map) {
               setPhase('globe');
-              map = buildMap();
+              if (SOLO !== 'planeta') map = buildMap();
             }
           },
           onLost,
-          onDive: () => setPhase('diving'),
+          onDive: () => {
+            step('bajando');
+            setPhase('diving');
+          },
           onHandoff: (handoff) => {
             // El mapa sigue bajando desde donde va el planeta; el planeta se desvanece encima y luego deja de dibujarse
             // (o se suelta del todo, en equipos modestos). Si la costa aún se está armando, la llegada la espera.
+            if (SOLO === 'planeta') return step('planeta: llegó (sin costa)');
             void (map ??= buildMap()).then((m) => {
               if (!live) return;
               m.land(handoff, () => setPhase('map'));
@@ -121,7 +127,14 @@ export default function MapScreen() {
         globe.current = g;
       });
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (live) globeReady.current = makeGlobe.current();
+      if (!live) return;
+      if (SOLO !== 'costa') {
+        globeReady.current = makeGlobe.current();
+        return;
+      }
+      // Probando solo la costa: sin planeta.
+      map = buildMap();
+      void map.then(() => live && setPhase('map'));
     }));
     return () => {
       live = false;
@@ -176,6 +189,7 @@ export default function MapScreen() {
           <Link className="ghost-link" to="/">← Volver al recorrido</Link>
           {/* Para diagnosticar: qué nivel se usó y por qué (una captura de esto basta). */}
           <p className="map-lost__diag">{TIER_LABEL}</p>
+          <p className="map-lost__diag">{lastSteps()}</p>
         </div>
       )}
 
