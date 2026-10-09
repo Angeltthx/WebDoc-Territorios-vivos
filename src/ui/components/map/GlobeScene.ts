@@ -174,7 +174,11 @@ function buildStars(pixelRatio: number) {
         float core = smoothstep(mix(0.5, 0.16, big), 0.0, d);
         float halo = big * exp(-d * 9.0) * 0.5;
         float spikes = big * (exp(-abs(p.x) * 60.0) + exp(-abs(p.y) * 60.0)) * smoothstep(0.5, 0.0, d) * 0.55;
-        gl_FragColor = vec4(vColor * (core * core + halo + spikes), 1.0);
+        // La transparencia sigue al brillo: el lienzo es transparente (detrás está el fondo de la página) y, sin la Vía
+        // Láctea detrás, un cuadro negro opaco alrededor de cada estrella tapaba ese fondo.
+        vec3 c = vColor * (core * core + halo + spikes);
+        float a = clamp(max(c.r, max(c.g, c.b)), 0.0, 1.0);
+        gl_FragColor = vec4(c / max(a, 1e-3), a);
       }`,
   });
   return { points: new Points(geo, mat), uniforms: mat.uniforms };
