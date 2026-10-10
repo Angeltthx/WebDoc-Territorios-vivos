@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
-import { TopBar } from '../components/Chrome';
+import { Arrow, TopBar } from '../components/Chrome';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { createFlatGlobe } from '../components/map/FlatGlobe';
 import { DIVE } from '../components/map/dive';
@@ -262,8 +262,9 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
               </button>
             )}
             {onBack ? (
-              <button type="button" className="ghost-link" onClick={onBack}>
-                <span aria-hidden="true">↑</span> Volver al recorrido
+              // La misma flecha de «Sigue bajando» del recorrido, hacia arriba.
+              <button type="button" className="ghost-link ghost-link--back" onClick={onBack}>
+                <Arrow dir="up" /> Volver al recorrido
               </button>
             ) : (
               <Link className="ghost-link" to="/">
@@ -300,7 +301,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
             Sigue alejándote para ver el planeta
             <span className="map-pull__bar" style={{ transform: `scaleX(${pull})` }} />
           </p>
-          <p className={`map-hint${hint ? '' : ' is-hidden'}`}>Arrastra para recorrer la costa · rueda o pellizca para acercarte · toca un lugar</p>
+          <p className={`map-hint${hint && !place ? '' : ' is-hidden'}`}>Arrastra para recorrer la costa · rueda o pellizca para acercarte · toca un lugar</p>
           <nav className="map-towns tabs" aria-label="Pueblos de la costa, de norte a sur">
             {MAP_TOWNS.map((t) => (
               <button key={t.id} type="button" className={`tab${t.id === town ? ' is-active' : ''}`} onClick={() => goTown(t.id)}>

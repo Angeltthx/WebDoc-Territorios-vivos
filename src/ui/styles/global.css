@@ -660,6 +660,15 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   padding: 18px var(--gutter) max(14px, env(safe-area-inset-bottom));
 }
 
+/* Dentro del recorrido, los botones de sonido y redes van a la izquierda (en computador): lo de ese lado se corre
+   para no quedar debajo. En el celular van a la derecha, a media altura, donde no tapan nada. */
+.ghost-link--back { display: inline-flex; align-items: center; gap: 6px; }
+.ghost-link--back svg { width: 14px; height: 14px; }
+@media (min-width: 641px) {
+  .map-screen--embedded .globe-title, .map-screen--embedded .map-card { left: 76px; }
+  .map-screen--embedded .map-towns { padding-left: 76px; padding-right: 76px; }
+}
+
 @media (max-width: 640px) {
   .map-card { bottom: 70px; }
   .map-hint { bottom: 60px; font-size: 11px; }
