@@ -6,7 +6,7 @@
 // y el sur (Coquí) a la derecha, como en el afiche. Ver `terrain.ts` para las coordenadas.
 
 import {
-  BackSide, type BufferGeometry, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
+  BackSide, BufferGeometry, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
   Fog, Group, HemisphereLight, Matrix4, IcosahedronGeometry, MathUtils, Mesh, LinearFilter, Object3D, UnsignedByteType,
   PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster, RedFormat, SRGBColorSpace, Scene, ShaderMaterial,
   SphereGeometry, Timer, UniformsLib, UniformsUtils, Vector2, Vector3, Vector4, WebGLRenderer, type Texture, type WebGLProgramParametersWithUniforms,
@@ -17,7 +17,7 @@ import type { MapPlace } from '../../../content/map';
 import { CHOCO_POINTS, SUBREGION_LABELS, categorize, type ChocoPoint } from '../../../content/choco';
 import { EMBLEM_SIZE, figureChunks, storyChunks } from './emblems';
 import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
-import { Batch, type Pace, clearKitCache, pacer, paint, sticker } from './kit';
+import { BALL, BLADE, Batch, type Pace, ROCK, clearKitCache, pacer, paint, part, sticker } from './kit';
 import { buildFlora, buildMist, clearPlants } from './flora';
 import { buildPlaces } from './places';
 import { loadAnimals } from './animals';
@@ -761,6 +761,130 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     }
     return best;
   };
+  /**
+   * Una cascada pegada a la ladera: desde la pendiente más empinada cerca del lugar se sube por la loma (siguiendo la
+   * pendiente) y se baja hasta donde se calma; por ese camino corre una cinta de agua que copia la forma del terreno,
+   * blanca donde la caída es fuerte y azul donde el agua se calma, y al pie, un pozo con su borde de espuma. Así no es un
+   * objeto encima del paisaje: es parte de él.
+   */
+  const buildFall = (x0: number, z0: number) => {
+    const start = steepest(x0, z0, 260);
+    if (start.slope < 0.25) return null;
+    const step = 18;
+    const grad = (x: number, z: number) => {
+      const e = 12;
+      const gx = groundAt(x + e, z) - groundAt(x - e, z);
+      const gz = groundAt(x, z + e) - groundAt(x, z - e);
+      const l = Math.hypot(gx, gz) || 1;
+      return { x: gx / l, z: gz / l, steep: Math.hypot(gx, gz) / (2 * e) };
+    };
+    // Camino: subir por la loma desde el punto más empinado y bajar hasta que se aplana.
+    const up: [number, number][] = [];
+    let p: [number, number] = [start.x, start.z];
+    for (let k = 0; k < 9; k++) {
+      const g = grad(p[0], p[1]);
+      if (g.steep < 0.1) break;
+      p = [p[0] + g.x * step, p[1] + g.z * step];
+      up.push(p);
+    }
+    const down: [number, number][] = [];
+    p = [start.x, start.z];
+    for (let k = 0; k < 8; k++) {
+      const g = grad(p[0], p[1]);
+      p = [p[0] - g.x * step, p[1] - g.z * step];
+      if (isSea(p[0], p[1])) break;
+      down.push(p);
+      if (g.steep < 0.12) break;
+    }
+    const path = [...up.reverse(), [start.x, start.z] as [number, number], ...down];
+    if (path.length < 3) return null;
+    const pos: number[] = [];
+    const col: number[] = [];
+    const white = new Color('#f4fcff');
+    const light = new Color('#b8ecfb');
+    const blue = new Color('#5cc6e6');
+    const tri = (a: Vector3, b: Vector3, c: Vector3, ca: Color, cb: Color, cc: Color) => {
+      pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b, cc.r, cc.g, cc.b);
+    };
+    // Tres hilos por tramo (orilla, centro, orilla): el centro más claro; más ancha abajo.
+    const rows = path.map(([x, z], k) => {
+      const [nx, nz] = path[Math.min(k + 1, path.length - 1)];
+      const [px, pz] = path[Math.max(k - 1, 0)];
+      const dx = nx - px;
+      const dz = nz - pz;
+      const l = Math.hypot(dx, dz) || 1;
+      const w = 10 + (k / path.length) * 12;
+      const sx = (-dz / l) * w;
+      const sz = (dx / l) * w;
+      // Un poco sobre el terreno (la malla de fondo es más gruesa que la altura medida: que no quede por debajo).
+      const at = (f: number) => new Vector3(x + sx * f, groundAt(x + sx * f, z + sz * f) + (inFine(x, z) ? 2 : 6), z + sz * f);
+      const fall = grad(x, z).steep;
+      const c = fall > 0.6 ? white : fall > 0.3 ? light : blue;
+      return { l: at(-1), m: at(0), r: at(1), c, edge: fall > 0.6 ? light : blue };
+    });
+    for (let k = 0; k < rows.length - 1; k++) {
+      const a = rows[k];
+      const b = rows[k + 1];
+      // (en este orden miran hacia arriba)
+      tri(a.l, a.m, b.l, a.edge, a.c, b.edge);
+      tri(a.m, b.m, b.l, a.c, b.c, b.edge);
+      tri(a.m, a.r, b.m, a.c, a.edge, b.c);
+      tri(a.r, b.r, b.m, a.edge, b.edge, b.c);
+    }
+    // El pozo al pie: agua quieta a la altura más baja de su borde, con piedras alrededor.
+    const [fx, fz] = path[path.length - 1];
+    const R = 20;
+    let low = Infinity;
+    for (let k = 0; k < 12; k++) low = Math.min(low, groundAt(fx + Math.cos((k / 12) * Math.PI * 2) * R, fz + Math.sin((k / 12) * Math.PI * 2) * R));
+    const py = Math.max(low, groundAt(fx, fz) - 3) + 1.4;
+    const center = new Vector3(fx, py, fz);
+    for (let k = 0; k < 14; k++) {
+      const a0 = (k / 14) * Math.PI * 2;
+      const a1 = ((k + 1) / 14) * Math.PI * 2;
+      const r0 = R * (0.85 + 0.15 * Math.sin(k * 2.3));
+      const r1 = R * (0.85 + 0.15 * Math.sin((k + 1) * 2.3));
+      tri(center, new Vector3(fx + Math.cos(a1) * r1, py, fz + Math.sin(a1) * r1), new Vector3(fx + Math.cos(a0) * r0, py, fz + Math.sin(a0) * r0), blue, blue, blue);
+    }
+    // Piedras, espuma y helechos: en el borde del pozo, en las orillas de la caída y a los lados.
+    const extras: BufferGeometry[] = [];
+    const rock = (x: number, z: number, r: number, c: string) =>
+      extras.push(part(ROCK, c, { p: [x, groundAt(x, z) + r * 0.25, z], s: [r, r * 0.8, r], r: [0, x * 0.1, 0] }));
+    for (let k = 0; k < 9; k++) {
+      const a = (k / 9) * Math.PI * 2 + 0.3;
+      rock(fx + Math.cos(a) * (R + 2), fz + Math.sin(a) * (R + 2), 3.5 + (k % 3) * 1.5, k % 2 ? '#7c8a80' : '#6f7d73');
+    }
+    rows.forEach((r, k) => {
+      if (k % 2) return;
+      rock(r.l.x, r.l.z, 3 + (k % 3), '#7c8a80');
+      rock(r.r.x, r.r.z, 2.5 + ((k + 1) % 3), '#869488');
+      for (const side of [r.l, r.r]) {
+        const out = side.clone().sub(r.m).setY(0).normalize().multiplyScalar(9).add(side);
+        for (const a of [0, 1.6, 3.2, 4.8]) extras.push(part(BLADE, k % 4 ? '#3d7f4c' : '#2f6b45', { p: [out.x, groundAt(out.x, out.z) + 0.6, out.z], r: [-0.45, a + k, 0], s: [1.6, 0.2, 6], o: 'YXZ' }));
+      }
+      // Espuma donde cae fuerte.
+      if (r.c === white) extras.push(part(BALL, '#ffffff', { p: [r.m.x, r.m.y + 0.6, r.m.z], s: [5, 1.2, 4] }));
+    });
+    extras.push(part(BALL, '#ffffff', { p: [fx, py + 0.5, fz], s: [8, 1.4, 6] }));
+    if (inFine(fx, fz)) {
+      clearPlants(flora, fx, fz, R + 10);
+      for (const r of rows) clearPlants(flora, r.m.x, r.m.z, 14);
+    }
+    // Que todos los triángulos miren hacia arriba (el material solo dibuja la cara de adelante).
+    for (let i = 0; i < pos.length; i += 9) {
+      const ux = pos[i + 3] - pos[i], uz = pos[i + 5] - pos[i + 2];
+      const vx = pos[i + 6] - pos[i], vz = pos[i + 8] - pos[i + 2];
+      if (uz * vx - ux * vz < 0) {
+        for (const k of [0, 1, 2]) [pos[i + 3 + k], pos[i + 6 + k]] = [pos[i + 6 + k], pos[i + 3 + k]];
+        for (const k of [0, 1, 2]) [col[i + 3 + k], col[i + 6 + k]] = [col[i + 6 + k], col[i + 3 + k]];
+      }
+    }
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new Float32BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    return mergeGeometries([geo, ...extras])!;
+  };
   /** ¿Es mar? (el relieve sin recortar en cero: negativo en el agua). */
   const isSea = (x: number, z: number) => (inFine(x, z) ? heightAt(x, z) : farHeight(x, z)) < 0;
   /** El punto de mar más cercano a (x, z), hasta `max` unidades; un poco mar adentro para que no toque la orilla. */
@@ -812,22 +936,6 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
       let x = at.x - c.z;
       let z = at.z + c.x;
       let y: number;
-      let turn = -Math.PI / 2;
-      if (c.on === 'slope') {
-        // La ladera más empinada a menos de ~400 unidades: ahí nace la cascada, de frente cuesta abajo.
-        const s = steepest(x, z, 400);
-        x = s.x;
-        z = s.z;
-        turn = Math.atan2(s.dx, s.dz);
-        // La base, a la altura del pie de la caída (lo de atrás queda hundido en la loma).
-        y = groundAt(x + s.dx * c.r * 0.35, z + s.dz * c.r * 0.35) - 2;
-        if (inFine(x, z)) clearPlants(flora, x, z, c.r * 1.3);
-        const g = c.geo.clone();
-        g.rotateY(turn);
-        g.translate(x, y, z);
-        emblemParts.push(g);
-        continue;
-      }
       if (c.on === 'air') y = groundAt(at.x, at.z);
       else {
         const water = c.on === 'ground' ? null : nearestSea(x, z, c.on === 'sea' ? 3000 : 700);
@@ -844,6 +952,11 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
       g.rotateY(-Math.PI / 2);
       g.translate(x, y, z);
       emblemParts.push(g);
+    }
+    // La cascada (en pocos lugares): no es una pieza, es agua sobre la ladera misma.
+    if (point.figure?.extra?.includes('cascada')) {
+      const fall = buildFall(at.x, at.z);
+      if (fall) emblemParts.push(fall);
     }
     // El punto flota sobre su figurita.
     label.position.set(at.x, top + EMBLEM_SIZE + 22, at.z);

@@ -28,10 +28,9 @@ export interface Chunk {
   x: number;
   z: number;
   /**
-   * En el suelo; en el agua más cercana (si no hay, se omite: `seaOrGround` cae al suelo); en el aire; o en la ladera más
-   * empinada de cerca, mirando cuesta abajo (la cascada).
+   * En el suelo; en el agua más cercana (si no hay, se omite: `seaOrGround` cae al suelo); o en el aire.
    */
-  on: 'ground' | 'sea' | 'seaOrGround' | 'air' | 'slope';
+  on: 'ground' | 'sea' | 'seaOrGround' | 'air';
   /** Radio que ocupa (para abrir el claro en la vegetación). */
   r: number;
 }
@@ -230,7 +229,8 @@ const MAIN: Record<Figure['main'], () => Chunk[]> = {
 
 // ───────── Detalles ─────────
 
-const EXTRA: Record<FigureExtra, () => Chunk> = {
+/** Los detalles que son una pieza (la cascada no: se dibuja sobre la ladera misma, ver `buildFall` en MapScene). */
+const EXTRA: Record<Exclude<FigureExtra, 'cascada'>, () => Chunk> = {
   // Potrillo con su remo: en el agua si hay cerca; si no, en tierra junto a las casas.
   canoa: () => piece([
     part(BOX, '#7a4a2a', { p: [0, 0.5, 0], s: [7, 1.2, 1.8] }),
@@ -266,35 +266,6 @@ const EXTRA: Record<FigureExtra, () => Chunk> = {
     part(BALL, '#eceef2', { p: [-3.4, 21.6, -0.5], s: [3.2, 2.3, 3] }),
     ...[-3, -1, 1, 3].map((x, k) => pole('#8fb6e0', [x, 19 - (k % 2) * 2, (k % 2) - 0.5], [x - 0.5, 15 - (k % 2) * 2, (k % 2) - 0.5], 0.18)),
   ], 0, 0, 'air', 0),
-  // Cascada: nace de la ladera (ver `on: 'slope'`). Un frente de roca hundido en la loma, con las rocas y el musgo de la
-  // costa, vegetación arriba y a los lados, y el agua que cae a su pozo y sale cuesta abajo (+z).
-  cascada: () => piece([
-    // La roca: varias piedras grises verdosas, la del centro alta; las de atrás se hunden en la loma.
-    part(ROCK, '#7c8a80', { p: [0, 6, -3], s: [6.5, 10, 5] }),
-    part(ROCK, '#6f7d73', { p: [-5.5, 4, -2.5], s: [5, 8, 5] }),
-    part(ROCK, '#869488', { p: [5.5, 4.5, -2.5], s: [5, 8.5, 5] }),
-    part(ROCK, '#7c8a80', { p: [0, 3, -8], s: [11, 9, 6] }),
-    part(ROCK, '#6f7d73', { p: [-3.5, 0.5, 2.5], s: [2.2, 1.6, 2] }),
-    part(ROCK, '#869488', { p: [4, 0.4, 3], s: [1.8, 1.4, 1.6] }),
-    // Musgo y vegetación encima y a los lados (los mismos verdes del mapa).
-    part(BALL, '#4f9a52', { p: [0, 14.5, -3.5], s: [5, 1.8, 3.6] }),
-    part(BALL, '#4f9a52', { p: [-5.5, 11, -3], s: [4, 1.6, 3.4] }),
-    part(BALL, '#5aa244', { p: [5.5, 11.5, -3], s: [3.8, 1.6, 3.2] }),
-    ...[[-8, -4, 9], [8.5, -5, 10], [-2.5, -9, 12], [4, -10, 11]].flatMap(([x, z, h]) => tree(h, x > 0 ? '#3f8a3a' : '#2f6b2c').map((g) => g.clone().translate(x, 0, z))),
-    ...[[-6.5, 2], [6.5, 1.5], [-8.5, -1], [9, -1.5]].flatMap(([x, z], k) =>
-      [0, 1.3, 2.6, 3.9, 5.2].map((a) => part(BLADE, k % 2 ? '#2f6b45' : '#3d7f4c', { p: [x, 0.6, z], r: [-0.4, a + k, 0], s: [1.1, 0.16, 4.2], o: 'YXZ' }))),
-    // El agua: la caída (redonda: se ve desde cualquier lado), su brillo y la espuma.
-    part(CYL, '#5fbfe8', { p: [0, 7.2, 0.4], s: [2.4, 13.5, 1.8] }),
-    part(CYL, '#e8f8ff', { p: [-0.4, 7.2, 1.1], s: [0.7, 13.5, 0.7] }),
-    part(CYL, '#5fbfe8', { p: [2.6, 5, 0.2], s: [1.1, 9, 1.1] }),
-    // El pozo y la quebradita que baja (tramos de agua cada vez más angostos), con espuma.
-    part(CYL, '#3fb0c8', { p: [0.5, 0.2, 3.2], s: [8, 0.4, 5.5] }),
-    part(BALL, '#ffffff', { p: [0, 0.9, 1.6], s: [3, 1.4, 2.2] }),
-    part(BALL, '#f2fbfd', { p: [2.4, 0.7, 1.7], s: [1.8, 1.1, 1.5] }),
-    // La salida del pozo, inclinada como la ladera.
-    part(BOX, '#3fb0c8', { p: [0.9, -0.6, 8.6], s: [3, 0.3, 5], r: [0.22, 0, 0] }),
-    part(BALL, '#ffffff', { p: [0.6, -0.2, 8.2], s: [0.7, 0.35, 0.6] }),
-  ], -8, -14, 'slope', 9),
   // Pozo de agua caliente con su vapor, junto a las casas.
   termal: () => piece([
     part(CYL, '#9a9088', { p: [0, 0.2, 0], s: [6.4, 0.8, 6.4] }),
@@ -307,7 +278,7 @@ const EXTRA: Record<FigureExtra, () => Chunk> = {
 
 /** Las piezas de la figurita de un punto del mapa. */
 export function figureChunks(fig: Figure): Chunk[] {
-  const extras = (fig.extra ?? []).map((e) => {
+  const extras = (fig.extra ?? []).filter((e): e is Exclude<FigureExtra, 'cascada'> => e !== 'cascada').map((e) => {
     const c = EXTRA[e]();
     // En la ciudad, el cununo va en la plaza, frente a la iglesia, y la canoa más allá de las casas.
     const spot = fig.main === 'ciudad' ? CITY_SLOT[e] : undefined;
@@ -317,7 +288,7 @@ export function figureChunks(fig: Figure): Chunk[] {
   const main = fig.main === 'montana' ? MAIN.montana().map((c) => ({ ...c, x: c.x * 1.45, z: c.z * 1.45 })) : MAIN[fig.main]();
   return [...main, ...extras];
 }
-const CITY_SLOT: Partial<Record<FigureExtra, [number, number]>> = { cununo: [5, 7], canoa: [8, 30], lancha: [-6, 32] };
+const CITY_SLOT: Partial<Record<Exclude<FigureExtra, 'cascada'>, [number, number]>> = { cununo: [5, 7], canoa: [8, 30], lancha: [-6, 32] };
 
 /** Las seis figuritas de las historias: las mismas piezas. */
 const STORY: Record<Emblem, () => Chunk[]> = {
