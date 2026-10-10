@@ -14,6 +14,7 @@ import {
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MapPlace } from '../../../content/map';
+import { CHOCO_POINTS, SUBREGION_LABELS, type ChocoPoint } from '../../../content/choco';
 import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
 import { Batch, type Pace, clearKitCache, pacer, sticker } from './kit';
 import { buildFlora, buildMist } from './flora';
@@ -23,7 +24,7 @@ import { ASCENT, DIVE, diveProgress, fovs, mapUnitsPerKm, type Handoff } from '.
 import { DUSK_AT_NUQUI, DUSK_GLSL, REGION, posterTexture, regionCanvas } from './posterArt';
 import {
   ARRIVAL, BOUNDS, FAR_GRID, FAR_SHORE_FIELD, GRID, HEIGHTS, RAIL, SHORE_FIELD, farVertex, nature, placeNear, placed, railAt, rng, SUN_DIR,
-  shore, smoothstep, toScene, valueNoise, type PlacedPlace,
+  farHeight, heightAt, shore, smoothstep, toScene, valueNoise, type PlacedPlace,
 } from './terrain';
 import { QUALITY, litMaterial, pixelRatioCap } from './quality';
 import { step } from './diag';
@@ -587,6 +588,8 @@ export interface MapSceneOptions {
   onPull?: (amount: number) => void;
   /** El navegador quitó el 3D (por ejemplo, el equipo se quedó sin memoria). */
   onLost?: () => void;
+  /** Se eligió (o se soltó) uno de los puntos del resto del Chocó. */
+  onSpot?: (point: ChocoPoint | null) => void;
 }
 
 /** Cede el turno a la página entre las etapas pesadas: en un teléfono modesto, armar todo de corrido la congela. */
@@ -596,7 +599,7 @@ const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
  * Arma la costa por etapas (cediendo el turno entre una y otra, así el planeta de la entrada sigue respondiendo) y
  * compila sus sombreadores sin congelar la página. Se resuelve cuando ya se puede llegar a ella.
  */
-export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost }: MapSceneOptions): Promise<MapSceneHandle> {
+export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost, onSpot }: MapSceneOptions): Promise<MapSceneHandle> {
   const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, powerPreference: 'high-performance' });
   renderer.setPixelRatio(pixelRatioCap());
   renderer.outputColorSpace = SRGBColorSpace;
@@ -711,6 +714,70 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     pin.add(label);
     pinGroup.add(pin);
     pins.push({ place, pin, label, el });
+  }
+
+  // ───────── El resto del Chocó ─────────
+  // Puntos discretos en su lugar real (la costa al norte y al sur, y detrás de la serranía el Atrato y el San Juan);
+  // el nombre aparece al pasar el mouse o al tocarlos. Son rótulos de la página, no figuras 3D: se ven igual de
+  // nítidos a 100 km y no le cuestan nada a la tarjeta gráfica. Las historias que manden las personas usarán el mismo
+  // camino: latitud y longitud → lugar en la escena (ver `addSpot`).
+  const spots: { point: ChocoPoint; el: HTMLButtonElement; at: Vector3; behind?: boolean }[] = [];
+  const inFine = (x: number, z: number) => x > BOUNDS.x0 && x < BOUNDS.x1 && z > BOUNDS.z0 && z < BOUNDS.z1;
+  /** Altura del suelo en cualquier punto del Chocó (relieve fino cerca de Nuquí; el de fondo en el resto). */
+  const groundAt = (x: number, z: number) => Math.max(inFine(x, z) ? heightAt(x, z) : farHeight(x, z), 0);
+  let openSpot: string | null = null;
+  function selectSpot(id: string | null) {
+    openSpot = id;
+    for (const s of spots) s.el.classList.toggle('is-open', s.point.id === id);
+    if (id && selected) select(null);
+    onSpot?.(spots.find((s) => s.point.id === id)?.point ?? null);
+  }
+  function addSpot(point: ChocoPoint, kind: string = point.kind) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = `map-spot map-spot--${kind}`;
+    el.setAttribute('aria-label', point.name);
+    const name = document.createElement('span');
+    name.className = 'map-spot__name';
+    name.textContent = point.name;
+    el.append(name);
+    el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    el.addEventListener('click', () => selectSpot(openSpot === point.id ? null : point.id));
+    const label = new CSS2DObject(el);
+    const at = toScene(point.lat, point.lon);
+    label.position.set(at.x, groundAt(at.x, at.z) + 30, at.z);
+    pinGroup.add(label);
+    spots.push({ point, el, at: label.position });
+  }
+  for (const point of CHOCO_POINTS) addSpot(point);
+  // Prueba: ?punto=lat,lon,Nombre pone una historia de ejemplo en el mapa (así llegarán las aprobadas).
+  const test = new URLSearchParams(location.search).get('punto')?.split(',');
+  if (test && test.length >= 2 && test.slice(0, 2).every((v) => Number.isFinite(+v))) {
+    addSpot({ id: 'historia-prueba', name: test.slice(2).join(',').trim() || 'Historia de prueba', kind: 'corregimiento', lat: +test[0], lon: +test[1], subregion: 'Pacífico Norte' }, 'historia');
+  }
+  /** Los que quedan detrás de la serranía (vistos desde la cámara) se atenúan: así se leen en segundo plano. */
+  const ray = new Vector3();
+  const updateBehind = () => {
+    for (const s of spots) {
+      let behind = false;
+      for (let k = 1; k < 28 && !behind; k++) {
+        ray.lerpVectors(camera.position, s.at, k / 28);
+        behind = groundAt(ray.x, ray.z) > ray.y + 4;
+      }
+      if (behind !== s.behind) s.el.classList.toggle('is-behind', (s.behind = behind));
+    }
+  };
+  // Las cinco subregiones: su nombre, tenue, sobre su territorio (solo con la cámara lejos, para no estorbar de cerca).
+  const regionEls: HTMLElement[] = [];
+  for (const r of SUBREGION_LABELS) {
+    const el = document.createElement('div');
+    el.className = 'map-region';
+    el.textContent = r.name;
+    regionEls.push(el);
+    const label = new CSS2DObject(el);
+    const at = toScene(r.lat, r.lon);
+    label.position.set(at.x, groundAt(at.x, at.z) + 400, at.z);
+    pinGroup.add(label);
   }
 
   // ───────── Cámara: siempre en el mar, mirando hacia la costa ─────────
@@ -843,6 +910,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   let selected: string | null = null;
   function select(id: string | null) {
     selected = id;
+    if (openSpot) selectSpot(null);
     for (const p of pins) p.el.classList.toggle('is-selected', p.place.id === id);
     const place = [...placed, ...nature].find((p) => p.id === id) ?? null;
     if (place) {
@@ -1008,6 +1076,11 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     if (moved || ticks % 3 === 0) {
       labels.render(pinGroup as unknown as Scene, camera); // basta un grupo: solo recorre lo que se le da
       lastCam.copy(camera.matrixWorld);
+    }
+    if (ticks % 10 === 0) {
+      updateBehind();
+      const op = smoothstep(view.dist, 1100, 1600).toFixed(2);
+      for (const el of regionEls) if (el.style.opacity !== op) el.style.opacity = op;
     }
     if (ticks++ % 6 === 0) declutter();
   };

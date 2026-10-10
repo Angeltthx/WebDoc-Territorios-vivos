@@ -40,7 +40,6 @@ export default function Shop({ onClose }: { onClose?: () => void }) {
 
   return (
     <Sheet
-      wide
       eyebrow="Tienda"
       title="Lleva un pedazo del Pacífico"
       intro="Productos y precios de muestra: así se verá la tienda cuando abra."

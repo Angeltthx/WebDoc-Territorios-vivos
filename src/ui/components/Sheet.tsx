@@ -33,14 +33,15 @@ export function LineIcon({ name, size = 20 }: { name: 'help' | 'story' | 'shop';
   );
 }
 
-export function Sheet({ eyebrow, title, intro, onClose, children, wide }: {
+export function Sheet({ eyebrow, title, intro, aside, onClose, children }: {
   eyebrow: string;
   title: string;
   intro?: ReactNode;
+  /** Lo que acompaña al título en el panel del atardecer (por ejemplo, los pasos de una historia). */
+  aside?: ReactNode;
   /** Dentro del mapa: vuelve a la costa. Sin esto (dirección propia), un enlace al cierre del recorrido. */
   onClose?: () => void;
   children: ReactNode;
-  wide?: boolean;
 }) {
   // Mientras está abierta, los botones flotantes del webdoc (menú, sonido y redes) se esconden: tapaban el formulario.
   useEffect(() => {
@@ -52,21 +53,24 @@ export function Sheet({ eyebrow, title, intro, onClose, children, wide }: {
       <Arrow dir="left" /> Volver al mapa
     </>
   );
+  // A pantalla completa: a un lado el atardecer del mapa con el título (como la llegada a la costa), al otro el
+  // contenido sobre papel claro. En el celular, el atardecer queda arriba.
   return (
     <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-no-arrows>
-      <div className={`sheet__inner${wide ? ' sheet__inner--wide' : ''}`}>
-        <header className="sheet__head">
-          {onClose ? (
-            <button type="button" className="sheet__back" onClick={onClose}>{back}</button>
-          ) : (
-            <Link className="sheet__back" to="/27">{back}</Link>
-          )}
+      <header className="sheet__hero">
+        {onClose ? (
+          <button type="button" className="sheet__back" onClick={onClose}>{back}</button>
+        ) : (
+          <Link className="sheet__back" to="/27">{back}</Link>
+        )}
+        <div className="sheet__heading">
           <p className="eyebrow">{eyebrow}</p>
           <h2 id="sheet-title" className="sheet__title">{title}</h2>
           {intro && <p className="sheet__intro">{intro}</p>}
-        </header>
-        {children}
-      </div>
+          {aside}
+        </div>
+      </header>
+      <div className="sheet__body">{children}</div>
     </div>
   );
 }

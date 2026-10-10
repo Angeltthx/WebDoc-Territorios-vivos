@@ -66,16 +66,24 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
     setSent({ title: String(data.get('title')), place: [data.get('spot'), data.get('town')].filter(Boolean).join(', ') });
   };
 
+  const aside = (
+    <ol className="sheet-steps">
+      <li><span><strong>Cuéntala</strong> con tus palabras, y si quieres con fotos, audios o videos.</span></li>
+      <li><span><strong>La revisamos</strong> en el equipo de Territorios Vivos.</span></li>
+      <li><span><strong>Aparece en el mapa,</strong> en el lugar donde pasó.</span></li>
+    </ol>
+  );
+
   if (sent) {
     return (
-      <Sheet eyebrow="Cuéntanos tu historia" title="¡Gracias por contarla!" onClose={onClose}>
+      <Sheet eyebrow="Cuéntanos tu historia" title="¡Gracias por contarla!" onClose={onClose} aside={aside}>
         <div className="story-sent">
-          <p>
-            Tu historia <strong>«{sent.title}»</strong>, en {sent.place}, llegaría al equipo de Territorios Vivos. Después de
-            revisarla, aparecería en el mapa, en su lugar.
+          <p className="story-sent__lead">
+            «{sent.title}», en {sent.place}, llegaría al equipo de Territorios Vivos. Después de revisarla, aparecería en el
+            mapa, en su lugar.
           </p>
           <p className="notice">Versión de prueba: todavía no se envía ni se guarda nada.</p>
-          <button type="button" className="btn btn--dark" onClick={() => setSent(null)}>Volver al formulario</button>
+          <button type="button" className="story-send" onClick={() => setSent(null)}>Volver al formulario</button>
         </div>
       </Sheet>
     );
@@ -85,49 +93,55 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
     <Sheet
       eyebrow="Cuéntanos tu historia"
       title="¿Qué viviste en el Chocó?"
-      intro="Una historia, un recuerdo, una receta, un canto… Cuéntanos qué pasó y dónde. El equipo la revisa y, si se aprueba, aparece en el mapa."
+      intro="Una historia, un recuerdo, una receta, un canto… Cuéntanos qué pasó y dónde."
       onClose={onClose}
+      aside={aside}
     >
       <form className="story-form" onSubmit={submit}>
-        <fieldset>
-          <legend>Tu historia</legend>
-          <label>
-            Título
-            <input name="title" required maxLength={90} placeholder="Por ejemplo: La noche que llegaron las ballenas" />
+        <section className="story-step">
+          <h3 className="story-step__title"><span>01</span> Tu historia</h3>
+          <label className="story-field">
+            <span className="story-field__label">Título</span>
+            <input name="title" required maxLength={90} placeholder="La noche que llegaron las ballenas" />
           </label>
-          <label>
-            Cuéntanos qué pasó
-            <textarea name="story" required minLength={40} rows={7} placeholder="Escríbela como si se la contaras a alguien en la playa." />
+          <label className="story-field">
+            <span className="story-field__label">Cuéntanos qué pasó</span>
+            <textarea name="story" required minLength={40} rows={6} placeholder="Escríbela como si se la contaras a alguien en la playa." />
           </label>
-          <label>
-            <span>¿Cuándo pasó? <span className="story-form__opt">(opcional)</span></span>
-            <input name="when" maxLength={60} placeholder="Un año o una época: «en los 90», «de niña»…" />
+          <label className="story-field">
+            <span className="story-field__label">¿Cuándo pasó? <em>opcional</em></span>
+            <input name="when" maxLength={60} placeholder="Un año o una época: en los 90, de niña…" />
           </label>
-        </fieldset>
+        </section>
 
-        <fieldset>
-          <legend>¿Dónde pasó?</legend>
-          <label>
-            Municipio
-            <select name="town" required defaultValue="">
-              <option value="" disabled>Elige el municipio</option>
-              {CHOCO_MUNICIPALITIES.map((m) => <option key={m}>{m}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Lugar <span className="story-form__opt">(corregimiento, vereda, playa, río…)</span></span>
-            <input name="spot" maxLength={90} placeholder="Por ejemplo: playa de Guachalito" />
-          </label>
-          <div className="story-form__geo">
-            <button type="button" className="btn btn--light" onClick={locate} disabled={locating === 'busy'}>
-              {locating === 'busy' ? 'Buscando…' : 'Usar mi ubicación'}
+        <section className="story-step">
+          <h3 className="story-step__title"><span>02</span> ¿Dónde pasó?</h3>
+          <div className="story-row">
+            <label className="story-field">
+              <span className="story-field__label">Municipio</span>
+              <select name="town" required defaultValue="">
+                <option value="" disabled>Elige el municipio</option>
+                {CHOCO_MUNICIPALITIES.map((m) => <option key={m}>{m}</option>)}
+              </select>
+            </label>
+            <label className="story-field">
+              <span className="story-field__label">Lugar <em>corregimiento, vereda, playa, río…</em></span>
+              <input name="spot" maxLength={90} placeholder="Playa de Guachalito" />
+            </label>
+          </div>
+          <div className="story-geo">
+            <button type="button" className="story-geo__btn" onClick={locate} disabled={locating === 'busy'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              </svg>
+              {locating === 'busy' ? 'Buscando…' : coords ? `${coords.lat}, ${coords.lon}` : 'Usar mi ubicación'}
             </button>
-            <p className="story-form__help">
+            <p className="story-help">
               {coords
-                ? <>Ubicación: {coords.lat}, {coords.lon} <button type="button" className="story-form__link" onClick={() => setCoords(null)}>quitar</button></>
+                ? <>Listo: la historia queda en ese punto. <button type="button" className="story-link" onClick={() => setCoords(null)}>Quitar</button></>
                 : locating === 'error'
                   ? 'No se pudo leer la ubicación. No pasa nada: con el municipio y el lugar el equipo la ubica.'
-                  : 'Solo si estás en el lugar de la historia. Si no, con el municipio y el lugar el equipo la ubica en el mapa.'}
+                  : 'Solo si estás donde pasó. Si no, con el municipio y el lugar el equipo la ubica en el mapa.'}
             </p>
             {coords && (
               <>
@@ -136,15 +150,16 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
               </>
             )}
           </div>
-        </fieldset>
+        </section>
 
-        <fieldset>
-          <legend>Fotos, audios y videos <span className="story-form__opt">(opcional)</span></legend>
+        <section className="story-step">
+          <h3 className="story-step__title"><span>03</span> Fotos, audios y videos <em>opcional</em></h3>
           <label className="story-drop">
             <input type="file" multiple accept="image/*,audio/*,video/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
-            <span><strong>Agregar archivos</strong> · hasta {MAX_FILE_MB} MB cada uno</span>
+            <span className="story-drop__text">Agrega fotos, audios o videos</span>
+            <span className="story-help">Hasta {MAX_FILE_MB} MB cada uno</span>
           </label>
-          {fileNote && <p className="story-form__help" role="status">{fileNote}</p>}
+          {fileNote && <p className="story-help" role="status">{fileNote}</p>}
           {files.length > 0 && (
             <ul className="story-files">
               {files.map((a, i) => (
@@ -158,26 +173,30 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
               ))}
             </ul>
           )}
-        </fieldset>
+        </section>
 
-        <fieldset>
-          <legend>Sobre ti</legend>
-          <label>
-            <span>Tu nombre <span className="story-form__opt">(o cómo quieres aparecer en el mapa)</span></span>
-            <input name="name" required maxLength={60} autoComplete="name" />
+        <section className="story-step">
+          <h3 className="story-step__title"><span>04</span> Sobre ti</h3>
+          <div className="story-row">
+            <label className="story-field">
+              <span className="story-field__label">Tu nombre <em>o cómo quieres aparecer</em></span>
+              <input name="name" required maxLength={60} autoComplete="name" />
+            </label>
+            <label className="story-field">
+              <span className="story-field__label">Correo o WhatsApp <em>opcional · no se publica</em></span>
+              <input name="contact" maxLength={90} autoComplete="email" />
+            </label>
+          </div>
+          <label className="story-check">
+            <input type="checkbox" name="consent" required />
+            <span>Autorizo a Territorios Vivos a revisar mi historia y, si se aprueba, publicarla en el mapa con los archivos que adjunté.</span>
           </label>
-          <label>
-            <span>Correo o WhatsApp <span className="story-form__opt">(opcional, solo para el equipo: no se publica)</span></span>
-            <input name="contact" maxLength={90} autoComplete="email" />
-          </label>
-        </fieldset>
+        </section>
 
-        <label className="story-form__check">
-          <input type="checkbox" name="consent" required />
-          <span>Autorizo a Territorios Vivos a revisar mi historia y, si se aprueba, publicarla en el mapa con los archivos que adjunté.</span>
-        </label>
-
-        <button type="submit" className="btn btn--dark story-form__send">Enviar mi historia</button>
+        <button type="submit" className="story-send">
+          Enviar mi historia
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M10 4.5 14.5 9 10 13.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
       </form>
     </Sheet>
   );

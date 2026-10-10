@@ -757,61 +757,117 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   .globe-label--country { font-size: 12px; }
 }
 
-/* ───────── Costa: íconos de ayuda, historia y tienda ───────── */
+/* ───────── Costa: ayuda, «Tu historia» y tienda ─────────
+   Abajo a la derecha, con la misma letra y la misma línea que los pueblos: parte de la barra del mapa, no botones
+   flotando sobre el paisaje. */
 .map-tools {
-  position: absolute; z-index: 6; right: calc(var(--gutter) - 14px); top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; gap: 14px; animation: rise 0.6s var(--ease) 0.4s both;
+  position: absolute; z-index: 6; right: var(--gutter); bottom: 0; display: flex; gap: clamp(14px, 2vw, 24px);
+  padding-bottom: max(14px, env(safe-area-inset-bottom)); animation: rise 0.6s var(--ease) 0.4s both;
 }
-.map-tool {
-  width: 72px; display: grid; justify-items: center; gap: 4px; padding: 0; border: 0; background: none;
-  font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
-}
-.map-tool svg {
-  box-sizing: content-box; padding: 9px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(0, 0, 0, 0.28); backdrop-filter: blur(8px); transition: background 0.25s, color 0.25s, transform 0.25s var(--ease);
-}
-.map-tool:hover svg { transform: translateY(-2px); }
-.map-tool:hover, .map-tool.is-active { color: var(--gold); }
-.map-tool.is-active svg { background: rgba(0, 0, 0, 0.5); border-color: var(--gold); }
+.map-tool { gap: 7px; font-size: 12px; }
+.map-tool svg { width: 16px; height: 16px; flex: none; opacity: 0.9; }
+.map-tool.is-active { color: #fff; }
+.map-tool.is-active::after { height: 2px; background: #fff; }
+/* Los rótulos 3D (CSS2D) llevan su propio orden de apilado: dentro del lienzo, nunca encima de la interfaz. */
+.map-stage { z-index: 0; }
 
 .map-help {
-  position: absolute; z-index: 7; right: calc(var(--gutter) + 64px); top: 50%; transform: translateY(-50%);
+  position: absolute; z-index: 20; right: var(--gutter); bottom: 74px;
   width: min(340px, calc(100vw - 32px)); padding: 18px 44px 18px 20px; border-radius: 16px;
-  background: var(--paper-2); color: var(--ink); box-shadow: 0 10px 30px rgba(6, 30, 34, 0.28);
+  background: var(--paper-2); color: var(--ink); box-shadow: 0 10px 30px rgba(6, 30, 34, 0.28); animation: rise 0.35s var(--ease) both;
 }
 .map-help .eyebrow { color: var(--muted); }
 .map-help ul { margin: 6px 0 14px; padding-left: 18px; font-size: 14px; line-height: 1.45; }
 .map-help ul:last-of-type { margin-bottom: 0; }
 .map-help li + li { margin-top: 4px; }
 
+/* Si no caben al lado de los pueblos, van en la línea de arriba. */
+@media (max-width: 1180px) {
+  .map-tools { bottom: 52px; padding-bottom: 0; }
+  .map-help { bottom: 112px; }
+}
 @media (max-width: 640px) {
-  /* En el celular, los botones de redes van a la derecha a media altura: los íconos del mapa van arriba. */
-  .map-tools { top: 92px; transform: none; right: 0; gap: 10px; }
-  .map-tool svg { padding: 7px; }
-  .map-help { left: 16px; right: 16px; width: auto; top: auto; bottom: 70px; transform: none; }
+  .map-tools { left: 0; right: 0; justify-content: center; gap: 18px; }
+  .map-tool { font-size: 11px; min-height: 40px; }
+  .map-hint { bottom: 102px; }
+  .map-help { left: 16px; right: 60px; width: auto; }
+  .map-card { bottom: 104px; }
 }
 
-/* ───────── Hojas sobre el mapa: tienda y «Cuéntanos tu historia» ───────── */
-.sheet {
-  position: absolute; inset: 0; z-index: 60; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--paper-2); color: var(--ink); animation: rise 0.4s var(--ease) both;
+/* ───────── El resto del Chocó: puntos con su nombre al pasar el mouse ───────── */
+.map-spot {
+  position: relative; width: 22px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto;
 }
+.map-spot::before {
+  content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--p-pink);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 1px 6px rgba(10, 30, 40, 0.45); transition: transform 0.2s var(--ease);
+}
+.map-spot--playa::before, .map-spot--cabo::before, .map-spot--parque::before, .map-spot--cerro::before { background: var(--p-navy); }
+.map-spot--historia::before { background: var(--gold); inset: 4px; }
+.map-spot__name {
+  position: absolute; left: 50%; bottom: calc(100% + 2px); translate: -50% 4px; opacity: 0; pointer-events: none; white-space: nowrap;
+  padding: 4px 11px 5px; border-radius: 999px; background: var(--p-pink); color: #fff; box-shadow: 0 2px 8px rgba(10, 40, 40, 0.22);
+  font: 700 10.5px var(--serif); letter-spacing: 0.01em; transition: opacity 0.2s, translate 0.2s var(--ease);
+}
+.map-spot:hover::before, .map-spot:focus-visible::before, .map-spot.is-open::before { transform: scale(1.35); }
+.map-spot:hover .map-spot__name, .map-spot:focus-visible .map-spot__name, .map-spot.is-open .map-spot__name { opacity: 1; translate: -50% 0; }
+.map-spot.is-open .map-spot__name { background: #b8264e; }
+/* Detrás de la serranía: más pequeño y tenue (el nombre sigue apareciendo al pasar el mouse). */
+.map-spot.is-behind::before { inset: 8px; opacity: 0.6; box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.7); }
+.map-spot.is-behind:hover::before, .map-spot.is-behind.is-open::before { opacity: 1; }
+.map-spot--historia .map-spot__name { background: var(--gold); color: var(--ink); }
+.map-region {
+  opacity: 0; transition: opacity 0.6s; pointer-events: none; white-space: nowrap; font: 600 11px var(--sans); letter-spacing: 0.32em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55); text-shadow: 0 1px 10px rgba(40, 20, 50, 0.5);
+}
+
+/* ───────── Hojas sobre el mapa: tienda y «Cuéntanos tu historia» ─────────
+   Pantalla completa. A la izquierda, el atardecer del mapa (el mismo cielo y el mismo mar de la llegada) con el
+   título en la letra del webdoc; a la derecha, el contenido sobre papel claro. */
+.sheet {
+  position: absolute; inset: 0; z-index: 60; display: grid; grid-template-columns: minmax(320px, 38%) 1fr;
+  background: var(--paper-2); color: var(--ink); animation: sheet-in 0.45s var(--ease) both;
+}
+@keyframes sheet-in { from { opacity: 0; } to { opacity: 1; } }
 .sheet-page { position: fixed; inset: 0; }
 .has-sheet .dock, .has-sheet .menu-btn { display: none; }
-.sheet__inner { width: min(720px, 100%); margin: 0 auto; padding: calc(var(--gutter) + 8px) 20px 64px; }
-.sheet__inner--wide { width: min(1080px, 100%); }
-.sheet__head { margin-bottom: 26px; }
-.sheet__head .eyebrow { color: #b8264e; margin-top: 18px; }
+.sheet__hero {
+  position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; overflow: hidden;
+  padding: calc(var(--gutter) + 6px) clamp(24px, 3.4vw, 56px) clamp(32px, 5vh, 56px); color: #fff;
+  background:
+    radial-gradient(ellipse 70% 22% at 50% 61%, rgba(255, 214, 160, 0.55), transparent 70%),
+    linear-gradient(#5b68a2, #b27fa6 24%, #f19aa8 42%, #f2ae8a 58%, #2f6f80 59%, #1d4d68 78%, #163a52);
+}
+/* El reflejo del sol en el agua, como en la costa. */
+.sheet__hero::after {
+  content: ''; position: absolute; left: 50%; top: 59%; width: 34%; height: 41%; translate: -50% 0; pointer-events: none;
+  background: repeating-linear-gradient(transparent 0 7px, rgba(255, 226, 180, 0.32) 7px 9px);
+  -webkit-mask: linear-gradient(rgba(0, 0, 0, 0.9), transparent 85%); mask: linear-gradient(rgba(0, 0, 0, 0.9), transparent 85%);
+  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+}
+.sheet__heading { position: relative; z-index: 1; max-width: 30rem; text-shadow: 0 2px 18px rgba(30, 20, 50, 0.35); }
+.sheet__heading .eyebrow { opacity: 0.9; }
+.sheet__title { margin-top: 10px; font: 700 italic clamp(36px, 4.4vw, 64px)/1.02 var(--serif); }
+.sheet__intro { margin-top: 16px; font: italic 17px/1.5 var(--sans); opacity: 0.95; }
 .sheet__back {
-  display: inline-flex; align-items: center; gap: 4px; padding: 6px 0; border: 0; background: none; color: var(--muted);
-  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none;
+  position: relative; z-index: 1; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 6px 0;
+  border: 0; background: none; color: #fff; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
 }
 .sheet__back svg { width: 15px; height: 15px; }
-.sheet__back:hover { color: var(--ink); }
-.sheet__title { margin-top: 4px; font: 700 italic clamp(28px, 4vw, 40px)/1.1 var(--serif); }
-.sheet__intro { margin-top: 10px; max-width: 60ch; color: var(--muted); }
+.sheet__back:hover { color: var(--gold); }
+.sheet__body { overflow-y: auto; overscroll-behavior: contain; padding: clamp(28px, 6vh, 72px) clamp(20px, 5vw, 88px) 72px; }
 .sheet .notice { margin-top: 10px; font-size: 13px; color: var(--muted); }
-.sheet .btn--light { border-color: var(--line); }
+.sheet-steps { list-style: none; counter-reset: paso; margin: 28px 0 0; padding: 0; display: grid; gap: 12px; font-size: 14px; line-height: 1.45; }
+.sheet-steps li { counter-increment: paso; display: grid; grid-template-columns: 28px 1fr; }
+.sheet-steps li::before { content: counter(paso); font: 700 italic 18px/1.2 var(--serif); opacity: 0.85; }
+
+@media (max-width: 860px) {
+  .sheet { display: block; overflow-y: auto; overscroll-behavior: contain; }
+  .sheet__hero { min-height: 58vh; justify-content: flex-start; }
+  .sheet__heading { margin-top: auto; }
+  .sheet__body { overflow: visible; }
+}
 
 /* Tienda */
 .shop-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -842,32 +898,65 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .shop-item__add { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--ink); background: none; font-size: 12px; font-weight: 600; transition: background 0.2s, color 0.2s; }
 .shop-item__add:hover { background: var(--ink); color: #fff; }
 
-/* Cuéntanos tu historia */
-.story-form { display: grid; gap: 22px; }
-.story-form fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; display: grid; gap: 14px; min-width: 0; }
-.story-form legend { padding: 0 6px; font: 700 italic 18px var(--serif); }
-.story-form label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
-.story-form input:not([type="checkbox"]):not([type="file"]), .story-form textarea, .story-form select {
-  width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
-  font: 15px/1.45 var(--sans);
+/* Cuéntanos tu historia: pasos numerados, campos de línea (como escribir en una libreta), sin cajas. */
+.story-form { max-width: 760px; display: grid; gap: clamp(36px, 6vh, 56px); }
+.story-step { display: grid; gap: 22px; }
+.story-step__title { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; font: 700 italic clamp(22px, 2.2vw, 28px) var(--serif); }
+.story-step__title span { font: 600 12px var(--sans); letter-spacing: 0.18em; color: #b8264e; }
+.story-step__title em { font: 400 13px var(--sans); color: var(--muted); }
+.story-row { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 32px; }
+.story-field { display: grid; gap: 4px; }
+.story-field__label { font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.story-field__label em { margin-left: 6px; font-style: normal; font-weight: 400; letter-spacing: 0.06em; text-transform: none; opacity: 0.85; }
+.story-field input, .story-field textarea, .story-field select {
+  width: 100%; padding: 8px 0 10px; border: 0; border-bottom: 1.5px solid rgba(24, 57, 47, 0.25); border-radius: 0;
+  background: transparent; color: var(--ink); font: 19px/1.45 var(--serif); transition: border-color 0.2s;
 }
-.story-form textarea { resize: vertical; }
-.story-form input:focus, .story-form textarea:focus, .story-form select:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
-.story-form__opt { font-weight: 400; color: var(--muted); }
-.story-form__help { font-size: 13px; color: var(--muted); }
-.story-form__link { border: 0; background: none; padding: 0; color: #b8264e; text-decoration: underline; font-size: 13px; }
-.story-form__geo { display: grid; gap: 8px; justify-items: start; }
-.story-form .story-drop { position: relative; display: block; padding: 22px; border: 1.5px dashed var(--line); border-radius: 12px; text-align: center; cursor: pointer; font-weight: 400; }
-.story-drop:hover { border-color: var(--ink); }
+.story-field textarea {
+  resize: vertical; min-height: 9em; padding-top: 0; margin-top: 8px; background-attachment: local;
+  background-image: repeating-linear-gradient(transparent 0 calc(1.45em - 1px), rgba(24, 57, 47, 0.1) calc(1.45em - 1px) 1.45em);
+}
+.story-field select {
+  appearance: none; cursor: pointer;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 18 18'%3E%3Cpath d='M3 7l6 6 6-6' fill='none' stroke='%2318392f' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") right 4px center no-repeat;
+}
+.story-field input::placeholder, .story-field textarea::placeholder { color: rgba(24, 57, 47, 0.35); font-style: italic; }
+.story-field input:focus, .story-field textarea:focus, .story-field select:focus { outline: none; border-bottom-color: #e2456f; }
+.story-help { font-size: 13px; color: var(--muted); }
+.story-link { border: 0; background: none; padding: 0; color: #b8264e; text-decoration: underline; font-size: 13px; }
+.story-geo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.story-geo__btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; border: 1.5px solid #e2456f;
+  background: none; color: #b8264e; font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+}
+.story-geo__btn:hover { background: #e2456f; color: #fff; }
+.story-geo .story-help { flex: 1; min-width: 220px; }
+.story-drop {
+  position: relative; display: grid; justify-items: center; gap: 4px; padding: 34px 20px; border-radius: 4px; cursor: pointer;
+  border: 1.5px dashed rgba(24, 57, 47, 0.3); text-align: center; transition: border-color 0.2s, background 0.2s;
+}
+.story-drop:hover { border-color: #e2456f; background: rgba(226, 69, 111, 0.04); }
 .story-drop input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
-.story-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.story-files li { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; padding: 8px; border-radius: 10px; background: var(--paper-2); }
-.story-files img, .story-files video { width: 64px; height: 48px; object-fit: cover; border-radius: 6px; background: #000; }
-.story-files audio { width: 64px; height: 32px; }
-.story-files__name { display: grid; font-size: 13px; overflow-wrap: anywhere; }
+.story-drop__text { font: italic 600 18px var(--serif); }
+.story-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.story-files li { display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.story-files img, .story-files video { width: 72px; height: 54px; object-fit: cover; border-radius: 3px; background: #000; }
+.story-files audio { width: 72px; height: 32px; }
+.story-files__name { display: grid; font-size: 14px; overflow-wrap: anywhere; }
 .story-files__name small { color: var(--muted); text-transform: capitalize; }
-.story-files__x { width: 30px; height: 30px; border: 0; border-radius: 50%; background: #e8ede5; font-size: 18px; line-height: 1; }
-.story-form .story-form__check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; }
-.story-form__check input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--ink); flex: none; }
-.story-form__send { justify-self: start; }
-.story-sent { display: grid; gap: 14px; justify-items: start; max-width: 60ch; }
+.story-files__x { width: 30px; height: 30px; border: 0; border-radius: 50%; background: none; font-size: 20px; line-height: 1; color: var(--muted); }
+.story-files__x:hover { color: #b8264e; }
+.story-check { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 1.5; cursor: pointer; }
+.story-check input { margin-top: 3px; width: 18px; height: 18px; accent-color: #e2456f; flex: none; }
+.story-send {
+  justify-self: start; display: inline-flex; align-items: center; gap: 10px; padding: 15px 28px; border: 0; border-radius: 999px;
+  background: #e2456f; color: #fff; font-size: 15px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(226, 69, 111, 0.3);
+  transition: transform 0.2s var(--ease), background 0.2s;
+}
+.story-send:hover { background: #b8264e; transform: translateY(-1px); }
+.story-sent { display: grid; gap: 16px; justify-items: start; max-width: 60ch; }
+.story-sent__lead { font: italic 22px/1.45 var(--serif); }
+@media (max-width: 640px) {
+  .story-row { grid-template-columns: 1fr; }
+  .story-field input, .story-field textarea, .story-field select { font-size: 17px; }
+}

@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
+import type { ChocoPoint } from '../../content/choco';
 import { Arrow, TopBar } from '../components/Chrome';
 import { LineIcon } from '../components/Sheet';
 import Shop from './Shop';
@@ -20,6 +21,9 @@ import { SOLO, lastSteps, step } from '../components/map/diag';
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
 const INVITE_SEEN = 'mapa-invitacion-vista';
+const SPOT_KIND: Record<ChocoPoint['kind'], string> = {
+  municipio: 'Municipio', corregimiento: 'Corregimiento', parque: 'Parque nacional', cerro: 'Cerro', playa: 'Playa', cabo: 'Cabo',
+};
 /** En equipos modestos, el planeta se suelta al llegar a la costa (y se vuelve a armar al regresar): así nunca están
  * las dos escenas 3D en memoria más que durante el cambio. */
 const RELEASE_GLOBE = TIER === 'baja' || TIER === 'minima' || TIER === 'segura';
@@ -38,6 +42,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   const globe = useRef<GlobeHandle | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [place, setPlace] = useState<MapPlace | null>(null);
+  const [spot, setSpot] = useState<ChocoPoint | null>(null);
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
@@ -123,6 +128,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
         onInteract: () => setHint(false),
         onZoomOut: () => leave.current(),
         onPull: setPull,
+        onSpot: setSpot,
         onLost,
       }).then((m) => {
         handle.current = m;
@@ -285,6 +291,20 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
         }
       />
 
+      {onMap && spot && !place && (
+        <aside className="map-card map-card--spot" aria-live="polite">
+          <div className="map-card__head">
+            <p className="eyebrow">{spot.subregion} · {SPOT_KIND[spot.kind]}</p>
+            <h2 className="map-card__title">{spot.name}</h2>
+          </div>
+          {spot.municipio && spot.municipio !== spot.name && (
+            <p className="map-card__sci">{spot.kind === 'municipio' ? 'Cabecera de' : 'Municipio de'} {spot.municipio}</p>
+          )}
+          <button type="button" className="map-card__close" aria-label="Cerrar" onClick={() => handle.current?.select(null)}>
+            ×
+          </button>
+        </aside>
+      )}
       {onMap && place && (
         <aside className={`map-card map-card--${place.kind}`} aria-live="polite">
           <div className="map-card__head">
@@ -312,7 +332,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
             <span className="map-pull__bar" style={{ transform: `scaleX(${pull})` }} />
           </p>
           <p className={`map-hint${hint && !place ? '' : ' is-hidden'}`}>Arrastra para recorrer la costa · rueda o pellizca para acercarte · toca un lugar</p>
-          {/* Íconos discretos de la costa: ayuda, contar una historia y la tienda. */}
+          {/* Ayuda, contar una historia y la tienda: en la barra de abajo, con la letra de los pueblos. */}
           <nav className="map-tools" aria-label="Más del mapa">
             {([
               ['ayuda', 'help', 'Ayuda'],
@@ -322,11 +342,11 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
               <button
                 key={id}
                 type="button"
-                className={`map-tool${panel === id ? ' is-active' : ''}`}
+                className={`tab map-tool${panel === id ? ' is-active' : ''}`}
                 onClick={() => setPanel(panel === id ? null : id)}
                 aria-pressed={panel === id}
               >
-                <LineIcon name={icon} />
+                <LineIcon name={icon} size={16} />
                 <span>{label}</span>
               </button>
             ))}
