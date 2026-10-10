@@ -80,18 +80,22 @@ function palm(h = 15, lean = 0.2) {
 const MAIN: Record<Figure['main'], () => Chunk[]> = {
   // Muchas casas de colores, edificios de dos y tres pisos y la iglesia con su torre.
   ciudad: () => [
-    piece(house('#f2e3c6', '#c4553a', 0.85, 2), -6, 5),
-    piece(house('#9fc7d6', '#7a4a32', 0.8), 1, 7),
-    piece(house('#f4c8a0', '#b84a4a', 0.85, 3), 7, 2),
-    piece(house('#e8d5a0', '#8a4a3a', 0.8), -8, -3),
-    piece(house('#c9e0c0', '#b84a4a', 0.8, 2), 6, -6),
-    piece(house('#f2d0b8', '#8a4a3a', 0.75), -2, -9),
+    // La iglesia en la plaza y, alrededor, las casas separadas por calles.
     piece([
       part(BOX, '#f6f1e6', { p: [0, 4.5, -2], s: [6, 9, 8] }),
       part(CONE4, '#8a4a3a', { p: [0, 11, -2], s: [5.4, 3.5, 7.4], r: [0, Math.PI / 4, 0] }),
       part(BOX, '#f6f1e6', { p: [0, 10, 2.5], s: [3, 20, 3] }),
       part(CONE4, '#8a4a3a', { p: [0, 22, 2.5], s: [2.6, 4.5, 2.6], r: [0, Math.PI / 4, 0] }),
-    ], -0.5, -1, 'ground', 6),
+    ], 0, 0, 'ground', 6),
+    piece(house('#f2e3c6', '#c4553a', 0.85, 2), -14, 12),
+    piece(house('#9fc7d6', '#7a4a32', 0.8), 1, 18),
+    piece(house('#f4c8a0', '#b84a4a', 0.85, 3), 17, 6),
+    piece(house('#e8d5a0', '#8a4a3a', 0.8), -18, -6),
+    piece(house('#c9e0c0', '#b84a4a', 0.8, 2), 14, -13),
+    piece(house('#f2d0b8', '#8a4a3a', 0.75), -4, -20),
+    piece(house('#f6e0a8', '#c4553a', 0.75), 20, 20),
+    piece(house('#d8c8e8', '#7a4a32', 0.8, 2), -21, 21),
+    piece(house('#f0c0b0', '#8a4a3a', 0.7), -23, 5),
   ],
   // Pueblo cabecera: algunas casas de material, una de dos pisos.
   cabecera: () => [
@@ -173,8 +177,15 @@ const EXTRA: Record<FigureExtra, () => Chunk> = {
 
 /** Las piezas de la figurita de un punto del mapa. */
 export function figureChunks(fig: Figure): Chunk[] {
-  return [...MAIN[fig.main](), ...(fig.extra ?? []).map((e) => EXTRA[e]())];
+  const extras = (fig.extra ?? []).map((e) => {
+    const c = EXTRA[e]();
+    // En la ciudad, el cununo va en la plaza, frente a la iglesia, y la canoa más allá de las casas.
+    const spot = fig.main === 'ciudad' ? CITY_SLOT[e] : undefined;
+    return spot ? { ...c, x: spot[0] * UNIT, z: spot[1] * UNIT } : c;
+  });
+  return [...MAIN[fig.main](), ...extras];
 }
+const CITY_SLOT: Partial<Record<FigureExtra, [number, number]>> = { cununo: [5, 7], canoa: [8, 30], lancha: [-6, 32] };
 
 /** Las seis figuritas de las historias: las mismas piezas. */
 const STORY: Record<Emblem, () => Chunk[]> = {
