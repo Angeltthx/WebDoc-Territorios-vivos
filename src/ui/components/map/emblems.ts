@@ -13,6 +13,7 @@
 import { type BufferGeometry, Matrix4 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Emblem, Figure, FigureExtra } from '../../../content/choco';
+import { type PalafitoOpts, arbol, capilla, casaMaterial, catedral, palafito, platano, tendedero, turned } from './houses';
 import { BALL, BLADE, BOX, CONE, CONE4, CYL, ROCK, part, pole } from './kit';
 
 /** Alto aproximado de una figurita, en unidades de la escena (≈ 1 km: se distinguen al acercarse a cada punto). */
@@ -40,29 +41,6 @@ const piece = (parts: Parts, x: number, z: number, on: Chunk['on'] = 'ground', r
   geo.applyMatrix4(new Matrix4().makeScale(UNIT * s, UNIT * s, UNIT * s));
   return { geo, x: x * UNIT, z: z * UNIT, on, r: r * UNIT * s };
 };
-
-function house(wall: string, roof: string, k = 1, floors = 1) {
-  const h = 8 * k * floors;
-  return [
-    part(BOX, wall, { p: [0, h / 2, 0], s: [7 * k, h, 6 * k] }),
-    part(CONE4, roof, { p: [0, h + 2.4 * k, 0], s: [6.4 * k, 4.8 * k, 5.6 * k], r: [0, Math.PI / 4, 0] }),
-    part(BOX, '#3b2c22', { p: [0, 2.2 * k, 3.05 * k], s: [1.8 * k, 3.4 * k, 0.2] }),
-    ...(floors > 1 ? [part(BOX, '#3b2c22', { p: [0, h * 0.75, 3.05 * k], s: [3 * k, 2 * k, 0.2] })] : []),
-  ];
-}
-
-/** Casa de madera en zancos con techo de palma (los caseríos de la costa y de los ríos). */
-function rancho(turn = 0) {
-  const parts: Parts = [];
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push(pole('#5a4330', [sx * 2.6, -1, sz * 2.1], [sx * 2.6, 3.2, sz * 2.1], 0.35));
-  parts.push(part(BOX, '#8a6a48', { p: [0, 3.3, 0], s: [7, 0.5, 6] }));
-  parts.push(part(BOX, '#a8825a', { p: [0, 5.6, 0], s: [6, 4.2, 5] }));
-  parts.push(part(BOX, '#3b2c22', { p: [0, 5, 2.55], s: [1.4, 2.8, 0.2] }));
-  parts.push(part(CONE4, '#c9a85a', { p: [0, 10, 0], s: [6.6, 4.8, 5.8], r: [0, Math.PI / 4, 0] }));
-  const g = mergeGeometries(parts)!;
-  g.rotateY(turn);
-  return [g];
-}
 
 const tree = (h: number, leaf: string, k = 1) => [
   part(CYL, '#6d5238', { p: [0, (h * k) / 2 - 0.5, 0], s: [0.9 * k, h * k + 1, 0.9 * k] }),
@@ -155,36 +133,81 @@ const mist = () =>
     part(BALL, '#ecebef', { p: [x + 3.5, y + 0.4, z + 0.8], s: [3.4, 1, 2] }),
   ]);
 
+// ───────── Colores de los pueblos ─────────
+
+/** Azar con semilla: cada pueblo arma sus casas a su manera, pero siempre igual. */
+interface Rand {
+  (): number;
+  jitter: (a: number) => number;
+}
+function rand(seed: number): Rand {
+  let t = seed >>> 0 || 1;
+  const r = (() => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let x = Math.imul(t ^ (t >>> 15), 1 | t);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  }) as Rand;
+  r.jitter = (a) => (r() * 2 - 1) * a;
+  return r;
+}
+const pick = <T,>(r: Rand, list: readonly T[]) => list[Math.floor(r() * list.length)];
+
+/** Los colores con que se pintan las casas de madera y de material en el Pacífico: vivos y algo gastados. */
+const WALLS = ['#3fa7a0', '#f2c14e', '#e8737f', '#5b8fd1', '#7cc47a', '#f1ebdd', '#e98a3c', '#9b7fc4', '#4fb3c9', '#d94f4f'];
+const TRIMS = ['#f4efe4', '#f4efe4', '#2f6f8f', '#c8423a', '#2f7a4a', '#f2c14e'];
+const ACCENTS = ['#c8423a', '#2f6f8f', '#2f7a4a', '#e2a33a', '#7a2f5a'];
+const ZINC = ['#9ea6a8', '#8d9597', '#a7adae', '#7f8789'];
+
+/** Una casa de madera al azar: pintada (o de tabla sin pintar, si `plain`), con su techo de zinc. */
+function woodHouse(r: Rand, plain = false): PalafitoOpts {
+  const bare = plain || r() < 0.2;
+  const wall = bare ? pick(r, ['#a8825a', '#9a7a58', '#b8946a']) : pick(r, WALLS);
+  const trim = bare ? pick(r, ['#f4efe4', '#3fa7a0', '#e8737f']) : pick(r, TRIMS.filter((c) => c !== wall));
+  return { wall, trim, roof: pick(r, ZINC), shutter: r() < 0.5 ? trim : pick(r, WALLS), rust: Math.floor(r() * 3), tank: r() < 0.45, w: 6.6 + r() * 1.2 };
+}
+
 // ───────── Escenas principales ─────────
 
-const MAIN: Record<Figure['main'], () => Chunk[]> = {
-  // Muchas casas de colores, edificios de dos y tres pisos y la iglesia con su torre.
-  ciudad: () => [
-    // La iglesia en la plaza y, alrededor, las casas separadas por calles.
-    piece([
-      part(BOX, '#f6f1e6', { p: [0, 4.5, -2], s: [6, 9, 8] }),
-      part(CONE4, '#8a4a3a', { p: [0, 11, -2], s: [5.4, 3.5, 7.4], r: [0, Math.PI / 4, 0] }),
-      part(BOX, '#f6f1e6', { p: [0, 10, 2.5], s: [3, 20, 3] }),
-      part(CONE4, '#8a4a3a', { p: [0, 22, 2.5], s: [2.6, 4.5, 2.6], r: [0, Math.PI / 4, 0] }),
-    ], 0, 0, 'ground', 6),
-    piece(house('#f2e3c6', '#c4553a', 0.85, 2), -14, 12),
-    piece(house('#9fc7d6', '#7a4a32', 0.8), 1, 18),
-    piece(house('#f4c8a0', '#b84a4a', 0.85, 3), 17, 6),
-    piece(house('#e8d5a0', '#8a4a3a', 0.8), -18, -6),
-    piece(house('#c9e0c0', '#b84a4a', 0.8, 2), 14, -13),
-    piece(house('#f2d0b8', '#8a4a3a', 0.75), -4, -20),
-    piece(house('#f6e0a8', '#c4553a', 0.75), 20, 20),
-    piece(house('#d8c8e8', '#7a4a32', 0.8, 2), -21, 21),
-    piece(house('#f0c0b0', '#8a4a3a', 0.7), -23, 5),
+const MAIN: Record<Figure['main'], (r: Rand) => Chunk[]> = {
+  // Ciudad (Quibdó, Istmina): la catedral con su plaza y sus árboles, edificios de material de dos a cuatro pisos (con
+  // tiendas, balcones y algún piso sin terminar) y, hacia el río, una hilera de palafitos de madera.
+  ciudad: (r) => [
+    piece(catedral(), 0, -6, 'ground', 9, 0.85),
+    ...[[-5, 9], [5, 10]].map(([x, z], k) => piece(arbol(6 + k, k ? '#3f8a3a' : '#4f9a52'), x, z, 'ground', 3, 0.8)),
+    ...[[-16, 8, 3], [16, 7, 2], [-18, -9, 4], [17, -8, 3], [-8, -22, 2], [8, -23, 3], [-27, -1, 2], [27, 0, 2]].map(([x, z, floors], k) =>
+      piece(turned(casaMaterial({ wall: pick(r, WALLS), accent: pick(r, ACCENTS), floors, unfinished: k % 3 === 1, shed: k % 4 === 3, shop: k % 2 === 0, w: 8.4, d: 7 }), r.jitter(0.08)), x, z, 'ground', 6, 0.85)),
+    ...[-21, -8, 7, 20].map((x) => piece(turned(palafito(woodHouse(r)), r.jitter(0.15)), x, 22 + r.jitter(2), 'ground', 6, 0.8)),
+    piece(platano(6), -27, 14, 'ground', 2.5, 0.8),
+    piece(platano(5, 1), 27, 13, 'ground', 2.5, 0.8),
   ],
-  // Pueblo cabecera: algunas casas de material, una de dos pisos.
-  cabecera: () => [
-    piece(house('#f2e3c6', '#c4553a', 1.0), -4.5, 2),
-    piece(house('#9fc7d6', '#7a4a32', 0.85, 2), 4, 3),
-    piece(house('#f4c8a0', '#b84a4a', 1.05), 0.5, -4.5),
+  // Cabecera de municipio: al frente (hacia el río o el mar), palafitos de colores; atrás, casas de material con su
+  // tienda y la capilla; entre las casas, plataneras, un árbol de patio y ropa tendida.
+  cabecera: (r) => [
+    ...[-17, -6, 5, 16].map((x) => piece(turned(palafito(woodHouse(r)), r.jitter(0.18)), x, 11 + r.jitter(1.5), 'ground', 6, 0.85)),
+    piece(turned(casaMaterial({ wall: pick(r, WALLS), accent: pick(r, ACCENTS), floors: 2 }), r.jitter(0.1)), -11, -3, 'ground', 6, 0.85),
+    piece(turned(casaMaterial({ wall: pick(r, WALLS), accent: pick(r, ACCENTS), floors: 1, unfinished: true, shop: false }), r.jitter(0.1)), 1, -2, 'ground', 6, 0.85),
+    piece(turned(palafito({ ...woodHouse(r), floors: 2, porch: false }), r.jitter(0.1)), 13, -3, 'ground', 6, 0.85),
+    piece(capilla(pick(r, ['#3f6e9a', '#2f7a5a', '#8a4a3a'])), -1, -16, 'ground', 7, 0.85),
+    piece(platano(6), -22, 2, 'ground', 2.5, 0.85),
+    piece(platano(5, 1.4), 21, 1, 'ground', 2.5, 0.85),
+    piece(platano(6.5, 0.6), 9, -14, 'ground', 2.5, 0.85),
+    piece(arbol(7), 14, -15, 'ground', 4, 0.85),
+    piece(tendedero(['#e2456f', '#f2c14e', '#3e6197', '#f4efe4']), -6, 3, 'ground', 2, 0.85),
   ],
-  // Caserío: casas de madera en zancos con techo de palma.
-  rancho: () => [piece(rancho(0.3), -3.5, 1.5, 'ground', 5, 0.95), piece(rancho(-0.4), 3.5, -2.5, 'ground', 5, 0.85), piece(tree(8, '#3f8a3a', 0.8), 4.5, 5, 'ground', 3)],
+  // Caserío (corregimiento): pocas casas de madera en pilotes, unas pintadas y otras de tabla sin pintar, una con
+  // techo de palma; plataneras, una palma y ropa tendida.
+  rancho: (r) => [
+    piece(turned(palafito({ ...woodHouse(r), rust: 2 }), 0.25), -7, 3, 'ground', 6, 0.85),
+    piece(turned(palafito(woodHouse(r, true)), -0.3), 6, -2, 'ground', 6, 0.85),
+    piece(turned(palafito({ wall: '#a8825a', trim: '#8f6d4c', roof: '#c9a85a', thatch: true, porch: false, w: 6, d: 5 }), 0.1), -2, -12, 'ground', 5, 0.85),
+    piece(turned(palafito({ ...woodHouse(r), w: 6, porch: false }), -0.5), 13, 9, 'ground', 5, 0.8),
+    piece(platano(6), -14, -4, 'ground', 2.5, 0.85),
+    piece(platano(5, 1.2), 1, 9, 'ground', 2.5, 0.85),
+    piece(platano(5.5, 2.2), 10, -11, 'ground', 2.5, 0.85),
+    piece(palm(14, 0.2), -13, 8, 'ground', 3, 0.85),
+    piece(tendedero(['#f4efe4', '#e2456f', '#3fa7a0']), 0, 4, 'ground', 2, 0.8),
+  ],
   playa: () => [piece(palm(15, 0.25), -2, -1, 'ground', 3), piece(palm(12, -0.2), 2, -4, 'ground', 3), piece(palm(13, 0.15), 5, 2, 'ground', 3)],
   selva: () => [
     piece(tree(11, '#2f6b2c'), -4, 1, 'ground', 4),
@@ -258,7 +281,7 @@ const EXTRA: Record<Exclude<FigureExtra, 'cascada'>, () => Chunk> = {
     part(CYL, '#f2e3c6', { p: [0, 6.7, 0], s: [3.7, 0.4, 3.7] }),
     part(CYL, '#e2456f', { p: [0, 0.6, 0], s: [3.6, 0.8, 3.6] }),
     ...[0, 1, 2, 3].map((k) => pole('#e2c38a', [Math.cos(k * 1.57) * 1.75, 0.8, Math.sin(k * 1.57) * 1.75], [Math.cos(k * 1.57 + 0.5) * 1.85, 6.5, Math.sin(k * 1.57 + 0.5) * 1.85], 0.18)),
-  ], -7, 7, 'ground', 3),
+  ], -7, 7, 'ground', 2, 0.55),
   // Nube con lluvia (los pueblos más lluviosos del mundo), sobre el pueblo.
   lluvia: () => piece([
     part(BALL, '#e4e6ec', { p: [0, 22, 0], s: [4.5, 3, 4] }),
@@ -277,7 +300,8 @@ const EXTRA: Record<Exclude<FigureExtra, 'cascada'>, () => Chunk> = {
 };
 
 /** Las piezas de la figurita de un punto del mapa. */
-export function figureChunks(fig: Figure): Chunk[] {
+export function figureChunks(fig: Figure, seed = 1): Chunk[] {
+  const r = rand(seed);
   const extras = (fig.extra ?? []).filter((e): e is Exclude<FigureExtra, 'cascada'> => e !== 'cascada').map((e) => {
     const c = EXTRA[e]();
     // En la ciudad, el cununo va en la plaza, frente a la iglesia, y la canoa más allá de las casas.
@@ -285,18 +309,22 @@ export function figureChunks(fig: Figure): Chunk[] {
     return spot ? { ...c, x: spot[0] * UNIT, z: spot[1] * UNIT } : c;
   });
   // El pueblo de montaña se extiende por la ladera: sus piezas más separadas.
-  const main = fig.main === 'montana' ? MAIN.montana().map((c) => ({ ...c, x: c.x * 1.45, z: c.z * 1.45 })) : MAIN[fig.main]();
+  const main = fig.main === 'montana' ? MAIN.montana(r).map((c) => ({ ...c, x: c.x * 1.45, z: c.z * 1.45 })) : MAIN[fig.main](r);
   return [...main, ...extras];
 }
-const CITY_SLOT: Partial<Record<Exclude<FigureExtra, 'cascada'>, [number, number]>> = { cununo: [5, 7], canoa: [8, 30], lancha: [-6, 32] };
+const CITY_SLOT: Partial<Record<Exclude<FigureExtra, 'cascada'>, [number, number]>> = { cununo: [0, 15], canoa: [8, 30], lancha: [-6, 32] };
 
 /** Las seis figuritas de las historias: las mismas piezas. */
 const STORY: Record<Emblem, () => Chunk[]> = {
-  pueblo: MAIN.cabecera,
-  selva: MAIN.selva,
-  mar: MAIN.playa,
+  pueblo: () => [
+    piece(turned(palafito({ wall: '#3fa7a0', trim: '#f4efe4', roof: '#9ea6a8', tank: true }), 0.2), -4, 2, 'ground', 6, 0.8),
+    piece(turned(palafito({ wall: '#f2c14e', trim: '#2f6f8f', roof: '#8d9597', porch: false }), -0.3), 6, -4, 'ground', 6, 0.75),
+    piece(platano(6), 7, 7, 'ground', 2.5, 0.8),
+  ],
+  selva: () => MAIN.selva(rand(1)),
+  mar: () => MAIN.playa(rand(1)),
   rio: () => [{ ...EXTRA.canoa(), x: 0, z: 0 }, piece(tree(9, '#3f8a3a'), -5, -3, 'ground', 4)],
-  cultura: () => [{ ...EXTRA.cununo(), x: 0, z: 0 }, piece(rancho(0.2), -6, -4, 'ground', 5, 0.8)],
+  cultura: () => [{ ...EXTRA.cununo(), x: 0, z: 0 }, piece(turned(palafito({ wall: '#e8737f', trim: '#f4efe4', roof: '#9ea6a8' }), 0.2), -7, -5, 'ground', 6, 0.75)],
   cocina: () => [piece([
     ...[0, 2.1, 4.2].map((a) => part(BOX, '#9a9088', { p: [Math.cos(a) * 4, 1, Math.sin(a) * 4], s: [3, 2.4, 2.4], r: [0, -a, 0] })),
     part(CONE, '#f29a3a', { p: [0, 2.4, 0], s: [2.6, 4.5, 2.6] }),

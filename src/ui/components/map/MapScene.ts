@@ -930,7 +930,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     }
     // Cada pieza de la figurita (una casa, una palma, una roca, la lancha) se apoya por separado en el terreno real.
     // El frente de la figurita (+z) mira al oeste, al mar: (x, z) local → (−z, x) en la escena.
-    const chunks = point.story ? storyChunks(point.story) : figureChunks(point.figure ?? { main: 'cabecera' });
+    const chunks = point.story ? storyChunks(point.story) : figureChunks(point.figure ?? { main: 'cabecera' }, [...point.id].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619), 2166136261));
     let top = groundAt(at.x, at.z);
     for (const c of chunks) {
       let x = at.x - c.z;
