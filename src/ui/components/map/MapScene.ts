@@ -1251,7 +1251,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     placeCamera();
     applyTour(dt);
     // Los puntos del resto del Chocó (y sus figuritas) solo de lejos, o mientras se visita uno.
-    const reveal = openSpot ? 1 : smoothstep(view.dist, 1250, 1600);
+    // (visitando algo de la costa no se muestran, aunque la vista de la costa haya quedado alejada).
+    const reveal = openSpot ? 1 : tour ? 0 : smoothstep(view.dist, 1250, 1600);
     if ((reveal > 0.5) !== host.classList.contains('show-spots')) host.classList.toggle('show-spots', reveal > 0.5);
     emblems.visible = reveal > 0.01;
     emblemMat.opacity = reveal;
@@ -1286,7 +1287,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     }
     if (ticks % 10 === 0) {
       updateBehind();
-      const op = (openSpot ? 0.7 : smoothstep(view.dist, 1250, 1600)).toFixed(2);
+      const op = (openSpot ? 0.7 : tour ? 0 : smoothstep(view.dist, 1250, 1600)).toFixed(2);
       for (const el of regionEls) if (el.style.opacity !== op) el.style.opacity = op;
     }
     if (ticks++ % 6 === 0) declutter();

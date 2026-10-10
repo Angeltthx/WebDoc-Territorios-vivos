@@ -602,31 +602,35 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .map-screen.is-map::after { opacity: 1; }
 .map-screen .topbar .ghost-link span { font-size: 14px; }
 
-/* Ficha del lugar elegido: la hoja clara de la guía del webdoc. */
+/* Ficha del lugar o del animal elegido: como las citas del webdoc, texto blanco directo sobre la escena (con su
+   sombra y un velo oscuro muy suave detrás para que se lea), sin tarjeta. */
 .map-card {
-  position: absolute; z-index: 6; left: var(--gutter); bottom: 86px; width: min(320px, calc(100vw - 32px));
-  padding: 16px 44px 16px 18px; border-radius: 16px; background: var(--paper-2); color: var(--ink);
-  box-shadow: 0 10px 30px rgba(6, 30, 34, 0.28); animation: rise 0.4s var(--ease) both;
+  position: absolute; z-index: 6; left: var(--gutter); bottom: 86px; width: max-content; max-width: min(440px, calc(100vw - 32px));
+  padding: 0 48px 0 0; color: #fff; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+  animation: rise 0.6s var(--ease) both;
 }
-.map-card .eyebrow { color: var(--muted); }
-.map-card--site .eyebrow { color: #b8264e; }
-.map-card--nature .eyebrow { color: var(--p-navy); }
-.map-card__title { margin-top: 4px; font: 700 italic 22px/1.2 var(--serif); }
-.map-card__sci { margin-top: 2px; font: italic 15px var(--serif); color: var(--muted); }
-.map-card__body { margin-top: 8px; font-size: 14px; }
-.map-card__handle { color: #b8264e; font-weight: 600; text-decoration: none; }
-.map-card__handle:hover { text-decoration: underline; }
+.map-card::before {
+  content: ''; position: absolute; z-index: -1; inset: -60px -80px -50px -120px; pointer-events: none;
+  background: radial-gradient(ellipse at 30% 60%, rgba(12, 20, 28, 0.5), rgba(12, 20, 28, 0.22) 45%, transparent 72%);
+}
+.map-card .eyebrow { font-size: 11px; letter-spacing: 0.2em; opacity: 0.85; }
+.map-card__title { margin-top: 8px; font: italic 400 clamp(28px, 3vw, 40px)/1.15 var(--sans); }
+.map-card__sci { margin-top: 4px; font: italic 15px var(--sans); opacity: 0.85; }
+.map-card__body { margin-top: 10px; font-size: 14px; }
+.map-card__handle { color: #fff; font-size: 13px; letter-spacing: 0.06em; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255, 255, 255, 0.5); }
+.map-card__handle:hover { text-decoration-color: #fff; }
 .map-card__close {
-  position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border: 0; border-radius: 50%;
-  background: #e8ede5; color: var(--ink); font-size: 20px; line-height: 1;
+  position: absolute; top: -6px; right: 0; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none;
+  color: #fff; font-size: 24px; line-height: 1; opacity: 0.8; text-shadow: inherit; transition: opacity 0.2s;
 }
-.map-card__close:hover { background: #dbe3d8; }
-.map-card__info { margin-top: 8px; font-size: 14px; line-height: 1.45; }
+.map-card__close:hover { opacity: 1; }
+.map-card__info { margin-top: 12px; max-width: 34ch; font-size: 15px; line-height: 1.5; opacity: 0.95; }
 .map-card__back {
-  margin-top: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none;
-  color: #b8264e; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+  margin-top: 16px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; border: 0; background: none;
+  color: #fff; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: inherit;
 }
 .map-card__back svg { width: 14px; height: 14px; }
+.map-card__back:hover { color: var(--gold); }
 
 /* Aviso mientras se arma la escena (tarda unos segundos la primera vez). */
 .map-loading {
