@@ -29,54 +29,61 @@ export interface ChocoPoint {
   info?: string;
   /** Si es una historia (no un lugar): su tipo, que decide su figurita. */
   story?: Emblem;
+  /** Su figurita en el mapa (los lugares; las historias usan la de su tipo). */
+  figure?: Figure;
 }
 
-/** La figurita de cada tipo de punto. */
-export const EMBLEM_OF_KIND: Record<ChocoPoint['kind'], Emblem> = {
-  municipio: 'pueblo', corregimiento: 'pueblo', parque: 'selva', cerro: 'selva', playa: 'mar', cabo: 'mar',
-};
+/**
+ * La figurita de un punto: su escena principal (una ciudad, un pueblo cabecera, un caserío de casas en zancos, una
+ * playa, selva, un cerro o un cabo) y detalles de lo que lo distingue (ver map/emblems.ts).
+ */
+export type FigureExtra = 'canoa' | 'lancha' | 'ballena' | 'cununo' | 'lluvia' | 'termal';
+export interface Figure {
+  main: 'ciudad' | 'cabecera' | 'rancho' | 'playa' | 'selva' | 'cerro' | 'cabo';
+  extra?: FigureExtra[];
+}
 
 const m = (id: string, name: string, lat: number, lon: number, subregion: Subregion): ChocoPoint =>
   ({ id, name, kind: 'municipio', lat, lon, subregion, municipio: name });
 
 export const CHOCO_POINTS: ChocoPoint[] = [
   // Costa norte (Pacífico Norte), de norte a sur.
-  { ...m('jurado', 'Juradó', 7.103169, -77.76232, 'Pacífico Norte'), info: 'El municipio más al norte de la costa pacífica del Chocó, cerca de la frontera con Panamá.' },
-  { ...m('bahia-solano', 'Bahía Solano', 6.224564, -77.40343, 'Pacífico Norte'), info: 'Su cabecera es Ciudad Mutis. Con Nuquí, uno de los lugares para ver las ballenas jorobadas entre julio y octubre.' },
-  { id: 'el-valle', name: 'El Valle', kind: 'corregimiento', lat: 6.104202, lon: -77.42656, subregion: 'Pacífico Norte', municipio: 'Bahía Solano', info: 'Corregimiento de Bahía Solano, junto a la playa El Almejal.' },
-  { id: 'utria', name: 'Parque Nacional Natural Utría', kind: 'parque', lat: 5.994606, lon: -77.34117, subregion: 'Pacífico Norte', info: 'Parque nacional entre Bahía Solano y Nuquí: una ensenada rodeada de manglar y selva.' },
-  { id: 'morromico', name: 'Morromico', kind: 'playa', lat: 5.873466, lon: -77.2953, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa al norte de Jurubidá, entre la selva y el mar.' },
+  { ...m('jurado', 'Juradó', 7.103169, -77.76232, 'Pacífico Norte'), info: 'El municipio más al norte de la costa pacífica del Chocó, cerca de la frontera con Panamá.', figure: { main: 'cabecera', extra: ['lancha'] } },
+  { ...m('bahia-solano', 'Bahía Solano', 6.224564, -77.40343, 'Pacífico Norte'), info: 'Su cabecera es Ciudad Mutis. Con Nuquí, uno de los lugares para ver las ballenas jorobadas entre julio y octubre.', figure: { main: 'cabecera', extra: ['ballena', 'lancha'] } },
+  { id: 'el-valle', name: 'El Valle', kind: 'corregimiento', lat: 6.104202, lon: -77.42656, subregion: 'Pacífico Norte', municipio: 'Bahía Solano', info: 'Corregimiento de Bahía Solano, junto a la playa El Almejal.', figure: { main: 'rancho', extra: ['lancha'] } },
+  { id: 'utria', name: 'Parque Nacional Natural Utría', kind: 'parque', lat: 5.994606, lon: -77.34117, subregion: 'Pacífico Norte', info: 'Parque nacional entre Bahía Solano y Nuquí: una ensenada rodeada de manglar y selva.', figure: { main: 'selva', extra: ['ballena'] } },
+  { id: 'morromico', name: 'Morromico', kind: 'playa', lat: 5.873466, lon: -77.2953, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa al norte de Jurubidá, entre la selva y el mar.', figure: { main: 'playa' } },
   // Costa al sur de Coquí (Nuquí) y Baudó (Pacífico Sur).
-  { id: 'jovi', name: 'Joví', kind: 'corregimiento', lat: 5.615605, lon: -77.38296, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, en la desembocadura del río Joví.' },
-  { id: 'guachalito', name: 'Guachalito', kind: 'playa', lat: 5.628702, lon: -77.40592, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa larga entre Coquí y Termales.' },
-  { id: 'termales', name: 'Termales', kind: 'corregimiento', lat: 5.606169, lon: -77.44128, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí que debe su nombre a sus aguas termales.' },
-  { id: 'partado', name: 'Partadó', kind: 'corregimiento', lat: 5.596871, lon: -77.4552, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, camino a Cabo Corrientes.' },
-  { id: 'arusi', name: 'Arusí', kind: 'corregimiento', lat: 5.595341, lon: -77.47415, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, cerca de Cabo Corrientes.' },
-  { id: 'cabo-corrientes', name: 'Cabo Corrientes', kind: 'cabo', lat: 5.480395, lon: -77.53943, subregion: 'Pacífico Sur', info: 'La punta que cierra por el sur el golfo de Tribugá.' },
-  { id: 'virudo', name: 'Virudó', kind: 'corregimiento', lat: 5.399466, lon: -77.40189, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó', info: 'Corregimiento de la costa de Bajo Baudó.' },
-  { ...m('pizarro', 'Pizarro', 4.953752, -77.36678, 'Pacífico Sur'), municipio: 'Bajo Baudó', info: 'Cabecera de Bajo Baudó, cerca de la desembocadura del río Baudó.' },
-  { id: 'siviru', name: 'Sivirú', kind: 'corregimiento', lat: 4.8056, lon: -77.34244, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó', info: 'Corregimiento de la costa de Bajo Baudó.' },
-  { ...m('docordo', 'Docordó', 4.258038, -77.36467, 'Pacífico Sur'), municipio: 'El Litoral del San Juan', info: 'Cabecera del Litoral del San Juan, en el delta del río San Juan.' },
+  { id: 'jovi', name: 'Joví', kind: 'corregimiento', lat: 5.615605, lon: -77.38296, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, en la desembocadura del río Joví.', figure: { main: 'rancho', extra: ['canoa'] } },
+  { id: 'guachalito', name: 'Guachalito', kind: 'playa', lat: 5.628702, lon: -77.40592, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa larga entre Coquí y Termales.', figure: { main: 'playa' } },
+  { id: 'termales', name: 'Termales', kind: 'corregimiento', lat: 5.606169, lon: -77.44128, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí que debe su nombre a sus aguas termales.', figure: { main: 'rancho', extra: ['termal'] } },
+  { id: 'partado', name: 'Partadó', kind: 'corregimiento', lat: 5.596871, lon: -77.4552, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, camino a Cabo Corrientes.', figure: { main: 'rancho' } },
+  { id: 'arusi', name: 'Arusí', kind: 'corregimiento', lat: 5.595341, lon: -77.47415, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, cerca de Cabo Corrientes.', figure: { main: 'rancho', extra: ['lancha'] } },
+  { id: 'cabo-corrientes', name: 'Cabo Corrientes', kind: 'cabo', lat: 5.480395, lon: -77.53943, subregion: 'Pacífico Sur', info: 'La punta que cierra por el sur el golfo de Tribugá.', figure: { main: 'cabo' } },
+  { id: 'virudo', name: 'Virudó', kind: 'corregimiento', lat: 5.399466, lon: -77.40189, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó', info: 'Corregimiento de la costa de Bajo Baudó.', figure: { main: 'rancho', extra: ['lancha'] } },
+  { ...m('pizarro', 'Pizarro', 4.953752, -77.36678, 'Pacífico Sur'), municipio: 'Bajo Baudó', info: 'Cabecera de Bajo Baudó, cerca de la desembocadura del río Baudó.', figure: { main: 'cabecera', extra: ['canoa'] } },
+  { id: 'siviru', name: 'Sivirú', kind: 'corregimiento', lat: 4.8056, lon: -77.34244, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó', info: 'Corregimiento de la costa de Bajo Baudó.', figure: { main: 'rancho' } },
+  { ...m('docordo', 'Docordó', 4.258038, -77.36467, 'Pacífico Sur'), municipio: 'El Litoral del San Juan', info: 'Cabecera del Litoral del San Juan, en el delta del río San Juan.', figure: { main: 'cabecera', extra: ['canoa'] } },
   // Serranía y valle del Baudó.
-  { id: 'alto-del-buey', name: 'Alto del Buey', kind: 'cerro', lat: 6.081154, lon: -77.28832, subregion: 'Atrato', info: 'Uno de los cerros más altos de la serranía del Baudó.' },
-  { ...m('pie-de-pato', 'Pie de Pató', 5.516015, -76.97428, 'Pacífico Sur'), municipio: 'Alto Baudó', info: 'Cabecera de Alto Baudó, a orillas del río Baudó.' },
-  { ...m('puerto-meluk', 'Puerto Meluk', 5.192699, -76.95127, 'Pacífico Sur'), municipio: 'Medio Baudó', info: 'Cabecera de Medio Baudó, a orillas del río Baudó.' },
+  { id: 'alto-del-buey', name: 'Alto del Buey', kind: 'cerro', lat: 6.081154, lon: -77.28832, subregion: 'Atrato', info: 'Uno de los cerros más altos de la serranía del Baudó.', figure: { main: 'cerro' } },
+  { ...m('pie-de-pato', 'Pie de Pató', 5.516015, -76.97428, 'Pacífico Sur'), municipio: 'Alto Baudó', info: 'Cabecera de Alto Baudó, a orillas del río Baudó.', figure: { main: 'cabecera', extra: ['canoa'] } },
+  { ...m('puerto-meluk', 'Puerto Meluk', 5.192699, -76.95127, 'Pacífico Sur'), municipio: 'Medio Baudó', info: 'Cabecera de Medio Baudó, a orillas del río Baudó.', figure: { main: 'cabecera', extra: ['canoa'] } },
   // Atrato.
-  { ...m('quibdo', 'Quibdó', 5.691283, -76.65313, 'Atrato'), info: 'La capital del Chocó, a orillas del río Atrato.' },
-  { id: 'tutunendo', name: 'Tutunendo', kind: 'corregimiento', lat: 5.744297, lon: -76.54077, subregion: 'Atrato', municipio: 'Quibdó', info: 'Corregimiento de Quibdó, famoso por ser uno de los lugares más lluviosos del mundo.' },
-  { ...m('bete', 'Beté', 5.994886, -76.78227, 'Atrato'), municipio: 'Medio Atrato', info: 'Cabecera de Medio Atrato, a orillas del río Atrato.' },
-  { ...m('bellavista', 'Bellavista', 6.557252, -76.88358, 'Atrato'), municipio: 'Bojayá', info: 'Cabecera de Bojayá, a orillas del río Atrato.' },
-  { ...m('paimado', 'Paimadó', 5.483774, -76.73957, 'Atrato'), municipio: 'Río Quito', info: 'Cabecera de Río Quito.' },
-  { ...m('lloro', 'Lloró', 5.499783, -76.54263, 'Atrato'), info: 'Municipio del Atrato, entre los lugares más lluviosos del planeta.' },
-  { ...m('carmen-de-atrato', 'El Carmen de Atrato', 5.899266, -76.14245, 'Atrato'), info: 'Municipio en la cordillera Occidental, cerca del límite con Antioquia.' },
+  { ...m('quibdo', 'Quibdó', 5.691283, -76.65313, 'Atrato'), info: 'La capital del Chocó, a orillas del río Atrato. Sus fiestas de San Pacho son Patrimonio Cultural Inmaterial de la Humanidad.', figure: { main: 'ciudad', extra: ['canoa', 'cununo'] } },
+  { id: 'tutunendo', name: 'Tutunendo', kind: 'corregimiento', lat: 5.744297, lon: -76.54077, subregion: 'Atrato', municipio: 'Quibdó', info: 'Corregimiento de Quibdó, famoso por ser uno de los lugares más lluviosos del mundo.', figure: { main: 'rancho', extra: ['lluvia'] } },
+  { ...m('bete', 'Beté', 5.994886, -76.78227, 'Atrato'), municipio: 'Medio Atrato', info: 'Cabecera de Medio Atrato, a orillas del río Atrato.', figure: { main: 'cabecera', extra: ['canoa'] } },
+  { ...m('bellavista', 'Bellavista', 6.557252, -76.88358, 'Atrato'), municipio: 'Bojayá', info: 'Cabecera de Bojayá, a orillas del río Atrato.', figure: { main: 'cabecera', extra: ['canoa'] } },
+  { ...m('paimado', 'Paimadó', 5.483774, -76.73957, 'Atrato'), municipio: 'Río Quito', info: 'Cabecera de Río Quito.', figure: { main: 'cabecera', extra: ['canoa'] } },
+  { ...m('lloro', 'Lloró', 5.499783, -76.54263, 'Atrato'), info: 'Municipio del Atrato, entre los lugares más lluviosos del planeta.', figure: { main: 'cabecera', extra: ['lluvia'] } },
+  { ...m('carmen-de-atrato', 'El Carmen de Atrato', 5.899266, -76.14245, 'Atrato'), info: 'Municipio en la cordillera Occidental, cerca del límite con Antioquia.', figure: { main: 'cabecera' } },
   // San Juan.
-  { ...m('certegui', 'Cértegui', 5.371904, -76.60857, 'San Juan'), info: 'Municipio de la subregión del San Juan.' },
-  { ...m('tado', 'Tadó', 5.263378, -76.56212, 'San Juan'), info: 'Municipio a orillas del río San Juan.' },
-  { ...m('istmina', 'Istmina', 5.159309, -76.68552, 'San Juan'), info: 'Municipio a orillas del río San Juan, el centro de su subregión.' },
-  { ...m('andagoya', 'Andagoya', 5.096587, -76.69479, 'San Juan'), municipio: 'Medio San Juan', info: 'Cabecera de Medio San Juan, donde el río Condoto llega al San Juan.' },
-  { ...m('condoto', 'Condoto', 5.092196, -76.65135, 'San Juan'), info: 'Municipio del San Juan, de larga tradición minera.' },
+  { ...m('certegui', 'Cértegui', 5.371904, -76.60857, 'San Juan'), info: 'Municipio de la subregión del San Juan.', figure: { main: 'cabecera' } },
+  { ...m('tado', 'Tadó', 5.263378, -76.56212, 'San Juan'), info: 'Municipio a orillas del río San Juan.', figure: { main: 'cabecera', extra: ['canoa'] } },
+  { ...m('istmina', 'Istmina', 5.159309, -76.68552, 'San Juan'), info: 'Municipio a orillas del río San Juan, el centro de su subregión.', figure: { main: 'ciudad', extra: ['canoa'] } },
+  { ...m('andagoya', 'Andagoya', 5.096587, -76.69479, 'San Juan'), municipio: 'Medio San Juan', info: 'Cabecera de Medio San Juan, donde el río Condoto llega al San Juan.', figure: { main: 'cabecera', extra: ['canoa'] } },
+  { ...m('condoto', 'Condoto', 5.092196, -76.65135, 'San Juan'), info: 'Municipio del San Juan, de larga tradición minera.', figure: { main: 'cabecera' } },
   // Darién.
-  { ...m('riosucio', 'Riosucio', 7.436557, -77.11225, 'Darién'), info: 'Municipio del Darién, a orillas del río Atrato.' },
+  { ...m('riosucio', 'Riosucio', 7.436557, -77.11225, 'Darién'), info: 'Municipio del Darién, a orillas del río Atrato.', figure: { main: 'cabecera', extra: ['canoa'] } },
 ];
 
 /** Nombre de cada subregión en el mapa: un rótulo tenue en su centro aproximado. */

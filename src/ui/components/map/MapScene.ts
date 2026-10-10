@@ -14,8 +14,8 @@ import {
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MapPlace } from '../../../content/map';
-import { CHOCO_POINTS, EMBLEM_OF_KIND, SUBREGION_LABELS, categorize, type ChocoPoint, type Emblem } from '../../../content/choco';
-import { EMBLEM_SIZE, emblemGeometry } from './emblems';
+import { CHOCO_POINTS, SUBREGION_LABELS, categorize, type ChocoPoint } from '../../../content/choco';
+import { EMBLEM_SIZE, emblemGeometry, figureGeometry } from './emblems';
 import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
 import { Batch, type Pace, clearKitCache, pacer, paint, sticker } from './kit';
 import { buildFlora, buildMist, clearPlants } from './flora';
@@ -738,7 +738,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     onSpot?.(spot?.point ?? null);
   }
   const emblemParts: BufferGeometry[] = [];
-  function addSpot(point: ChocoPoint, emblem: Emblem = EMBLEM_OF_KIND[point.kind], kind: string = point.kind) {
+  function addSpot(point: ChocoPoint, kind: string = point.kind) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = `map-spot map-spot--${kind}`;
@@ -751,14 +751,19 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     el.addEventListener('click', () => selectSpot(openSpot === point.id ? null : point.id));
     const label = new CSS2DObject(el);
     const at = toScene(point.lat, point.lon);
-    const ground = groundAt(at.x, at.z);
+    // La base va a la altura del punto más alto bajo ella: en una ladera, sin quedar medio enterrada.
+    let ground = groundAt(at.x, at.z);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      ground = Math.max(ground, groundAt(at.x + Math.cos(a) * EMBLEM_SIZE * 0.45, at.z + Math.sin(a) * EMBLEM_SIZE * 0.45));
+    }
     // En la selva de la costa, un claro alrededor para que la figurita no quede tapada por los árboles.
     if (inFine(at.x, at.z)) clearPlants(flora, at.x, at.z, EMBLEM_SIZE * 1.1);
     // El punto flota sobre su figurita.
     label.position.set(at.x, ground + EMBLEM_SIZE + 22, at.z);
     pinGroup.add(label);
     spots.push({ point, el, at: label.position });
-    const fig = emblemGeometry(emblem).clone();
+    const fig = (point.story ? emblemGeometry(point.story) : figureGeometry(point.figure ?? { main: 'cabecera' })).clone();
     fig.rotateY(-Math.PI / 2); // el frente (las puertas) hacia el mar
     fig.translate(at.x, ground - 2, at.z);
     emblemParts.push(fig);
@@ -770,7 +775,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     const name = test.slice(2).join(',').trim() || 'Historia de prueba';
     // Se clasifica sola por lo que dice (aquí, por su nombre): ver `categorize`.
     const story = categorize(name);
-    addSpot({ id: 'historia-prueba', name, kind: 'corregimiento', lat: +test[0], lon: +test[1], subregion: 'Pacífico Norte', story }, story, 'historia');
+    addSpot({ id: 'historia-prueba', name, kind: 'corregimiento', lat: +test[0], lon: +test[1], subregion: 'Pacífico Norte', story }, 'historia');
   }
   // Todas las figuritas en una sola malla: un solo dibujo. Aparecen (y se desvanecen) junto con los puntos.
   const emblemMat = paint.clone();
@@ -835,6 +840,13 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     tour = { at: at.clone().setY(at.y - EMBLEM_SIZE * 0.4), yaw, pitch: 24, dist: 900 };
     flight = { start: performance.now(), pos: camera.position.clone(), look: look.clone(), back: false };
   }
+  const TOUR_DIST = { min: 320, max: 2600 };
+  /** Acerca o aleja la visita; si ya estaba en el máximo y sigue alejándose, vuelve a la costa. */
+  function zoomTour(factor: number) {
+    if (!tour) return;
+    if (factor > 1 && tour.dist >= TOUR_DIST.max * 0.99) return selectSpot(null);
+    tour.dist = MathUtils.clamp(tour.dist * factor, TOUR_DIST.min, TOUR_DIST.max);
+  }
   function leaveTour() {
     flight = { start: performance.now(), pos: camera.position.clone(), look: look.clone(), back: true };
   }
@@ -890,6 +902,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   let downAt: { x: number; y: number; t: number } | null = null;
   let pinchStart = 0;
   let pinchDist = 0;
+  let lastPinch = 0;
   const canvas = renderer.domElement;
 
   const worldPerPixel = () => (2 * view.dist * Math.tan(MathUtils.degToRad(camera.fov / 2))) / Math.max(host.clientHeight, 1);
@@ -916,7 +929,11 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchStart > 0) {
+      if (pinchStart > 0 && tour) {
+        // En una visita: pellizcar acerca o aleja el punto (y al límite, vuelve a la costa).
+        if (!flight) zoomTour(pinchStart / d / (lastPinch || 1));
+        lastPinch = pinchStart / d;
+      } else if (pinchStart > 0) {
         goal.dist = pinchDist * (pinchStart / d);
         // Pellizcar hacia adentro más allá del máximo también lleva al planeta.
         if (goal.dist > DIST.max) {
@@ -941,7 +958,10 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   };
   const onUp = (e: PointerEvent) => {
     pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinchStart = 0;
+    if (pointers.size < 2) {
+      pinchStart = 0;
+      lastPinch = 0;
+    }
     if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6 && performance.now() - downAt.t < 500) pick(e);
     downAt = null;
   };
@@ -949,7 +969,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     e.preventDefault();
     if (intro || outro) return;
     if (tour) {
-      if (!flight) tour.dist = MathUtils.clamp(tour.dist * Math.exp(e.deltaY * (e.ctrlKey ? 0.006 : 0.0012)), 320, 2600);
+      // Alejarse hasta el límite cierra la visita y vuelve a la costa.
+      if (!flight) zoomTour(Math.exp(e.deltaY * (e.ctrlKey ? 0.006 : 0.0012)));
       return;
     }
     // Con el panel táctil (pellizco = rueda con Ctrl) llegan pasos pequeños: cuentan más.
