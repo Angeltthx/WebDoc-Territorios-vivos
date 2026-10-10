@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
 import { EMBLEM_LABEL, type ChocoPoint } from '../../content/choco';
 import { Arrow, TopBar } from '../components/Chrome';
-import { LineIcon } from '../components/Sheet';
+import { LineIcon, type Origin } from '../components/Sheet';
 import Shop from './Shop';
 import StoryForm from './StoryForm';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
@@ -48,6 +48,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   const [pull, setPull] = useState(0);
   /** Lo que se abrió desde los íconos de la costa. La tienda y el formulario tapan el mapa: mientras tanto, se pausa. */
   const [panel, setPanel] = useState<'ayuda' | 'historia' | 'tienda' | null>(null);
+  /** Dónde está el botón que abrió la tienda o el formulario: la hoja crece desde ahí. */
+  const [origin, setOrigin] = useState<Origin | undefined>();
   useEffect(() => {
     const cover = panel === 'historia' || panel === 'tienda';
     handle.current?.setActive(!cover);
@@ -350,7 +352,12 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
                 key={id}
                 type="button"
                 className={`tab map-tool${panel === id ? ' is-active' : ''}`}
-                onClick={() => setPanel(panel === id ? null : id)}
+                onClick={(e) => {
+                  const b = e.currentTarget.getBoundingClientRect();
+                  const host = e.currentTarget.closest('.map-screen')!.getBoundingClientRect();
+                  setOrigin({ x: b.left + b.width / 2 - host.left, y: b.top + b.height / 2 - host.top });
+                  setPanel(panel === id ? null : id);
+                }}
                 aria-pressed={panel === id}
               >
                 <LineIcon name={icon} size={16} />
@@ -384,8 +391,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
           </nav>
         </>
       )}
-      {onMap && panel === 'historia' && <StoryForm onClose={closePanel} />}
-      {onMap && panel === 'tienda' && <Shop onClose={closePanel} />}
+      {onMap && panel === 'historia' && <StoryForm onClose={closePanel} origin={origin} />}
+      {onMap && panel === 'tienda' && <Shop onClose={closePanel} origin={origin} />}
     </div>
   );
 }

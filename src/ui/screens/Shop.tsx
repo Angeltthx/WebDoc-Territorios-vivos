@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { SHOP_ITEMS, pesos, type ShopItem } from '../../content/stories';
-import { LineIcon, Sheet } from '../components/Sheet';
+import { LineIcon, Sheet, type Origin } from '../components/Sheet';
 
 const KINDS = ['Todo', ...new Set(SHOP_ITEMS.map((i) => i.kind))] as const;
 
@@ -21,7 +21,7 @@ function ProductArt({ icon }: { icon: ShopItem['icon'] }) {
   );
 }
 
-export default function Shop({ onClose }: { onClose?: () => void }) {
+export default function Shop({ onClose, origin }: { onClose?: () => void; origin?: Origin }) {
   const [kind, setKind] = useState<(typeof KINDS)[number]>('Todo');
   const [bag, setBag] = useState<Record<string, number>>({});
   const [bagOpen, setBagOpen] = useState(false);
@@ -40,6 +40,7 @@ export default function Shop({ onClose }: { onClose?: () => void }) {
 
   return (
     <Sheet
+      origin={origin}
       eyebrow="Tienda"
       title="Lleva un pedazo del Pacífico"
       intro="Productos y precios de muestra: así se verá la tienda cuando abra."

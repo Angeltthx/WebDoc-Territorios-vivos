@@ -839,9 +839,24 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
    título en la letra del webdoc; a la derecha, el contenido sobre papel claro. */
 .sheet {
   position: absolute; inset: 0; z-index: 60; display: grid; grid-template-columns: minmax(320px, 38%) 1fr;
-  background: var(--paper-2); color: var(--ink); animation: sheet-in 0.45s var(--ease) both;
+  background: var(--paper-2); color: var(--ink); animation: sheet-open 0.8s cubic-bezier(0.65, 0, 0.35, 1) both;
 }
-@keyframes sheet-in { from { opacity: 0; } to { opacity: 1; } }
+/* Entrada: un círculo que crece desde el botón que se tocó hasta cubrir la pantalla; el atardecer se acomoda (un
+   leve zoom) y el título y el contenido suben en cascada. Salida: el círculo se encoge de vuelta hacia el botón. */
+@keyframes sheet-open { from { clip-path: circle(0 at var(--ox) var(--oy)); } to { clip-path: circle(150vmax at var(--ox) var(--oy)); } }
+@keyframes sheet-close { from { clip-path: circle(150vmax at var(--ox) var(--oy)); } to { clip-path: circle(0 at var(--ox) var(--oy)); } }
+@keyframes sheet-up { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+@keyframes sheet-settle { from { background-size: 100% 118%; } to { background-size: 100% 100%; } }
+.sheet.is-leaving { animation: sheet-close 0.48s cubic-bezier(0.65, 0, 0.35, 1) both; }
+.sheet.is-still { animation: none; }
+.sheet:not(.is-still) .sheet__hero { animation: sheet-settle 1.4s var(--ease) both; }
+.sheet:not(.is-still) .sheet__back { animation: sheet-up 0.6s var(--ease) 0.35s both; }
+.sheet:not(.is-still) .sheet__heading > * { animation: sheet-up 0.7s var(--ease) both; }
+.sheet:not(.is-still) .sheet__heading > :nth-child(1) { animation-delay: 0.3s; }
+.sheet:not(.is-still) .sheet__heading > :nth-child(2) { animation-delay: 0.38s; }
+.sheet:not(.is-still) .sheet__heading > :nth-child(3) { animation-delay: 0.46s; }
+.sheet:not(.is-still) .sheet__heading > :nth-child(4) { animation-delay: 0.54s; }
+.sheet:not(.is-still) .sheet__body { animation: sheet-up 0.8s var(--ease) 0.45s both; }
 .sheet-page { position: fixed; inset: 0; }
 .has-sheet .dock, .has-sheet .menu-btn { display: none; }
 .sheet__hero {

@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CHOCO_MUNICIPALITIES, MAX_FILE_MB } from '../../content/stories';
 import { EMBLEM_LABEL, SUBREGION_OF, categorize, type Emblem } from '../../content/choco';
-import { Sheet } from '../components/Sheet';
+import { Sheet, type Origin } from '../components/Sheet';
 
 interface Attachment {
   file: File;
@@ -18,11 +18,13 @@ const kindOf = (f: File): Attachment['kind'] | null =>
   f.type.startsWith('image/') ? 'foto' : f.type.startsWith('audio/') ? 'audio' : f.type.startsWith('video/') ? 'video' : null;
 const size = (bytes: number) => (bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.ceil(bytes / 1e3)} KB`);
 
-export default function StoryForm({ onClose }: { onClose?: () => void }) {
+export default function StoryForm({ onClose, origin }: { onClose?: () => void; origin?: Origin }) {
   const [files, setFiles] = useState<Attachment[]>([]);
   const [fileNote, setFileNote] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [locating, setLocating] = useState<'idle' | 'busy' | 'error'>('idle');
+  /** Ya se mostró una vez (al volver del agradecimiento, el formulario no repite la entrada). */
+  const [visited, setVisited] = useState(false);
   const [sent, setSent] = useState<{ title: string; place: string; kind: Emblem; region?: string } | null>(null);
 
   // Las vistas previas se sueltan al quitarlas o al salir.
@@ -84,7 +86,7 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
 
   if (sent) {
     return (
-      <Sheet eyebrow="Cuéntanos tu historia" title="¡Gracias por contarla!" onClose={onClose} aside={aside}>
+      <Sheet eyebrow="Cuéntanos tu historia" title="¡Gracias por contarla!" onClose={onClose} aside={aside} origin={origin} still>
         <div className="story-sent">
           <p className="story-sent__lead">
             «{sent.title}», en {sent.place}, llegaría al equipo de Territorios Vivos. Después de revisarla, aparecería en el
@@ -94,7 +96,7 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
             Aparecería en {sent.region ? `la subregión ${sent.region}` : 'el mapa'} con la figurita de <strong>{EMBLEM_LABEL[sent.kind]}</strong>.
           </p>
           <p className="notice">Versión de prueba: todavía no se envía ni se guarda nada.</p>
-          <button type="button" className="story-send" onClick={() => setSent(null)}>Volver al formulario</button>
+          <button type="button" className="story-send" onClick={() => { setVisited(true); setSent(null); }}>Volver al formulario</button>
         </div>
       </Sheet>
     );
@@ -102,6 +104,8 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
 
   return (
     <Sheet
+      origin={origin}
+      still={visited}
       eyebrow="Cuéntanos tu historia"
       title="¿Qué viviste en el Chocó?"
       intro="Una historia, un recuerdo, una receta, un canto… Cuéntanos qué pasó y dónde."

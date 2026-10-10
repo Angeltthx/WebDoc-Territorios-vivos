@@ -1,7 +1,7 @@
 // Hoja a pantalla completa sobre el mapa (la tienda, «Cuéntanos tu historia»): papel claro como la guía del webdoc.
 // Dentro del mapa se cierra y vuelve a la costa tal como estaba; abierta por su propia dirección, vuelve al recorrido.
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Arrow } from './Chrome';
 
@@ -33,7 +33,12 @@ export function LineIcon({ name, size = 20 }: { name: 'help' | 'story' | 'shop';
   );
 }
 
-export function Sheet({ eyebrow, title, intro, aside, onClose, children }: {
+/** Punto de la pantalla desde donde se abre la hoja (el botón que se tocó), en píxeles. */
+export type Origin = { x: number; y: number };
+/** Lo que dura la salida (ver `.sheet.is-leaving` en los estilos). */
+const LEAVE_MS = 480;
+
+export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin, still }: {
   eyebrow: string;
   title: string;
   intro?: ReactNode;
@@ -42,7 +47,18 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children }: {
   /** Dentro del mapa: vuelve a la costa. Sin esto (dirección propia), un enlace al cierre del recorrido. */
   onClose?: () => void;
   children: ReactNode;
+  /** Se abre como un círculo que crece desde aquí (y al cerrar se encoge hacia aquí). Sin esto, desde abajo al centro. */
+  origin?: Origin;
+  /** Sin la animación de entrada (al cambiar de una hoja a otra, como el formulario y su agradecimiento). */
+  still?: boolean;
 }) {
+  const [leaving, setLeaving] = useState(false);
+  const close = () => {
+    if (leaving) return;
+    setLeaving(true);
+    setTimeout(() => onClose?.(), LEAVE_MS);
+  };
+  const at = { '--ox': origin ? `${origin.x}px` : '50%', '--oy': origin ? `${origin.y}px` : '100%' } as CSSProperties;
   // Mientras está abierta, los botones flotantes del webdoc (menú, sonido y redes) se esconden: tapaban el formulario.
   useEffect(() => {
     document.body.classList.add('has-sheet');
@@ -56,10 +72,17 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children }: {
   // A pantalla completa: a un lado el atardecer del mapa con el título (como la llegada a la costa), al otro el
   // contenido sobre papel claro. En el celular, el atardecer queda arriba.
   return (
-    <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-no-arrows>
+    <div
+      className={`sheet${leaving ? ' is-leaving' : ''}${still ? ' is-still' : ''}`}
+      style={at}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sheet-title"
+      data-no-arrows
+    >
       <header className="sheet__hero">
         {onClose ? (
-          <button type="button" className="sheet__back" onClick={onClose}>{back}</button>
+          <button type="button" className="sheet__back" onClick={close}>{back}</button>
         ) : (
           <Link className="sheet__back" to="/27">{back}</Link>
         )}
