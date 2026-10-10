@@ -38,7 +38,7 @@ export type Origin = { x: number; y: number };
 /** Lo que dura la salida (ver `.sheet.is-leaving` en los estilos). */
 const LEAVE_MS = 480;
 
-export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin, still }: {
+export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin, still, tone }: {
   eyebrow: string;
   title: string;
   intro?: ReactNode;
@@ -51,6 +51,8 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
   origin?: Origin;
   /** Sin la animación de entrada (al cambiar de una hoja a otra, como el formulario y su agradecimiento). */
   still?: boolean;
+  /** Oscura, con letra blanca (como las páginas del recorrido), en vez de papel claro. */
+  tone?: 'dark';
 }) {
   const [leaving, setLeaving] = useState(false);
   const close = () => {
@@ -73,7 +75,7 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
   // contenido sobre papel claro. En el celular, el atardecer queda arriba.
   return (
     <div
-      className={`sheet${leaving ? ' is-leaving' : ''}${still ? ' is-still' : ''}`}
+      className={`sheet${tone ? ` sheet--${tone}` : ''}${leaving ? ' is-leaving' : ''}${still ? ' is-still' : ''}`}
       style={at}
       role="dialog"
       aria-modal="true"
