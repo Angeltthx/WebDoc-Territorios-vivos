@@ -323,6 +323,9 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
               </a>
             </p>
           )}
+          <button type="button" className="map-card__back" onClick={() => handle.current?.select(null)}>
+            <Arrow dir="left" /> Volver a la costa
+          </button>
           <button type="button" className="map-card__close" aria-label="Cerrar" onClick={() => handle.current?.select(null)}>
             ×
           </button>

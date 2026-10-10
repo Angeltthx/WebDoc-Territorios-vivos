@@ -617,10 +617,10 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
 
   const scene = new Scene();
   // Solo en desarrollo: para medir el rendimiento desde la consola.
-  if (import.meta.env.DEV) Object.assign(window, { __map: { renderer, scene } });
   const fog = new Fog(HAZE, FOG.near, FOG.far);
   scene.fog = fog;
   const camera = new PerspectiveCamera(52, 1, 5, 60000);
+  if (import.meta.env.DEV) Object.assign(window, { __map: { renderer, scene, camera } });
 
   const rand = rng(20261008);
   const sky = buildSky();
@@ -681,7 +681,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   /** Altura del alfiler: encima de lo que haya construido en el sitio. */
   const pinBase = (place: PlacedPlace) => place.pos.y + (places.heights.get(place.id) ?? 10) + 16;
 
-  for (const place of [...placed, ...nature]) {
+  // La fauna no lleva rótulo: se toca el animal mismo (ver `pick`) y la cámara lo sigue.
+  for (const place of placed) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = `map-label map-label--${place.kind}`;
@@ -729,11 +730,15 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   const groundAt = (x: number, z: number) => Math.max(inFine(x, z) ? heightAt(x, z) : farHeight(x, z), 0);
   let openSpot: string | null = null;
   function selectSpot(id: string | null) {
+    if (selected) {
+      selected = null;
+      for (const p of pins) p.el.classList.remove('is-selected');
+      onSelect(null);
+    }
     openSpot = id;
     for (const s of spots) s.el.classList.toggle('is-open', s.point.id === id);
-    if (id && selected) select(null);
     const spot = spots.find((s) => s.point.id === id);
-    if (spot) visit(spot.at);
+    if (spot) visit(spot.at.clone().setY(spot.at.y - EMBLEM_SIZE * 0.4));
     else if (tour) leaveTour();
     onSpot?.(spot?.point ?? null);
   }
@@ -872,18 +877,20 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   // ───────── Viaje a un punto del Chocó ─────────
   // Al tocar un punto, la cámara deja la costa y vuela hasta él (subiendo un poco en el camino); allá se queda quieta y
   // se mueve a mano. Al cerrar la ficha (o con Escape) vuelve por el mismo aire a la costa, donde estaba.
-  let tour: { at: Vector3; yaw: number; pitch: number; dist: number } | null = null;
+  /** La visita: el punto que se mira y desde dónde. Con `follow`, la cámara acompaña a ese animal mientras se mueve. */
+  let tour: { at: Vector3; yaw: number; pitch: number; dist: number; follow?: Object3D; lift: number } | null = null;
   let flight: { start: number; pos: Vector3; look: Vector3; back: boolean } | null = null;
   const FLIGHT = 2.4;
   const look = new Vector3();
   const tourPos = new Vector3();
   const tourLook = new Vector3();
-  function visit(at: Vector3) {
+  function visit(at: Vector3, dist = 900, follow?: Object3D, lift = 0) {
     const yaw = Math.atan2(camera.position.x - at.x, camera.position.z - at.z);
-    tour = { at: at.clone().setY(at.y - EMBLEM_SIZE * 0.4), yaw, pitch: 24, dist: 900 };
+    tour = { at: at.clone(), yaw, pitch: dist < 600 ? 20 : 24, dist, follow, lift };
     flight = { start: performance.now(), pos: camera.position.clone(), look: look.clone(), back: false };
   }
-  const TOUR_DIST = { min: 320, max: 2600 };
+  const TOUR_DIST = { min: 140, max: 2600 };
+  const followAt = new Vector3();
   /** Acerca o aleja la visita; si ya estaba en el máximo y sigue alejándose, vuelve a la costa. */
   function zoomTour(factor: number) {
     if (!tour) return;
@@ -900,8 +907,20 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     tourPos.set(Math.sin(t.yaw) * Math.cos(p), Math.sin(p), Math.cos(t.yaw) * Math.cos(p)).multiplyScalar(t.dist).add(t.at);
   };
   /** Después de `placeCamera` (que deja la cámara en la costa): si hay viaje, la lleva al punto o de vuelta. */
-  const applyTour = () => {
+  const applyTour = (dt: number) => {
     if (!tour) return;
+    // Siguiendo a un animal: el centro de la visita va tras él, suave. Si su figura se cambió por el modelo animado
+    // (ya no está en la escena), se queda donde estaba.
+    if (tour.follow) {
+      let root: Object3D = tour.follow;
+      while (root.parent) root = root.parent;
+      if (root !== scene) tour.follow = undefined;
+      else {
+        tour.follow.getWorldPosition(followAt);
+        followAt.y = Math.max(followAt.y, 0) + tour.lift;
+        tour.at.lerp(followAt, Math.min(1, dt * 3));
+      }
+    }
     posePoint();
     if (flight) {
       const u = Math.min(1, (performance.now() - flight.start) / 1000 / FLIGHT);
@@ -1037,15 +1056,39 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
 
   const raycaster = new Raycaster();
   const ndc = new Vector2();
+  const probe = new Vector3();
+  /** El animal (una de sus piezas) más cercano en pantalla al punto tocado, si está a menos de 40 px. */
+  const nearestAnimal = (px: number, py: number, w: number, h: number) => {
+    let best: { id: string; mesh: Object3D; d: number } | null = null;
+    for (const species of fauna.group.children) {
+      const id = species.userData.natureId as string | undefined;
+      if (!id) continue;
+      species.traverseVisible((m) => {
+        if (!(m as Mesh).isMesh) return;
+        m.getWorldPosition(probe).project(camera);
+        if (probe.z > 1) return;
+        const d = Math.hypot(((probe.x + 1) / 2) * w - px, ((1 - probe.y) / 2) * h - py);
+        if (d < 40 && (!best || d < best.d)) best = { id, mesh: m, d };
+      });
+    }
+    return best as { id: string; mesh: Object3D; d: number } | null;
+  };
   const pick = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    if (tour) return;
-    const hit = raycaster.intersectObjects(pins.filter((p) => p.place.kind === 'site').map((p) => p.pin), true)[0];
+    // Los alfileres de los sitios y los animales (y el cacao y el manglar): el que esté más cerca de la cámara.
+    const targets = [...pins.filter((p) => p.place.kind === 'site').map((p) => p.pin), ...fauna.group.children.filter((c) => c.userData.natureId)];
+    const hit = raycaster.intersectObjects(targets, true)[0];
     let o: Object3D | null = hit?.object ?? null;
-    while (o && !o.userData.id) o = o.parent;
-    select(o ? (o.userData.id as string) : null);
+    while (o && !o.userData.id && !o.userData.natureId) o = o.parent;
+    if (o?.userData.natureId) return select(o.userData.natureId as string, hit!.object);
+    if (o) return select(o.userData.id as string);
+    // Los animales son chicos y se mueven: tocar cerca (a unos 40 px) también vale.
+    const near = nearestAnimal(e.clientX - r.left, e.clientY - r.top, r.width, r.height);
+    if (near) return select(near.id, near.mesh);
+    // Tocar el vacío durante una visita no la cierra (se cierra con la ficha, Escape o alejándose).
+    if (!tour) select(null);
   };
 
   canvas.addEventListener('pointerdown', onDown);
@@ -1056,22 +1099,31 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   window.addEventListener('keydown', onKey);
 
   let selected: string | null = null;
-  function select(id: string | null) {
+  /**
+   * Elige un pueblo, un sitio o una especie: la cámara viaja hasta allá (como con los puntos del Chocó) y se abre su
+   * ficha. Con `follow` (el animal que se tocó), la cámara lo acompaña. Sin nada, vuelve a la costa.
+   */
+  function select(id: string | null, follow?: Object3D) {
+    if (openSpot) {
+      openSpot = null;
+      for (const s of spots) s.el.classList.remove('is-open');
+      onSpot?.(null);
+    }
     selected = id;
-    if (openSpot) selectSpot(null);
     for (const p of pins) p.el.classList.toggle('is-selected', p.place.id === id);
     const place = [...placed, ...nature].find((p) => p.id === id) ?? null;
     if (place) {
-      goal.s = place.s;
-      // La fauna es pequeña: al elegirla, la cámara se acerca más.
-      goal.dist = Math.min(goal.dist, place.kind === 'town' ? 760 : place.kind === 'nature' ? 380 : 560);
-      clampGoal();
-    }
+      const top = place.kind === 'nature' ? (NATURE_LABEL_HEIGHT[place.id] ?? 30) * 0.4 : (places.heights.get(place.id) ?? 20) * 0.5;
+      // Más cerca de los animales chicos (la rana, el cangrejo, la pava) que de la ballena o el manglar.
+      const dist = place.kind === 'town' ? 620 : place.kind === 'site' ? 380 : ({ ballena: 480, manglar: 420, cacao: 260, tortuga: 200 } as Record<string, number>)[place.id] ?? 150;
+      visit(place.pos.clone().setY(Math.max(place.pos.y, 0) + top), dist, follow, top);
+    } else if (tour) leaveTour();
     onSelect(place);
   }
   function focus(id: string) {
     const place = placed.find((p) => p.id === id);
     if (!place) return;
+    if (selected || openSpot) select(null);
     goal.s = place.s;
     goal.dist = 820;
     clampGoal();
@@ -1197,9 +1249,9 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     for (const g of details) g.visible = showDetails;
     for (const p of pins) p.pin.visible = showDetails;
     placeCamera();
-    applyTour();
+    applyTour(dt);
     // Los puntos del resto del Chocó (y sus figuritas) solo de lejos, o mientras se visita uno.
-    const reveal = tour ? 1 : smoothstep(view.dist, 1250, 1600);
+    const reveal = openSpot ? 1 : smoothstep(view.dist, 1250, 1600);
     if ((reveal > 0.5) !== host.classList.contains('show-spots')) host.classList.toggle('show-spots', reveal > 0.5);
     emblems.visible = reveal > 0.01;
     emblemMat.opacity = reveal;
@@ -1234,7 +1286,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     }
     if (ticks % 10 === 0) {
       updateBehind();
-      const op = (tour ? 0.7 : smoothstep(view.dist, 1250, 1600)).toFixed(2);
+      const op = (openSpot ? 0.7 : smoothstep(view.dist, 1250, 1600)).toFixed(2);
       for (const el of regionEls) if (el.style.opacity !== op) el.style.opacity = op;
     }
     if (ticks++ % 6 === 0) declutter();
