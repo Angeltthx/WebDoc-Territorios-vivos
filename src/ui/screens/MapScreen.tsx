@@ -8,12 +8,18 @@ import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
 import { TopBar } from '../components/Chrome';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
+import { createFlatGlobe } from '../components/map/FlatGlobe';
 import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
+import { QUALITY, TIER, TIER_LABEL, rememberCrash } from '../components/map/quality';
+import { SOLO, lastSteps, step } from '../components/map/diag';
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
 const INVITE_SEEN = 'mapa-invitacion-vista';
+/** En equipos modestos, el planeta se suelta al llegar a la costa (y se vuelve a armar al regresar): así nunca están
+ * las dos escenas 3D en memoria más que durante el cambio. */
+const RELEASE_GLOBE = TIER === 'baja' || TIER === 'minima' || TIER === 'segura';
 
 export default function MapScreen() {
   const stage = useRef<HTMLDivElement>(null);
@@ -25,6 +31,17 @@ export default function MapScreen() {
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
+  /** El navegador quitó el 3D: se reintenta un nivel más liviano o, si ya era el mínimo, se avisa. */
+  const [lost, setLost] = useState<'retry' | 'final' | null>(null);
+  const onLost = () => {
+    if (rememberCrash()) {
+      setLost('retry');
+      setTimeout(() => location.reload(), 1200);
+    } else setLost('final');
+  };
+  /** El planeta listo para usar (se vuelve a armar si se soltó, ver RELEASE_GLOBE). */
+  const globeReady = useRef<Promise<GlobeHandle> | null>(null);
+  const makeGlobe = useRef<() => Promise<GlobeHandle>>(() => Promise.reject(new Error('sin planeta')));
   // La invitación a bajar solo aparece la primera vez: después de entrar una vez, ya no se repite.
   const [invite, setInvite] = useState(() => {
     try {
@@ -53,15 +70,15 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    // Armar las escenas toma un momento: primero se pinta el aviso de carga y luego se construyen.
-    // La costa queda lista (en pausa) detrás del planeta, para que la llegada sea inmediata.
+    // Primero el planeta (lo que se ve al entrar) y, cuando ya está listo, la costa se arma por detrás, en pausa, sin
+    // congelar la página: así se puede girar el planeta mientras tanto y la llegada es inmediata.
     let live = true;
-    let map: MapSceneHandle | null = null;
+    let map: Promise<MapSceneHandle> | null = null;
     let earth: GlobeHandle | null = null;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (!live) return;
-      map = createMapScene(stage.current!, {
-        paused: true,
+    const buildMap = () =>
+      createMapScene(stage.current!, {
+        // Probando solo la costa (?solo=costa): arranca andando, sin esperar al planeta.
+        paused: SOLO !== 'costa',
         onSelect: (p) => {
           setPlace(p);
           if (p?.kind === 'town') setTown(p.id);
@@ -69,23 +86,61 @@ export default function MapScreen() {
         onInteract: () => setHint(false),
         onZoomOut: () => leave.current(),
         onPull: setPull,
+        onLost,
+      }).then((m) => {
+        handle.current = m;
+        return m;
       });
-      earth = createGlobe(globeStage.current!, {
-        onDive: () => setPhase('diving'),
-        onHandoff: (handoff) => {
-          // El mapa sigue bajando desde donde va el planeta; el planeta se desvanece encima y luego deja de dibujarse.
-          map?.land(handoff, () => setPhase('map'));
-          setPhase('landing');
-          setTimeout(() => earth?.setActive(false), DIVE.fade * 1000 + 200);
-        },
+    makeGlobe.current = () =>
+      new Promise<GlobeHandle>((resolve) => {
+        // En la versión 5 el planeta es un dibujo plano: una sola escena 3D en la página (la costa).
+        const g = (QUALITY.flatGlobe ? createFlatGlobe : createGlobe)(globeStage.current!, {
+          onReady: () => {
+            if (!live) return;
+            resolve(g);
+            // La primera vez: se muestra el planeta y se empieza a armar la costa (salvo si se prueba solo el planeta).
+            if (!map) {
+              setPhase('globe');
+              if (SOLO !== 'planeta') map = buildMap();
+            }
+          },
+          onLost,
+          onDive: () => {
+            step('bajando');
+            setPhase('diving');
+          },
+          onHandoff: (handoff) => {
+            // El mapa sigue bajando desde donde va el planeta; el planeta se desvanece encima y luego deja de dibujarse
+            // (o se suelta del todo, en equipos modestos). Si la costa aún se está armando, la llegada la espera.
+            if (SOLO === 'planeta') return step('planeta: llegó (sin costa)');
+            void (map ??= buildMap()).then((m) => {
+              if (!live) return;
+              m.land(handoff, () => setPhase('map'));
+              setPhase('landing');
+              setTimeout(() => {
+                if (!RELEASE_GLOBE) return g.setActive(false);
+                g.dispose();
+                if (earth === g) earth = globe.current = globeReady.current = null;
+              }, DIVE.fade * 1000 + 200);
+            });
+          },
+        });
+        earth = g;
+        globe.current = g;
       });
-      handle.current = map;
-      globe.current = earth;
-      setPhase('globe');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (!live) return;
+      if (SOLO !== 'costa') {
+        globeReady.current = makeGlobe.current();
+        return;
+      }
+      // Probando solo la costa: sin planeta.
+      map = buildMap();
+      void map.then(() => live && setPhase('map'));
     }));
     return () => {
       live = false;
-      map?.dispose();
+      void map?.then((m) => m.dispose());
       earth?.dispose();
     };
   }, []);
@@ -104,11 +159,15 @@ export default function MapScreen() {
     if (phase !== 'map') return;
     setPull(0);
     setPhase('leaving');
+    // Si el planeta se soltó al llegar, se vuelve a armar mientras la costa sube.
+    const ready = (globeReady.current ??= makeGlobe.current());
     handle.current?.ascend(() => {
-      globe.current?.setActive(true);
-      globe.current?.ascend();
-      setPhase('globe');
-      setTimeout(() => handle.current?.setActive(false), DIVE.fade * 1000 + 400);
+      void ready.then((g) => {
+        g.setActive(true);
+        g.ascend();
+        setPhase('globe');
+        setTimeout(() => handle.current?.setActive(false), DIVE.fade * 1000 + 400);
+      });
     });
   };
 
@@ -119,6 +178,22 @@ export default function MapScreen() {
       <div ref={stage} className="map-stage" />
       <div ref={globeStage} className="globe-stage" aria-hidden={onMap} />
       <p className={`map-loading${phase !== 'loading' ? ' is-hidden' : ''}`}>Cargando el mapa…</p>
+      {lost === 'retry' && (
+        <div className="map-lost" role="status">
+          <p>Ajustando el mapa a tu teléfono…</p>
+        </div>
+      )}
+      {lost === 'final' && (
+        <div className="map-lost" role="alert">
+          <p>Este equipo se quedó sin memoria para el mapa 3D.</p>
+          <p className="map-lost__hint">Cierra otras pestañas o aplicaciones y vuelve a intentarlo.</p>
+          <button type="button" className="btn btn--dark" onClick={() => location.reload()}>↻ Volver a intentar</button>
+          <Link className="ghost-link" to="/">← Volver al recorrido</Link>
+          {/* Para diagnosticar: qué nivel se usó y por qué (una captura de esto basta). */}
+          <p className="map-lost__diag">{TIER_LABEL}</p>
+          <p className="map-lost__diag">{lastSteps()}</p>
+        </div>
+      )}
 
       {/* Título como el del afiche, sobre el planeta. */}
       <div className="globe-title" aria-hidden={onMap}>

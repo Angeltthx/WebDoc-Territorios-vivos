@@ -4,6 +4,7 @@
 
 import { CanvasTexture, SRGBColorSpace } from 'three';
 import { COUNTRIES, DEPARTMENTS, LAND } from '../../../content/map-world';
+import { QUALITY, worldScale } from './quality';
 
 /** Paleta del afiche. */
 export const POSTER = {
@@ -227,10 +228,13 @@ export function worldCanvas() {
   if (world) return world;
   const w = 4096;
   const h = 2048;
+  // Se dibuja siempre en 4096 × 2048 "lógicos"; el lienzo real se achica según el equipo (ver worldScale).
+  const k = worldScale();
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = w * k;
+  canvas.height = h * k;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(k, k);
   const v: View = { lon0: -180, lat1: 90, lonSpan: 360, latSpan: 180, w, h };
   drawSea(ctx, w, h, 1, 7);
   const land = LAND.map(unpack);
@@ -264,10 +268,13 @@ export function regionCanvas() {
   if (region) return region;
   const w = 2560;
   const h = 2560;
+  // La región se ve de cerca al cambiar de escena: se reduce menos que el planeta (ver quality.ts).
+  const k = QUALITY.region;
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = w * k;
+  canvas.height = h * k;
   const ctx = canvas.getContext('2d')!;
+  ctx.scale(k, k);
   const v: View = { lon0: REGION.lonMin, lat1: REGION.latMax, lonSpan: REGION.lonMax - REGION.lonMin, latSpan: REGION.latMax - REGION.latMin, w, h };
   const scale = 2.2;
   drawSea(ctx, w, h, scale, 3);
@@ -326,9 +333,20 @@ export const DUSK_GLSL = `vec3 dusk(vec3 c, float k) { return mix(c, c * vec3(1.
 export const DUSK_AT_NUQUI = 0.62;
 
 /** Textura (sRGB) de un lienzo del afiche. */
-export function posterTexture(canvas: HTMLCanvasElement) {
+export function posterTexture(canvas: HTMLCanvasElement, uses = 1) {
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = SRGBColorSpace;
   tex.anisotropy = 8;
+  // Una vez en la tarjeta gráfica (en cada escena que lo usa), el lienzo sobra: se suelta su memoria (decenas de MB) y,
+  // si hiciera falta otra vez, se vuelve a dibujar.
+  tex.onUpdate = () => {
+    const n = (uploads.get(canvas) ?? 0) + 1;
+    uploads.set(canvas, n);
+    if (n < uses) return;
+    canvas.width = canvas.height = 1;
+    if (canvas === world) world = null;
+    if (canvas === region) region = null;
+  };
   return tex;
 }
+const uploads = new WeakMap<HTMLCanvasElement, number>();

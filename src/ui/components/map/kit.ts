@@ -3,9 +3,10 @@
 
 import {
   BoxGeometry, type BufferGeometry, Color, type ColorRepresentation, ConeGeometry, CylinderGeometry, Euler, Float32BufferAttribute,
-  BackSide, BufferGeometry as Geometry, type EulerOrder, Group, IcosahedronGeometry, MeshBasicMaterial, type Object3D, Matrix4, Mesh, MeshStandardMaterial, Quaternion, SkinnedMesh, SphereGeometry, Vector3,
+  BackSide, BufferGeometry as Geometry, type EulerOrder, BatchedMesh, Group, IcosahedronGeometry, InstancedMesh, type Material, MeshBasicMaterial, type Object3D, Matrix4, Mesh, Quaternion, SkinnedMesh, SphereGeometry, Vector3,
 } from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { QUALITY, litMaterial } from './quality';
 
 type V3 = [number, number, number];
 
@@ -17,8 +18,37 @@ export interface PartOpts {
   o?: EulerOrder;
 }
 
+// Las figuras se repiten mucho (15 fragatas, 46 mariposas, decenas de canoas…): la misma pieza con el mismo color y
+// la misma pose se calcula una sola vez, y lo mismo la fusión de las mismas piezas. Las geometrías que salen de aquí
+// no se modifican después (quien necesite cambiarlas, las clona primero, como `bake`).
+const partCache = new Map<string, BufferGeometry>();
+const mergeCache = new Map<string, BufferGeometry>();
+/** Suelta lo memorizado (al cerrar el mapa). */
+export function clearKitCache() {
+  partCache.clear();
+  mergeCache.clear();
+  cylinders.clear();
+}
+
+/**
+ * Para armar la escena sin congelar la página: `await pace()` dentro de un trabajo largo cede el turno al navegador
+ * cada ~12 ms (así el planeta de la entrada sigue girando y respondiendo mientras la costa se arma por detrás).
+ */
+export type Pace = () => Promise<void>;
+export function pacer(budget = 12): Pace {
+  let last = performance.now();
+  return async () => {
+    if (performance.now() - last < budget) return;
+    await new Promise<void>((r) => setTimeout(r, 0));
+    last = performance.now();
+  };
+}
+
 /** Una forma con su color y su posición, lista para fundirse con otras. */
 export function part(geo: BufferGeometry, color: ColorRepresentation, { p = [0, 0, 0], r = [0, 0, 0], s = 1, o = 'XYZ' }: PartOpts = {}) {
+  const key = `${geo.uuid}|${new Color(color).getHexString()}|${p}|${r}|${s}|${o}`;
+  const hit = partCache.get(key);
+  if (hit) return hit;
   const g = geo.index ? geo.toNonIndexed() : geo.clone();
   g.deleteAttribute('uv');
   const scale = typeof s === 'number' ? new Vector3(s, s, s) : new Vector3(...s);
@@ -27,13 +57,156 @@ export function part(geo: BufferGeometry, color: ColorRepresentation, { p = [0, 
   const colors = new Float32Array(g.attributes.position.count * 3);
   for (let i = 0; i < colors.length; i += 3) colors.set([c.r, c.g, c.b], i);
   g.setAttribute('color', new Float32BufferAttribute(colors, 3));
+  partCache.set(key, g);
   return g;
 }
 
-export const merge = (parts: BufferGeometry[]) => mergeGeometries(parts)!;
+export const merge = (parts: BufferGeometry[]) => {
+  const key = parts.map((g) => g.uuid).join(',');
+  let g = mergeCache.get(key);
+  if (!g) mergeCache.set(key, (g = mergeGeometries(parts)!));
+  return g;
+};
+
+/**
+ * Muchas figuras en movimiento (aves, mariposas, canoas, personas) en una llamada de dibujo por material. Cada figura
+ * se sigue armando y animando como un grupo normal, pero fuera de la escena; en cada cuadro la pose de cada pieza
+ * (cuerpo, alas, remo…) se copia a una malla por lotes (BatchedMesh), que además deja de dibujar las piezas que no
+ * están a la vista. Los bordes de calcomanía van en su propio lote.
+ */
+export class Instancer {
+  readonly group = new Group();
+  private pieces: { m: Mesh; id: number; figure: Object3D; batch: BatchedMesh }[] = [];
+  private frame = 0;
+  private stale = new Set<Object3D>();
+  private hidden = new Set<Object3D>();
+  /**
+   * `viewer`: dónde está la cámara. Las figuras a más de `far` se actualizan uno de cada tres cuadros (de lejos no se
+   * nota) y las que pasan de `hideBeyond` no se dibujan (las mariposas, de lejos, miden menos de un píxel).
+   */
+  constructor(private figures: Object3D[], private opts: { viewer?: Vector3; far?: number; hideBeyond?: number } = {}) {
+    const byMaterial = new Map<Material, { m: Mesh; figure: Object3D }[]>();
+    for (const figure of figures) {
+      figure.traverse((c) => {
+        const m = c as Mesh;
+        if (!m.isMesh) return;
+        const list = byMaterial.get(m.material as Material) ?? [];
+        list.push({ m, figure });
+        byMaterial.set(m.material as Material, list);
+      });
+    }
+    for (const [material, list] of byMaterial) {
+      const geos = [...new Set(list.map(({ m }) => m.geometry))];
+      const vertices = geos.reduce((n, g) => n + g.attributes.position.count, 0);
+      const indices = geos.reduce((n, g) => n + (g.index?.count ?? 0), 0);
+      // Copia del material solo para los lotes (mezclar mallas por lotes y normales en un material obliga a three.js a
+      // recalcular su programa en cada cambio).
+      const batch = new BatchedMesh(list.length, vertices, indices, batchMaterial(material));
+      batch.sortObjects = false;
+      batch.frustumCulled = false; // se mueven: se recorta pieza por pieza
+      const ids = new Map(geos.map((g) => [g, batch.addGeometry(g)]));
+      for (const { m, figure } of list) this.pieces.push({ m, figure, batch, id: batch.addInstance(ids.get(m.geometry)!) });
+      this.group.add(batch);
+    }
+  }
+  /** Copia la pose de cada figura (en coordenadas del mundo) a las mallas por lotes. */
+  sync() {
+    const { viewer, far = Infinity, hideBeyond = Infinity } = this.opts;
+    const tick = this.frame++ % 3 === 0;
+    this.stale.clear();
+    const hidden = this.hidden;
+    hidden.clear();
+    for (const f of this.figures) {
+      const d = viewer ? f.position.distanceTo(viewer) : 0;
+      if (d > hideBeyond) hidden.add(f);
+      else if (d > far && !tick) this.stale.add(f);
+      else f.updateMatrixWorld(true);
+    }
+    for (const { m, id, figure, batch } of this.pieces) {
+      if (this.stale.has(figure)) continue;
+      const show = figure.visible && m.visible && !hidden.has(figure);
+      batch.setVisibleAt(id, show);
+      if (show) batch.setMatrixAt(id, m.matrixWorld);
+    }
+  }
+}
+const batchMaterials = new Map<Material, Material>();
+const batchMaterial = (m: Material) => {
+  let copy = batchMaterials.get(m);
+  if (!copy) {
+    copy = m === paint ? paintFlock : m.clone();
+    // clone() no copia el sombreador modificado (el grosor del borde de calcomanía).
+    copy.onBeforeCompile = m.onBeforeCompile;
+    copy.customProgramCacheKey = m.customProgramCacheKey;
+    batchMaterials.set(m, copy);
+  }
+  return copy;
+};
+
+/**
+ * Muchas piezas con la misma forma y el mismo material (bocanadas de nubes y de neblina) en UNA llamada de dibujo.
+ * Las piezas siguen colgando de sus grupos (fuera de la escena), que se mueven como siempre; `sync` copia la posición.
+ */
+export class Batch {
+  readonly group = new Group();
+  private mesh: InstancedMesh | null = null;
+  private pieces: Mesh[] = [];
+  constructor(private holders: Object3D[]) {
+    for (const h of holders) h.traverse((c) => (c as Mesh).isMesh && this.pieces.push(c as Mesh));
+    if (!this.pieces.length) return;
+    this.mesh = new InstancedMesh(this.pieces[0].geometry, this.pieces[0].material, this.pieces.length);
+    this.mesh.frustumCulled = false;
+    this.group.add(this.mesh);
+    this.sync();
+  }
+  sync() {
+    const mesh = this.mesh;
+    if (!mesh) return;
+    for (const h of this.holders) h.updateMatrixWorld(true);
+    this.pieces.forEach((m, i) => mesh.setMatrixAt(i, m.matrixWorld));
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+/**
+ * Funde en una malla por material todo lo que cuelga de `root` y no se mueve (casas, muelles, botes varados): cada
+ * pieza suelta era una llamada de dibujo. Queda en coordenadas del mundo, bajo un grupo nuevo en el origen. Si hay
+ * contornos de calcomanía (dependen de la escala de su pieza) se deja tal cual.
+ */
+export function bake(root: Object3D): Object3D {
+  root.updateMatrixWorld(true);
+  const meshes: Mesh[] = [];
+  let outlined = false;
+  root.traverse((o) => {
+    const m = o as Mesh;
+    if (!m.isMesh) return;
+    if (m.userData.outline || Array.isArray(m.material) || (m as unknown as InstancedMesh).isInstancedMesh) outlined = true;
+    meshes.push(m);
+  });
+  if (outlined || meshes.length < 2) return root;
+  const byKey = new Map<string, { material: Mesh['material']; geos: BufferGeometry[] }>();
+  for (const m of meshes) {
+    let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+    g = g.applyMatrix4(m.matrixWorld);
+    const key = `${(m.material as MeshBasicMaterial).uuid}|${Object.keys(g.attributes).sort().join(',')}`;
+    const entry = byKey.get(key) ?? { material: m.material, geos: [] };
+    entry.geos.push(g);
+    byKey.set(key, entry);
+  }
+  const out = new Group();
+  for (const { material, geos } of byKey.values()) out.add(new Mesh(mergeGeometries(geos)!, material));
+  return out;
+}
 
 /** Material común: los colores vienen de cada pieza. */
-export const paint = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
+export const paint = litMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
+/**
+ * El mismo material para las mallas por lotes: la vegetación (con tono por planta) y las aves y mariposas (sin tono).
+ * Si un mismo material se usa en mallas de distinto tipo, three.js recalcula su programa en cada cambio, cientos de
+ * veces por cuadro; por eso cada uso tiene su copia.
+ */
+export const paintBatched = paint.clone();
+export const paintFlock = paint.clone();
 
 export const solid = (parts: BufferGeometry[]) => new Mesh(merge(parts), paint);
 
@@ -59,6 +232,8 @@ transformed += normalize(normal) * ${width.toPrecision(4)};`);
 
 /** Agrega el borde blanco a todas las mallas de una figura (incluidas las partes que se mueven). */
 export function sticker(root: Object3D, width = 0.45) {
+  // En equipos modestos no hay borde: cada contorno es otra figura entera que dibujar.
+  if (!QUALITY.outlines) return root;
   const meshes: Mesh[] = [];
   root.traverse((o) => {
     if ((o as Mesh).isMesh && !o.userData.outline) meshes.push(o as Mesh);
@@ -80,6 +255,7 @@ export function sticker(root: Object3D, width = 0.45) {
  * esqueleto del original, así el borde se dobla con la animación. `ratio`: grosor respecto al tamaño de la malla.
  */
 export function stickerSkinned(root: Object3D, ratio = 0.015) {
+  if (!QUALITY.outlines) return;
   const meshes: SkinnedMesh[] = [];
   root.traverse((o) => {
     if ((o as SkinnedMesh).isSkinnedMesh && !o.userData.outline) meshes.push(o as SkinnedMesh);
@@ -89,7 +265,8 @@ export function stickerSkinned(root: Object3D, ratio = 0.015) {
     const size = m.geometry.boundingBox!.getSize(new Vector3());
     const hull = new SkinnedMesh(m.geometry, outlineMat(Number((Math.max(size.x, size.y, size.z) * ratio).toPrecision(3))));
     hull.userData.outline = true;
-    hull.frustumCulled = false;
+    hull.boundingSphere = m.boundingSphere?.clone() ?? null;
+    hull.frustumCulled = !!hull.boundingSphere;
     hull.position.copy(m.position);
     hull.quaternion.copy(m.quaternion);
     hull.scale.copy(m.scale);
@@ -111,12 +288,18 @@ export const CONE = new ConeGeometry(1, 1, 7);
 export const CONE4 = new ConeGeometry(1, 1, 4);
 
 /** Cilindro entre dos alturas (para troncos, patas y postes). */
+const cylinders = new Map<string, BufferGeometry>();
 export function pole(color: ColorRepresentation, from: V3, to: V3, radius: number) {
   const a = new Vector3(...from);
   const b = new Vector3(...to);
   const len = a.distanceTo(b);
-  const geo = new CylinderGeometry(radius * 0.8, radius, len, 6);
-  geo.translate(0, len / 2, 0);
+  // El mismo cilindro (largo y grosor) se reutiliza: así la pieza también queda memorizada.
+  const ck = `${radius}|${len.toFixed(4)}`;
+  let geo = cylinders.get(ck);
+  if (!geo) {
+    geo = new CylinderGeometry(radius * 0.8, radius, len, 6).translate(0, len / 2, 0);
+    cylinders.set(ck, geo);
+  }
   const q = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), b.clone().sub(a).normalize());
   const e = new Euler().setFromQuaternion(q);
   return part(geo, color, { p: from, r: [e.x, e.y, e.z] });

@@ -574,7 +574,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .map-labels { position: absolute; inset: 0; pointer-events: none; }
 .map-label {
   pointer-events: auto; border: 0; white-space: nowrap; line-height: 1.15; cursor: pointer;
-  transition: opacity 0.35s, translate 0.25s var(--ease), scale 0.25s var(--ease), background 0.25s, color 0.25s;
+  transition: opacity 0.35s, translate 0.25s var(--ease), background 0.25s, color 0.25s;
 }
 .map-label--town {
   padding: 4px 15px 5px; border: 2px solid var(--p-line); border-radius: 999px; background: var(--p-cream); color: var(--p-ink);
@@ -598,7 +598,9 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   padding: 1px 10px 3px; border-radius: 0 0 3px 3px; background: var(--p-navy); color: #fff;
   font: italic 400 10.5px var(--serif);
 }
-.map-label:hover, .map-label.is-selected { translate: 0 -3px; scale: 1.06; }
+/* Realce: sube un poco y se oscurece. Sin `scale`: se aplicaría también a la posición que le da el renderizador de
+   rótulos (con transform) y lo correría de lado, sobre sus vecinos. */
+.map-label:hover, .map-label.is-selected { translate: 0 -3px; }
 .map-label--site.is-selected { background: #b8264e; }
 .map-label--town.is-selected { background: var(--p-pink); color: #fff; }
 .map-label--nature.is-selected span { background: var(--p-navy); }
@@ -642,6 +644,14 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   transition: opacity 0.8s ease, visibility 0.8s;
 }
 .map-loading.is-hidden { opacity: 0; visibility: hidden; }
+/* Si el navegador quita el 3D (equipo sin memoria): aviso amable en lugar de una pantalla en blanco. */
+.map-lost {
+  position: fixed; inset: 0; z-index: 9; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px;
+  background: linear-gradient(#5b68a2, #f19aa8 45%, #f2ae8a); text-align: center;
+  font: italic 500 clamp(17px, 2.2vw, 22px) var(--serif); text-shadow: 0 2px 12px rgba(40, 20, 40, 0.35);
+}
+.map-lost__hint { font: 14px var(--sans); font-style: normal; opacity: 0.9; }
+.map-lost__diag { margin-top: 18px; font: 11px var(--sans); font-style: normal; opacity: 0.7; text-shadow: none; }
 
 .map-hint {
   position: absolute; z-index: 5; left: 50%; bottom: 64px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
@@ -685,6 +695,10 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   transition: opacity 0.9s ease-in-out, visibility 0.9s;
 }
 .globe-stage canvas { display: block; }
+/* Planeta plano (versión 5): el lienzo cubre la pantalla y se pinta chico (el navegador lo agranda). */
+.flat-globe { position: absolute; inset: 0; width: 100%; height: 100%; }
+.flat-globe__sky { position: absolute; inset: 0; background-repeat: repeat; pointer-events: none; }
+.globe-choco.flat-globe__choco { position: absolute; transform: translate(-50%, -100%); }
 .globe-stage.is-diving { cursor: default; }
 .map-screen.is-landing .globe-stage, .map-screen.is-map .globe-stage, .map-screen.is-leaving .globe-stage { opacity: 0; visibility: hidden; pointer-events: none; }
 .map-screen.is-loading .globe-stage { opacity: 0; }
