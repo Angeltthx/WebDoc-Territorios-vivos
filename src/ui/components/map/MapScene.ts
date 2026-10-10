@@ -743,6 +743,24 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     onSpot?.(spot?.point ?? null);
   }
   const emblemParts: BufferGeometry[] = [];
+  /** El punto de tierra más empinado cerca de (x, z), con la dirección cuesta abajo (dx, dz, unitaria). */
+  const steepest = (x: number, z: number, max: number) => {
+    let best = { x, z, dx: 0, dz: 1, slope: -1 };
+    const e = 25;
+    for (let r = 0; r <= max; r += 40) {
+      for (let k = 0; k < (r ? 16 : 1); k++) {
+        const a = (k / 16) * Math.PI * 2;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (isSea(px, pz)) continue;
+        const gx = groundAt(px + e, pz) - groundAt(px - e, pz);
+        const gz = groundAt(px, pz + e) - groundAt(px, pz - e);
+        const slope = Math.hypot(gx, gz) - r * 0.0004;
+        if (slope > best.slope && slope > 0.01) best = { x: px, z: pz, dx: -gx / Math.hypot(gx, gz), dz: -gz / Math.hypot(gx, gz), slope };
+      }
+    }
+    return best;
+  };
   /** ¿Es mar? (el relieve sin recortar en cero: negativo en el agua). */
   const isSea = (x: number, z: number) => (inFine(x, z) ? heightAt(x, z) : farHeight(x, z)) < 0;
   /** El punto de mar más cercano a (x, z), hasta `max` unidades; un poco mar adentro para que no toque la orilla. */
@@ -794,6 +812,22 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
       let x = at.x - c.z;
       let z = at.z + c.x;
       let y: number;
+      let turn = -Math.PI / 2;
+      if (c.on === 'slope') {
+        // La ladera más empinada a menos de ~400 unidades: ahí nace la cascada, de frente cuesta abajo.
+        const s = steepest(x, z, 400);
+        x = s.x;
+        z = s.z;
+        turn = Math.atan2(s.dx, s.dz);
+        // La base, a la altura del pie de la caída (lo de atrás queda hundido en la loma).
+        y = groundAt(x + s.dx * c.r * 0.35, z + s.dz * c.r * 0.35) - 2;
+        if (inFine(x, z)) clearPlants(flora, x, z, c.r * 1.3);
+        const g = c.geo.clone();
+        g.rotateY(turn);
+        g.translate(x, y, z);
+        emblemParts.push(g);
+        continue;
+      }
       if (c.on === 'air') y = groundAt(at.x, at.z);
       else {
         const water = c.on === 'ground' ? null : nearestSea(x, z, c.on === 'sea' ? 3000 : 700);
