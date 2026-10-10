@@ -39,7 +39,7 @@ export interface ChocoPoint {
  */
 export type FigureExtra = 'canoa' | 'lancha' | 'ballena' | 'cununo' | 'lluvia' | 'termal';
 export interface Figure {
-  main: 'ciudad' | 'cabecera' | 'rancho' | 'playa' | 'selva' | 'cerro' | 'cabo';
+  main: 'ciudad' | 'cabecera' | 'rancho' | 'playa' | 'selva' | 'cerro' | 'cabo' | 'montana';
   extra?: FigureExtra[];
 }
 
@@ -75,7 +75,7 @@ export const CHOCO_POINTS: ChocoPoint[] = [
   { ...m('bellavista', 'Bellavista', 6.557252, -76.88358, 'Atrato'), municipio: 'Bojayá', info: 'Cabecera de Bojayá, a orillas del río Atrato.', figure: { main: 'cabecera', extra: ['canoa'] } },
   { ...m('paimado', 'Paimadó', 5.483774, -76.73957, 'Atrato'), municipio: 'Río Quito', info: 'Cabecera de Río Quito.', figure: { main: 'cabecera', extra: ['canoa'] } },
   { ...m('lloro', 'Lloró', 5.499783, -76.54263, 'Atrato'), info: 'Municipio del Atrato, entre los lugares más lluviosos del planeta.', figure: { main: 'cabecera', extra: ['lluvia'] } },
-  { ...m('carmen-de-atrato', 'El Carmen de Atrato', 5.899266, -76.14245, 'Atrato'), info: 'Municipio en la cordillera Occidental, cerca del límite con Antioquia.', figure: { main: 'cabecera' } },
+  { ...m('carmen-de-atrato', 'El Carmen de Atrato', 5.899266, -76.14245, 'Atrato'), info: 'Municipio en la cordillera Occidental, cerca del límite con Antioquia: un pueblo de montaña y clima frío.', figure: { main: 'montana' } },
   // San Juan.
   { ...m('certegui', 'Cértegui', 5.371904, -76.60857, 'San Juan'), info: 'Municipio de la subregión del San Juan.', figure: { main: 'cabecera' } },
   { ...m('tado', 'Tadó', 5.263378, -76.56212, 'San Juan'), info: 'Municipio a orillas del río San Juan.', figure: { main: 'cabecera', extra: ['canoa'] } },

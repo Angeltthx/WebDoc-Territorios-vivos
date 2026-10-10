@@ -75,6 +75,84 @@ function palm(h = 15, lean = 0.2) {
   ];
 }
 
+/** Iglesia blanca de pueblo de montaña, con su torre y su reloj. */
+function church() {
+  return [
+    part(BOX, '#f6f1e6', { p: [0, 4.5, -2], s: [6, 9, 9] }),
+    part(CONE4, '#9a3f2f', { p: [0, 11, -2], s: [5.4, 3.5, 8.4], r: [0, Math.PI / 4, 0] }),
+    part(BOX, '#f6f1e6', { p: [0, 9, 3.2], s: [3.4, 18, 3.4] }),
+    part(CYL, '#3b2c22', { p: [0, 14, 4.95], s: [1.6, 0.2, 1.6], r: [Math.PI / 2, 0, 0] }),
+    part(CONE4, '#9a3f2f', { p: [0, 20.4, 3.2], s: [3, 5, 3], r: [0, Math.PI / 4, 0] }),
+    part(BOX, '#3b2c22', { p: [0, 2.4, 4.95], s: [1.8, 4, 0.2] }),
+  ];
+}
+
+/** Casa de pueblo de montaña: paredes claras, techo de teja y balcón de madera de color. */
+function balconyHouse(wall: string, roof: string, trim: string) {
+  return [
+    part(BOX, wall, { p: [0, 4.5, 0], s: [7, 9, 6] }),
+    part(CONE4, roof, { p: [0, 11, 0], s: [6.6, 4, 5.8], r: [0, Math.PI / 4, 0] }),
+    part(BOX, trim, { p: [0, 5.2, 3.5], s: [6, 0.4, 1.4] }),
+    part(BOX, trim, { p: [0, 6.1, 4.15], s: [6, 1.4, 0.2] }),
+    part(BOX, '#3b2c22', { p: [-1.6, 7.2, 3.05], s: [1.4, 2.2, 0.2] }),
+    part(BOX, '#3b2c22', { p: [1.6, 7.2, 3.05], s: [1.4, 2.2, 0.2] }),
+    part(BOX, trim, { p: [0, 2, 3.05], s: [1.8, 3.6, 0.2] }),
+  ];
+}
+
+/** Ciprés: árbol alto y angosto de tierra fría. */
+const cypress = (h: number) => [
+  part(CYL, '#5a4330', { p: [0, 1, 0], s: [0.7, 2.4, 0.7] }),
+  part(CONE, '#2d5a3a', { p: [0, h / 2 + 1.5, 0], s: [2.6, h, 2.6] }),
+];
+
+/** Una quebrada que baja en saltos por la ladera, con espuma al caer. */
+function stream() {
+  const parts: Parts = [];
+  for (let k = 0; k < 4; k++) {
+    parts.push(part(BOX, '#7ec8e0', { p: [k * 1.2, 6 - k * 2, -k * 3.2], s: [2.2, 0.3, 3.4] }));
+    parts.push(part(BOX, '#bfe6f2', { p: [k * 1.2, 5 - k * 2, -k * 3.2 + 1.7], s: [2.2, 2, 0.3] }));
+    parts.push(part(BALL, '#ffffff', { p: [k * 1.2, 4.2 - k * 2, -k * 3.2 + 2.3], s: [1.1, 0.6, 0.8] }));
+    parts.push(part(ROCK, '#8a8478', { p: [k * 1.2 + 1.8, 5.4 - k * 2, -k * 3.2], s: [1.2, 1.2, 1.2] }));
+  }
+  return parts;
+}
+
+/** Carretera en zigzag por la montaña, con una chiva de colores subiendo. */
+function road() {
+  const parts: Parts = [];
+  const pts: [number, number][] = [[-8, 6], [6, 3], [-6, -1], [7, -5], [-4, -9]];
+  for (let k = 0; k < pts.length - 1; k++) {
+    const [x0, z0] = pts[k];
+    const [x1, z1] = pts[k + 1];
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    parts.push(part(BOX, '#9a8a70', { p: [(x0 + x1) / 2, 0.15, (z0 + z1) / 2], s: [len + 1.6, 0.3, 1.6], r: [0, -Math.atan2(z1 - z0, x1 - x0), 0] }));
+  }
+  // La chiva: cuerpo de madera pintado de colores, techo con carga.
+  const chiva = [
+    part(BOX, '#e2a33a', { p: [0, 1.6, 0], s: [4.6, 2, 2.2] }),
+    part(BOX, '#e2456f', { p: [0, 1, 0], s: [4.7, 0.6, 2.3] }),
+    part(BOX, '#3e6197', { p: [0, 2.2, 0], s: [4.7, 0.4, 2.3] }),
+    part(BOX, '#f2f2ee', { p: [0, 2.8, 0], s: [4.4, 0.3, 2.1] }),
+    part(BOX, '#8a5a3a', { p: [-0.6, 3.3, 0], s: [2.2, 0.8, 1.6] }),
+    part(BOX, '#e2a33a', { p: [2.9, 1.4, 0], s: [1.2, 1.6, 2] }),
+    part(CYL, '#2a2a2a', { p: [1.6, 0.5, 1.1], s: [1, 0.4, 1], r: [Math.PI / 2, 0, 0] }),
+    part(CYL, '#2a2a2a', { p: [-1.6, 0.5, 1.1], s: [1, 0.4, 1], r: [Math.PI / 2, 0, 0] }),
+  ];
+  const g = mergeGeometries(chiva)!;
+  g.rotateY(-Math.atan2(-4, 13));
+  g.translate(0, 0.3, 1.5);
+  parts.push(g);
+  return parts;
+}
+
+/** Jirones de neblina alrededor del pueblo. */
+const mist = () =>
+  [[-12, 10, 3], [10, 12, -6], [0, 9, -14], [-16, 8, -8], [15, 11, 8]].flatMap(([x, y, z], k) => [
+    part(BALL, '#f4f2f2', { p: [x, y, z], s: [5 + (k % 2) * 2, 1.2, 2.6] }),
+    part(BALL, '#ecebef', { p: [x + 3.5, y + 0.4, z + 0.8], s: [3.4, 1, 2] }),
+  ]);
+
 // ───────── Escenas principales ─────────
 
 const MAIN: Record<Figure['main'], () => Chunk[]> = {
@@ -118,6 +196,26 @@ const MAIN: Record<Figure['main'], () => Chunk[]> = {
     piece(tree(9, '#2f6b2c'), -5, 2, 'ground', 4),
     piece(tree(11, '#3f8a3a'), 4.5, -2.5, 'ground', 4),
     piece(tree(7, '#5aa244', 0.8), 1.5, 5, 'ground', 4),
+  ],
+  // Pueblo de montaña (El Carmen de Atrato, en la cordillera): casas de balcón en terrazas por la ladera, la iglesia
+  // blanca en la plaza, cipreses de clima frío, una quebrada que baja en saltos, la carretera en zigzag con una chiva
+  // subiendo y la neblina enredada en el pueblo.
+  montana: () => [
+    piece(church(), 0, 0, 'ground', 6),
+    // La plaza: un piso de piedra con su árbol.
+    piece([part(BOX, '#b8ae9c', { p: [0, 0.1, 0], s: [9, 0.6, 7] }), ...tree(5, '#3f8a3a', 0.7).map((g) => g.clone().translate(3, 0, 2))], 0, 7, 'ground', 5),
+    ...[[-9, 5, '#f4efe4', '#b84a3a', '#2f7a5a'], [9, 6, '#f2e8d0', '#a8452f', '#c4553a'], [-12, -5, '#efe6d6', '#b84a3a', '#3e6197'],
+      [11, -6, '#f6f1e6', '#9a3f2f', '#e2a33a'], [-4, -11, '#f2e3c6', '#b84a3a', '#7a2f5a'], [5, -13, '#f4efe4', '#a8452f', '#2f7a5a'],
+      [-15, 12, '#f2e8d0', '#9a3f2f', '#c4553a']].map(([x, z, wall, roof, trim]) =>
+      piece(balconyHouse(wall as string, roof as string, trim as string), x as number, z as number, 'ground', 5)),
+    // Cipreses alrededor (clima frío).
+    ...[[-18, -2], [17, 1], [-8, -18], [14, -16], [19, 12], [-20, 6], [2, -20]].map(([x, z], k) => piece(cypress(9 + (k % 3) * 2.5), x, z, 'ground', 2.5)),
+    // La quebrada: baja en saltos a un lado del pueblo.
+    piece(stream(), -22, -12, 'ground', 6),
+    // La carretera en zigzag, con una chiva.
+    piece(road(), 20, 18, 'ground', 9),
+    // Neblina: jirones blancos a media altura, alrededor.
+    piece(mist(), 0, 0, 'air', 0),
   ],
   // Cabo: rocas que salen del agua, con una palma.
   cabo: () => [
@@ -183,7 +281,9 @@ export function figureChunks(fig: Figure): Chunk[] {
     const spot = fig.main === 'ciudad' ? CITY_SLOT[e] : undefined;
     return spot ? { ...c, x: spot[0] * UNIT, z: spot[1] * UNIT } : c;
   });
-  return [...MAIN[fig.main](), ...extras];
+  // El pueblo de montaña se extiende por la ladera: sus piezas más separadas.
+  const main = fig.main === 'montana' ? MAIN.montana().map((c) => ({ ...c, x: c.x * 1.45, z: c.z * 1.45 })) : MAIN[fig.main]();
+  return [...main, ...extras];
 }
 const CITY_SLOT: Partial<Record<FigureExtra, [number, number]>> = { cununo: [5, 7], canoa: [8, 30], lancha: [-6, 32] };
 

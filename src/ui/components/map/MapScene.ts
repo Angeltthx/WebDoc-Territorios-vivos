@@ -738,7 +738,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     openSpot = id;
     for (const s of spots) s.el.classList.toggle('is-open', s.point.id === id);
     const spot = spots.find((s) => s.point.id === id);
-    if (spot) visit(spot.at.clone().setY(spot.at.y - EMBLEM_SIZE * 0.4));
+    if (spot) visit(spot.at.clone().setY(spot.at.y - EMBLEM_SIZE * 0.4), spot.point.figure?.main === 'montana' ? 1300 : 900);
     else if (tour) leaveTour();
     onSpot?.(spot?.point ?? null);
   }
