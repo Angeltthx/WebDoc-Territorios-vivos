@@ -263,6 +263,23 @@ const EXTRA: Record<FigureExtra, () => Chunk> = {
     part(BALL, '#eceef2', { p: [-3.4, 21.6, -0.5], s: [3.2, 2.3, 3] }),
     ...[-3, -1, 1, 3].map((x, k) => pole('#8fb6e0', [x, 19 - (k % 2) * 2, (k % 2) - 0.5], [x - 0.5, 15 - (k % 2) * 2, (k % 2) - 0.5], 0.18)),
   ], 0, 0, 'air', 0),
+  // Cascada: un peñasco con musgo, el agua que cae en dos chorros y la espuma en su pozo (detrás, hacia la selva).
+  cascada: () => piece([
+    part(ROCK, '#6f7466', { p: [0, 7, -2.5], s: [7, 9, 4] }),
+    part(ROCK, '#5f6658', { p: [-4.5, 4.5, -1.5], s: [4, 6, 3.5] }),
+    part(ROCK, '#7a8070', { p: [4.5, 5, -1.8], s: [3.6, 6.5, 3.2] }),
+    part(BALL, '#3f7a3a', { p: [-1.5, 15, -2.5], s: [4, 1.6, 3] }),
+    part(BALL, '#4f8a3e', { p: [3, 14, -2], s: [3, 1.4, 2.6] }),
+    // El agua: dos chorros redondos (se ven desde cualquier lado), claros, con su brillo.
+    part(CYL, '#5fbfe8', { p: [0, 7.6, 0.4], s: [2.6, 14, 2.2] }),
+    part(CYL, '#e8f8ff', { p: [-0.5, 7.6, 1.3], s: [0.8, 14, 0.8] }),
+    part(CYL, '#5fbfe8', { p: [2.8, 5.6, 0.2], s: [1.4, 10, 1.4] }),
+    part(CYL, '#4aa3c4', { p: [0.5, 0.15, 3], s: [7, 0.4, 5] }),
+    part(BALL, '#ffffff', { p: [0, 1, 1.4], s: [3, 1.6, 2.4] }),
+    part(BALL, '#f2fbfd', { p: [2.6, 0.8, 1.4], s: [1.8, 1.2, 1.6] }),
+    part(BALL, '#ffffff', { p: [-1.6, 0.6, 2.6], s: [1.4, 0.9, 1.2] }),
+    part(ROCK, '#7a8070', { p: [-3.2, 0.5, 4], s: [1.2, 1, 1.2] }),
+  ], -6, -12, 'ground', 7),
   // Pozo de agua caliente con su vapor, junto a las casas.
   termal: () => piece([
     part(CYL, '#9a9088', { p: [0, 0.2, 0], s: [6.4, 0.8, 6.4] }),

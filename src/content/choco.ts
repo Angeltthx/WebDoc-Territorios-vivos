@@ -37,7 +37,8 @@ export interface ChocoPoint {
  * La figurita de un punto: su escena principal (una ciudad, un pueblo cabecera, un caserío de casas en zancos, una
  * playa, selva, un cerro o un cabo) y detalles de lo que lo distingue (ver map/emblems.ts).
  */
-export type FigureExtra = 'canoa' | 'lancha' | 'ballena' | 'cununo' | 'lluvia' | 'termal';
+// La cascada es un detalle escondido: solo en los lugares con una cascada conocida (Tutunendo, Guachalito, El Valle).
+export type FigureExtra = 'canoa' | 'lancha' | 'ballena' | 'cununo' | 'lluvia' | 'termal' | 'cascada';
 export interface Figure {
   main: 'ciudad' | 'cabecera' | 'rancho' | 'playa' | 'selva' | 'cerro' | 'cabo' | 'montana';
   extra?: FigureExtra[];
@@ -50,12 +51,12 @@ export const CHOCO_POINTS: ChocoPoint[] = [
   // Costa norte (Pacífico Norte), de norte a sur.
   { ...m('jurado', 'Juradó', 7.103169, -77.76232, 'Pacífico Norte'), info: 'El municipio más al norte de la costa pacífica del Chocó, cerca de la frontera con Panamá.', figure: { main: 'cabecera', extra: ['lancha'] } },
   { ...m('bahia-solano', 'Bahía Solano', 6.224564, -77.40343, 'Pacífico Norte'), info: 'Su cabecera es Ciudad Mutis. Con Nuquí, uno de los lugares para ver las ballenas jorobadas entre julio y octubre.', figure: { main: 'cabecera', extra: ['ballena', 'lancha'] } },
-  { id: 'el-valle', name: 'El Valle', kind: 'corregimiento', lat: 6.104202, lon: -77.42656, subregion: 'Pacífico Norte', municipio: 'Bahía Solano', info: 'Corregimiento de Bahía Solano, junto a la playa El Almejal.', figure: { main: 'rancho', extra: ['lancha'] } },
+  { id: 'el-valle', name: 'El Valle', kind: 'corregimiento', lat: 6.104202, lon: -77.42656, subregion: 'Pacífico Norte', municipio: 'Bahía Solano', info: 'Corregimiento de Bahía Solano, junto a la playa El Almejal. Al norte, camino a Bahía Solano, cae la cascada El Tigre.', figure: { main: 'rancho', extra: ['lancha', 'cascada'] } },
   { id: 'utria', name: 'Parque Nacional Natural Utría', kind: 'parque', lat: 5.994606, lon: -77.34117, subregion: 'Pacífico Norte', info: 'Parque nacional entre Bahía Solano y Nuquí: una ensenada rodeada de manglar y selva.', figure: { main: 'selva', extra: ['ballena'] } },
   { id: 'morromico', name: 'Morromico', kind: 'playa', lat: 5.873466, lon: -77.2953, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa al norte de Jurubidá, entre la selva y el mar.', figure: { main: 'playa' } },
   // Costa al sur de Coquí (Nuquí) y Baudó (Pacífico Sur).
   { id: 'jovi', name: 'Joví', kind: 'corregimiento', lat: 5.615605, lon: -77.38296, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, en la desembocadura del río Joví.', figure: { main: 'rancho', extra: ['canoa'] } },
-  { id: 'guachalito', name: 'Guachalito', kind: 'playa', lat: 5.628702, lon: -77.40592, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa larga entre Coquí y Termales.', figure: { main: 'playa' } },
+  { id: 'guachalito', name: 'Guachalito', kind: 'playa', lat: 5.628702, lon: -77.40592, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa larga entre Coquí y Termales. Cerca, en la selva, está la cascada del Amor.', figure: { main: 'playa', extra: ['cascada'] } },
   { id: 'termales', name: 'Termales', kind: 'corregimiento', lat: 5.606169, lon: -77.44128, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí que debe su nombre a sus aguas termales.', figure: { main: 'rancho', extra: ['termal'] } },
   { id: 'partado', name: 'Partadó', kind: 'corregimiento', lat: 5.596871, lon: -77.4552, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, camino a Cabo Corrientes.', figure: { main: 'rancho' } },
   { id: 'arusi', name: 'Arusí', kind: 'corregimiento', lat: 5.595341, lon: -77.47415, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, cerca de Cabo Corrientes.', figure: { main: 'rancho', extra: ['lancha'] } },
@@ -70,7 +71,7 @@ export const CHOCO_POINTS: ChocoPoint[] = [
   { ...m('puerto-meluk', 'Puerto Meluk', 5.192699, -76.95127, 'Pacífico Sur'), municipio: 'Medio Baudó', info: 'Cabecera de Medio Baudó, a orillas del río Baudó.', figure: { main: 'cabecera', extra: ['canoa'] } },
   // Atrato.
   { ...m('quibdo', 'Quibdó', 5.691283, -76.65313, 'Atrato'), info: 'La capital del Chocó, a orillas del río Atrato. Sus fiestas de San Pacho son Patrimonio Cultural Inmaterial de la Humanidad.', figure: { main: 'ciudad', extra: ['canoa', 'cununo'] } },
-  { id: 'tutunendo', name: 'Tutunendo', kind: 'corregimiento', lat: 5.744297, lon: -76.54077, subregion: 'Atrato', municipio: 'Quibdó', info: 'Corregimiento de Quibdó, famoso por ser uno de los lugares más lluviosos del mundo.', figure: { main: 'rancho', extra: ['lluvia'] } },
+  { id: 'tutunendo', name: 'Tutunendo', kind: 'corregimiento', lat: 5.744297, lon: -76.54077, subregion: 'Atrato', municipio: 'Quibdó', info: 'Corregimiento de Quibdó, famoso por ser uno de los lugares más lluviosos del mundo y por sus cascadas, como Sal de Frutas.', figure: { main: 'rancho', extra: ['lluvia', 'cascada'] } },
   { ...m('bete', 'Beté', 5.994886, -76.78227, 'Atrato'), municipio: 'Medio Atrato', info: 'Cabecera de Medio Atrato, a orillas del río Atrato.', figure: { main: 'cabecera', extra: ['canoa'] } },
   { ...m('bellavista', 'Bellavista', 6.557252, -76.88358, 'Atrato'), municipio: 'Bojayá', info: 'Cabecera de Bojayá, a orillas del río Atrato.', figure: { main: 'cabecera', extra: ['canoa'] } },
   { ...m('paimado', 'Paimadó', 5.483774, -76.73957, 'Atrato'), municipio: 'Río Quito', info: 'Cabecera de Río Quito.', figure: { main: 'cabecera', extra: ['canoa'] } },
