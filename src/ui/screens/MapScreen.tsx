@@ -344,10 +344,10 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
           {/* Ayuda, contar una historia y la tienda: en la barra de abajo, con la letra de los pueblos. */}
           <nav className="map-tools" aria-label="Más del mapa">
             {([
-              ['ayuda', 'help', 'Ayuda'],
-              ['historia', 'story', 'Tu historia'],
-              ['tienda', 'shop', 'Tienda'],
-            ] as const).map(([id, icon, label]) => (
+              ['ayuda', 'help', 'Ayuda', 'Cómo moverte por el mapa y qué hay en cada lugar.'],
+              ['historia', 'story', 'Tu historia', 'Un espacio para contar algo que viviste en el Chocó —escrito o con tu voz— y que aparezca en el mapa, en su lugar.'],
+              ['tienda', 'shop', 'Tienda', 'Afiches, postales y objetos del recorrido para llevarte un pedazo del Pacífico.'],
+            ] as const).map(([id, icon, label, tip]) => (
               <button
                 key={id}
                 type="button"
@@ -362,6 +362,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
               >
                 <LineIcon name={icon} size={16} />
                 <span>{label}</span>
+                <span className="map-tool__tip" aria-hidden="true"><strong>{label}</strong>{tip}</span>
               </button>
             ))}
           </nav>

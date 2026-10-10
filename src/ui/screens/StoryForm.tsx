@@ -2,15 +2,18 @@
 // historia. Todavía no envía nada: al final muestra cómo quedaría el envío. Cuando se conecte, cada historia llega
 // «pendiente» a la revisión del equipo y, si se aprueba, aparece en el mapa en su lugar.
 //
-// Con la voz del webdoc: fondo oscuro, letra blanca (IBM Plex Sans, en cursiva para lo que se cuenta), y vivo: una
-// barra de pasos que se va llenando, el tipo de historia con las figuritas del mapa (se elige solo según lo que se
-// cuenta, y se puede cambiar), grabar un audio ahí mismo y, al lado, cómo se verá la historia en el mapa.
+// No es una página que cuenta una historia: es el espacio para que alguien cuente la suya. Por eso es sobria (blanco,
+// líneas finas, la letra del webdoc) y deja el protagonismo a lo que se escribe. La primera vez, un tutorial corto
+// explica para qué es (ver StoryTutorial). Vivo sin ruido: pasos que se marcan, el tipo de historia con las figuritas
+// del mapa (se elige solo según lo que se cuenta, y se puede cambiar), grabar la voz ahí mismo y, al lado, cómo se
+// verá en el mapa.
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CHOCO_MUNICIPALITIES, MAX_FILE_MB } from '../../content/stories';
 import { EMBLEM_LABEL, SUBREGION_OF, categorize, type Emblem } from '../../content/choco';
 import { Sheet, type Origin } from '../components/Sheet';
 import { EmblemIcon } from '../components/EmblemIcon';
+import { StoryTutorial, TUTORIAL_SEEN } from '../components/StoryTutorial';
 
 interface Attachment {
   file: File;
@@ -89,6 +92,14 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
   /** Ya se mostró una vez (al volver del agradecimiento, el formulario no repite la entrada). */
   const [visited, setVisited] = useState(false);
   const [sent, setSent] = useState(false);
+  // El tutorial: solo la primera vez (y cuando se pide con «¿Cómo funciona?»).
+  const [tutorial, setTutorial] = useState(() => {
+    try {
+      return !localStorage.getItem(TUTORIAL_SEEN);
+    } catch {
+      return true;
+    }
+  });
 
   // Las vistas previas se sueltan al quitarlas o al salir.
   const current = useRef(files);
@@ -129,10 +140,10 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
 
   // Cómo va: cada paso se marca al completarse (los archivos son opcionales: cuentan si se agregó alguno).
   const steps = [
-    { label: 'Tu historia', done: title.trim().length > 2 && story.trim().length >= MIN_STORY },
+    { label: 'Cuéntala', done: title.trim().length > 2 && story.trim().length >= MIN_STORY },
     { label: 'Dónde', done: !!town },
-    { label: 'Archivos', done: files.length > 0 },
-    { label: 'Sobre ti', done: name.trim().length > 1 && consent },
+    { label: 'Voz y fotos', done: files.length > 0 },
+    { label: 'Tú', done: name.trim().length > 1 && consent },
   ];
   const progress = steps.filter((s) => s.done).length / steps.length;
   /** Lo obligatorio está completo (los archivos son opcionales). */
@@ -163,7 +174,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
 
   if (sent) {
     return (
-      <Sheet eyebrow="Cuéntanos tu historia" title="¡Gracias por contarla!" onClose={onClose} aside={preview} origin={origin} tone="dark" still>
+      <Sheet eyebrow="Tu historia" title="Gracias por contarla" onClose={onClose} aside={preview} origin={origin} still>
         <div className="story-sent">
           <p className="story-sent__lead">
             «{title}», en {place}, llegaría al equipo de Territorios Vivos. Después de revisarla, aparecería en el mapa,
@@ -180,13 +191,14 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
     <Sheet
       origin={origin}
       still={visited}
-      tone="dark"
-      eyebrow="Cuéntanos tu historia"
-      title="¿Qué viviste en el Chocó?"
-      intro="Una historia, un recuerdo, una receta, un canto… Cuéntanos qué pasó y dónde."
+      eyebrow="Tu historia"
+      title="Este espacio es tuyo"
+      intro="Para que lo que viviste en el Chocó —un recuerdo, una receta, un canto— tenga su lugar en el mapa."
       onClose={onClose}
       aside={preview}
+      overlay={tutorial && <StoryTutorial onDone={() => setTutorial(false)} />}
     >
+      <button type="button" className="story-how" onClick={() => setTutorial(true)}>¿Cómo funciona?</button>
       {/* Cómo va: cuatro pasos que se llenan. */}
       <ol className="story-progress" aria-label="Pasos">
         {steps.map((s, i) => (
@@ -200,7 +212,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
 
       <form className="story-form" onSubmit={submit}>
         <section className="story-step">
-          <h3 className="story-step__title"><span className="story-step__n">01</span>Tu historia</h3>
+          <h3 className="story-step__title"><span className="story-step__n">01</span>Cuéntala</h3>
           <label className="story-field">
             <span className="story-field__label">Título</span>
             <input name="title" required maxLength={90} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="La noche que llegaron las ballenas" />
@@ -280,7 +292,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
         </section>
 
         <section className="story-step">
-          <h3 className="story-step__title"><span className="story-step__n">03</span>Fotos, audios y videos <em>opcional</em></h3>
+          <h3 className="story-step__title"><span className="story-step__n">03</span>Tu voz, fotos o video <em>opcional</em></h3>
           <div className="story-media">
             <label className="story-drop">
               <input type="file" multiple accept="image/*,audio/*,video/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
@@ -322,7 +334,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
         </section>
 
         <section className="story-step">
-          <h3 className="story-step__title"><span className="story-step__n">04</span>Sobre ti</h3>
+          <h3 className="story-step__title"><span className="story-step__n">04</span>Tú</h3>
           <div className="story-row">
             <label className="story-field">
               <span className="story-field__label">Tu nombre <em>o cómo quieres aparecer</em></span>
