@@ -89,6 +89,8 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [data-no-arrows]') || document.querySelector('dialog[open]')) return;
+      // Una página que usa las flechas para sí misma (el mapa 3D del cierre).
+      if (el.querySelector('.is-active [data-no-arrows]')) return;
       const current = anchor.current;
       if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); scrollToIndex(current + 1); }
       else if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); scrollToIndex(current - 1); }

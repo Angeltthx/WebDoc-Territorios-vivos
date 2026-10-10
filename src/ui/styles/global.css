@@ -302,27 +302,9 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 @keyframes rain { to { background-position: -40px 200px; } }
 
 /* ───────── 20 · Cierre ───────── */
-.screen--closing { background: #5f5c58; }
-.closing { position: absolute; inset: 0; display: grid; justify-items: center; align-content: start; text-align: center; padding: 50px 20px 90px; }
-.closing__quote { font: italic 400 clamp(22px, 2.2vw, 30px) var(--sans); animation: rise 1s var(--ease) both; }
-.closing__by { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
-.closing h2 { margin-top: 36px; font: 400 clamp(18px, 1.9vw, 24px) var(--sans); letter-spacing: 0.03em; animation: rise 1s var(--ease) 0.3s both; }
-.closing__map { position: relative; width: min(560px, 80vw); aspect-ratio: 16 / 9; margin-top: 30px; }
-.closing__lake { position: absolute; left: 12%; right: 12%; top: 30%; bottom: 20%; border-radius: 50%; background: #75716c; border: 1px solid #8f8a84; transform: rotate(-3deg); }
-.closing__pin {
-  position: absolute; border: 0; padding: 0; cursor: pointer; width: clamp(34px, 5vw, 56px); aspect-ratio: 1; display: grid; place-items: center; animation: rise 0.9s var(--ease) both; transition: transform 0.3s var(--ease);
-}
-.closing__pin span { width: 30%; aspect-ratio: 1; border-radius: 50%; background: rgba(90, 170, 150, 0.9); }
-.closing__pin:hover { transform: translateY(-5px) scale(1.06); }
-.closing__pin--1 { left: 13%; top: 16%; animation-delay: 0.4s; }
-.closing__pin--1 span { background: #5fc7a2; }
-.closing__pin--2 { left: 63%; top: 4%; animation-delay: 0.55s; }
-.closing__pin--2 span { background: #b9c14a; }
-.closing__pin--3 { left: 22%; top: 66%; animation-delay: 0.7s; }
-.closing__pin--3 span { background: #8cb8ee; }
-.closing__pin--4 { left: 70%; top: 70%; width: clamp(40px, 6vw, 68px); animation-delay: 0.85s; }
-.closing__pin--4 span { background: #fff; }
-.closing__actions { position: absolute; right: 80px; bottom: 0; display: flex; justify-content: flex-end; align-items: center; gap: 10px; flex-wrap: wrap; padding: var(--gutter); }
+/* El cierre es el mapa 3D (desde el planeta). Dentro del recorrido ocupa su página en vez de toda la ventana. */
+.screen--closing { background: #03060c; }
+.screen--closing .map-loading, .map-screen.map-screen--embedded, .map-screen--embedded .map-loading, .map-screen--embedded .map-lost { position: absolute; }
 .btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid transparent; font-size: 13px; font-weight: 500; transition: transform 0.2s; }
 .btn:hover { transform: translateY(-1px); }
 .btn--dark { background: #3c3a37; color: #fff; border-color: rgba(255, 255, 255, 0.35); }

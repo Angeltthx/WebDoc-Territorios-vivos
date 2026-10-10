@@ -1,4 +1,4 @@
-// Mapa 3D de prueba (/mapa). Empieza con el planeta Tierra (arte del afiche): solo el Chocó se puede tocar.
+// Mapa 3D: el cierre del recorrido (última página del webdoc) y, aparte, la dirección de prueba. Empieza con el planeta Tierra (arte del afiche): solo el Chocó se puede tocar.
 // Al tocarlo o acercarse, el planeta gira hasta Nuquí y baja; a mitad de camino el mapa de la costa sigue la misma
 // bajada con el mismo encuadre y las dos escenas se funden, hasta quedar frente a la costa, desde el mar.
 // Se carga bajo demanda para que three.js no pese en el resto del recorrido.
@@ -21,7 +21,11 @@ const INVITE_SEEN = 'mapa-invitacion-vista';
  * las dos escenas 3D en memoria más que durante el cambio. */
 const RELEASE_GLOBE = TIER === 'baja' || TIER === 'minima' || TIER === 'segura';
 
-export default function MapScreen() {
+export default function MapScreen({ embedded = false, onBack }: {
+  /** Dentro del recorrido (última página): ocupa su página y «Volver al recorrido» sube a la anterior. */
+  embedded?: boolean;
+  onBack?: () => void;
+} = {}) {
   const stage = useRef<HTMLDivElement>(null);
   const globeStage = useRef<HTMLDivElement>(null);
   const handle = useRef<MapSceneHandle | null>(null);
@@ -60,14 +64,15 @@ export default function MapScreen() {
     }
   }, [phase, invite]);
 
-  // Página de prueba: que los buscadores no la indexen.
+  // Dirección de prueba: que los buscadores no la indexen.
   useEffect(() => {
+    if (embedded) return;
     const meta = document.createElement('meta');
     meta.name = 'robots';
     meta.content = 'noindex, nofollow';
     document.head.appendChild(meta);
     return () => meta.remove();
-  }, []);
+  }, [embedded]);
 
   useEffect(() => {
     // Primero el planeta (lo que se ve al entrar) y, cuando ya está listo, la costa se arma por detrás, en pausa, sin
@@ -174,7 +179,8 @@ export default function MapScreen() {
   const onMap = phase === 'map';
 
   return (
-    <main className={`map-screen is-${phase}`}>
+    // En el recorrido, el mapa usa las flechas del teclado (no pasan de página: ver `data-no-arrows`).
+    <div className={`map-screen is-${phase}${embedded ? ' map-screen--embedded' : ''}`} data-no-arrows={embedded || undefined}>
       <div ref={stage} className="map-stage" />
       <div ref={globeStage} className="globe-stage" aria-hidden={onMap} />
       <p className={`map-loading${phase !== 'loading' ? ' is-hidden' : ''}`}>Cargando el mapa…</p>
@@ -214,9 +220,15 @@ export default function MapScreen() {
                 <span aria-hidden="true">◍</span> Ver el planeta
               </button>
             )}
-            <Link className="ghost-link" to="/">
-              <span aria-hidden="true">←</span> Volver al recorrido
-            </Link>
+            {onBack ? (
+              <button type="button" className="ghost-link" onClick={onBack}>
+                <span aria-hidden="true">↑</span> Volver al recorrido
+              </button>
+            ) : (
+              <Link className="ghost-link" to="/">
+                <span aria-hidden="true">←</span> Volver al recorrido
+              </Link>
+            )}
           </>
         }
       />
@@ -257,6 +269,6 @@ export default function MapScreen() {
           </nav>
         </>
       )}
-    </main>
+    </div>
   );
 }
