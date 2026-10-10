@@ -857,6 +857,14 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .sheet:not(.is-still) .sheet__heading > :nth-child(3) { animation-delay: 0.46s; }
 .sheet:not(.is-still) .sheet__heading > :nth-child(4) { animation-delay: 0.54s; }
 .sheet:not(.is-still) .sheet__body { animation: sheet-up 0.8s var(--ease) 0.45s both; }
+/* Con «reducir movimiento» (en Windows: efectos de animación apagados) el resto del sitio se queda quieto, pero la hoja
+   no aparece de golpe: entra y sale fundiéndose, sin moverse. */
+@keyframes sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-unfade { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sheet:not(.is-still) { animation: sheet-fade 0.45s ease both !important; }
+  .sheet.is-leaving { animation: sheet-unfade 0.45s ease both !important; }
+}
 .sheet-page { position: fixed; inset: 0; }
 .has-sheet .dock, .has-sheet .menu-btn { display: none; }
 .sheet__hero {
