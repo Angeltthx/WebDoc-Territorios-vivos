@@ -7,6 +7,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
 import { Arrow, TopBar } from '../components/Chrome';
+import { LineIcon } from '../components/Sheet';
+import Shop from './Shop';
+import StoryForm from './StoryForm';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { createFlatGlobe } from '../components/map/FlatGlobe';
 import { DIVE } from '../components/map/dive';
@@ -38,6 +41,12 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
+  /** Lo que se abrió desde los íconos de la costa. La tienda y el formulario tapan el mapa: mientras tanto, se pausa. */
+  const [panel, setPanel] = useState<'ayuda' | 'historia' | 'tienda' | null>(null);
+  useEffect(() => {
+    const cover = panel === 'historia' || panel === 'tienda';
+    handle.current?.setActive(!cover);
+  }, [panel]);
   /** Dentro del recorrido: el visitante ya está jugando con el planeta (lo tocó o lo giró). Antes de eso, la rueda y
    * deslizar el dedo hacia abajo mueven la página, para poder volver a la historia; después, la rueda acerca el
    * planeta y baja al Chocó. */
@@ -208,6 +217,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   };
 
   const onMap = phase === 'map';
+  const closePanel = () => setPanel(null);
 
   return (
     // En el recorrido, la costa usa las flechas del teclado (no pasan de página: ver `data-no-arrows`); en el planeta,
@@ -302,6 +312,42 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
             <span className="map-pull__bar" style={{ transform: `scaleX(${pull})` }} />
           </p>
           <p className={`map-hint${hint && !place ? '' : ' is-hidden'}`}>Arrastra para recorrer la costa · rueda o pellizca para acercarte · toca un lugar</p>
+          {/* Íconos discretos de la costa: ayuda, contar una historia y la tienda. */}
+          <nav className="map-tools" aria-label="Más del mapa">
+            {([
+              ['ayuda', 'help', 'Ayuda'],
+              ['historia', 'story', 'Tu historia'],
+              ['tienda', 'shop', 'Tienda'],
+            ] as const).map(([id, icon, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`map-tool${panel === id ? ' is-active' : ''}`}
+                onClick={() => setPanel(panel === id ? null : id)}
+                aria-pressed={panel === id}
+              >
+                <LineIcon name={icon} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+          {panel === 'ayuda' && (
+            <aside className="map-help" aria-label="Ayuda">
+              <p className="eyebrow">Cómo moverse</p>
+              <ul>
+                <li><strong>Arrastra</strong> para recorrer la costa, de Jurubidá a Coquí.</li>
+                <li><strong>Rueda o pellizca</strong> para acercarte; sigue alejándote para volver al planeta.</li>
+                <li><strong>Toca un lugar</strong> o un animal para saber qué es.</li>
+                <li>Abajo, <strong>los pueblos</strong> te llevan directo a cada uno.</li>
+              </ul>
+              <p className="eyebrow">También</p>
+              <ul>
+                <li><strong>Tu historia:</strong> cuéntanos algo que viviste en el Chocó y aparecerá en el mapa.</li>
+                <li><strong>Tienda:</strong> lleva un pedazo del Pacífico.</li>
+              </ul>
+              <button type="button" className="map-card__close" aria-label="Cerrar ayuda" onClick={closePanel}>×</button>
+            </aside>
+          )}
           <nav className="map-towns tabs" aria-label="Pueblos de la costa, de norte a sur">
             {MAP_TOWNS.map((t) => (
               <button key={t.id} type="button" className={`tab${t.id === town ? ' is-active' : ''}`} onClick={() => goTown(t.id)}>
@@ -311,6 +357,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
           </nav>
         </>
       )}
+      {onMap && panel === 'historia' && <StoryForm onClose={closePanel} />}
+      {onMap && panel === 'tienda' && <Shop onClose={closePanel} />}
     </div>
   );
 }
