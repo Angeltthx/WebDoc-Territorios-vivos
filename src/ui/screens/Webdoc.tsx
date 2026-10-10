@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getStation, stations, transitions, voices } from '../../content/journey';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { getStation, transitions, voices } from '../../content/journey';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
 import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
-  Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, STATION_PAGE, SiteMenu, SocialLinks,
+  Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
   StationGuide, TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
 import { GalleryPanel, QuotePanel, RecipePanel, SilencePanel, SongsPanel, VideoPanel } from '../components/Sections';
@@ -103,7 +103,7 @@ function PageView({ spec, next, playing, near, muted, openGuide }: {
   muted: boolean;
   openGuide: () => void;
 }) {
-  const { scrollToIndex, scrollToPage } = useJourneyNav();
+  const { scrollToIndex } = useJourneyNav();
   switch (spec.kind) {
     case 'welcome':
       return (
@@ -213,7 +213,7 @@ function PageView({ spec, next, playing, near, muted, openGuide }: {
       );
 
     case 'closing':
-      return <ClosingPage onRestart={() => scrollToIndex(0)} onStation={(id) => scrollToPage(STATION_PAGE[id])} />;
+      return <ClosingMap playing={playing} near={near} onBack={() => scrollToIndex(pages.length - 2)} />;
   }
 }
 
@@ -331,38 +331,27 @@ function SoundOff() {
   );
 }
 
-const PIN_COLORS = ['#ffffff', '#5fc7a2', '#8fbf5a', '#8cb8ee'];
+const MapScreen = lazy(() => import('./MapScreen'));
 
-function ClosingPage({ onRestart, onStation }: { onRestart: () => void; onStation: (id: string) => void }) {
-  const [soon, setSoon] = useState(false);
+/**
+ * Cierre del recorrido: el mapa 3D, desde el planeta. Se arma al llegar a esta página (no antes, para no cargar el
+ * celular mientras se ven los videos) y se suelta al alejarse más de una página.
+ */
+function ClosingMap({ playing, near, onBack }: { playing: boolean; near: boolean; onBack: () => void }) {
+  const [mounted, setMounted] = useState(playing);
+  useEffect(() => {
+    if (playing) setMounted(true);
+    else if (!near) setMounted(false);
+  }, [playing, near]);
   return (
-    <div className="screen screen--closing" aria-labelledby="closing-title">
-      <TopBar label="Cierre · Mapa 3D" right={<ChachitaTag />} />
-      <div className="closing">
-        <p className="closing__quote">volver a las raíces</p>
-        <p className="closing__by">— Chachita</p>
-        <h2 id="closing-title">¿cuál es tu río?</h2>
-        <div className="closing__map">
-          <div className="closing__lake" aria-hidden="true" />
-          {stations.map((s, i) => (
-            <button
-              key={s.id}
-              type="button"
-              className={`closing__pin closing__pin--${i + 1}`}
-              style={{ background: PIN_COLORS[i] }}
-              aria-label={`Estación ${s.number}: ${s.name}, ${s.place}`}
-              onClick={() => onStation(s.id)}
-            >
-              <span />
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="closing__actions">
-        {soon && <p className="notice" role="status">Aportar historias llegará en una fase posterior.</p>}
-        <button type="button" className="btn btn--dark" onClick={onRestart}>↻ volver a empezar</button>
-        <button type="button" className="btn btn--light" onClick={() => setSoon(true)}>+ aportar tu historia</button>
-      </div>
+    <div className="screen screen--closing" aria-label="Cierre · Mapa 3D">
+      {mounted ? (
+        <Suspense fallback={<p className="map-loading">Cargando el mapa…</p>}>
+          <MapScreen embedded onBack={onBack} />
+        </Suspense>
+      ) : (
+        <p className="map-loading">Cargando el mapa…</p>
+      )}
     </div>
   );
 }
