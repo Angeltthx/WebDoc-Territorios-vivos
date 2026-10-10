@@ -15,7 +15,7 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MapPlace } from '../../../content/map';
 import { CHOCO_POINTS, SUBREGION_LABELS, categorize, type ChocoPoint } from '../../../content/choco';
-import { EMBLEM_SIZE, emblemGeometry, figureGeometry } from './emblems';
+import { EMBLEM_SIZE, figureChunks, storyChunks } from './emblems';
 import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
 import { Batch, type Pace, clearKitCache, pacer, paint, sticker } from './kit';
 import { buildFlora, buildMist, clearPlants } from './flora';
@@ -738,6 +738,21 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     onSpot?.(spot?.point ?? null);
   }
   const emblemParts: BufferGeometry[] = [];
+  /** ¿Es mar? (el relieve sin recortar en cero: negativo en el agua). */
+  const isSea = (x: number, z: number) => (inFine(x, z) ? heightAt(x, z) : farHeight(x, z)) < 0;
+  /** El punto de mar más cercano a (x, z), hasta `max` unidades; un poco mar adentro para que no toque la orilla. */
+  const nearestSea = (x: number, z: number, max: number): [number, number] | null => {
+    if (isSea(x, z) && isSea(x + 40, z) && isSea(x - 40, z)) return [x, z];
+    for (let r = 60; r <= max; r += 60) {
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (isSea(px, pz) && isSea(px + Math.cos(a) * 50, pz + Math.sin(a) * 50)) return [px + Math.cos(a) * 30, pz + Math.sin(a) * 30];
+      }
+    }
+    return null;
+  };
   function addSpot(point: ChocoPoint, kind: string = point.kind) {
     const el = document.createElement('button');
     el.type = 'button';
@@ -751,22 +766,50 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     el.addEventListener('click', () => selectSpot(openSpot === point.id ? null : point.id));
     const label = new CSS2DObject(el);
     const at = toScene(point.lat, point.lon);
-    // La base va a la altura del punto más alto bajo ella: en una ladera, sin quedar medio enterrada.
-    let ground = groundAt(at.x, at.z);
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2;
-      ground = Math.max(ground, groundAt(at.x + Math.cos(a) * EMBLEM_SIZE * 0.45, at.z + Math.sin(a) * EMBLEM_SIZE * 0.45));
+    // El relieve de fondo es grueso (≈ 2,8 km): una punta o un pueblo de la orilla pueden caer en el agua. Se corren a
+    // la tierra más cercana (como mucho 2,5 km).
+    if (isSea(at.x, at.z)) {
+      search: for (let r = 40; r <= 2500; r += 40) {
+        for (let k = 0; k < 24; k++) {
+          const a = (k / 24) * Math.PI * 2;
+          const x = at.x + Math.cos(a) * r;
+          const z = at.z + Math.sin(a) * r;
+          if (!isSea(x, z) && !isSea(x + Math.cos(a) * 60, z + Math.sin(a) * 60)) {
+            at.set(x + Math.cos(a) * 40, 0, z + Math.sin(a) * 40);
+            break search;
+          }
+        }
+      }
     }
-    // En la selva de la costa, un claro alrededor para que la figurita no quede tapada por los árboles.
-    if (inFine(at.x, at.z)) clearPlants(flora, at.x, at.z, EMBLEM_SIZE * 1.1);
+    // Cada pieza de la figurita (una casa, una palma, una roca, la lancha) se apoya por separado en el terreno real.
+    // El frente de la figurita (+z) mira al oeste, al mar: (x, z) local → (−z, x) en la escena.
+    const chunks = point.story ? storyChunks(point.story) : figureChunks(point.figure ?? { main: 'cabecera' });
+    let top = groundAt(at.x, at.z);
+    for (const c of chunks) {
+      let x = at.x - c.z;
+      let z = at.z + c.x;
+      let y: number;
+      if (c.on === 'air') y = groundAt(at.x, at.z);
+      else {
+        const water = c.on === 'ground' ? null : nearestSea(x, z, c.on === 'sea' ? 3000 : 700);
+        if (water) {
+          [x, z] = water;
+          y = -0.5;
+        } else if (c.on === 'sea') continue; // sin mar cerca: sin lancha ni ballena
+        else y = groundAt(x, z) - 1;
+        top = Math.max(top, y);
+        // En la selva de la costa, un claro para que los árboles no la tapen.
+        if (inFine(x, z) && c.r > 0) clearPlants(flora, x, z, c.r * 1.4 + 12);
+      }
+      const g = c.geo.clone();
+      g.rotateY(-Math.PI / 2);
+      g.translate(x, y, z);
+      emblemParts.push(g);
+    }
     // El punto flota sobre su figurita.
-    label.position.set(at.x, ground + EMBLEM_SIZE + 22, at.z);
+    label.position.set(at.x, top + EMBLEM_SIZE + 22, at.z);
     pinGroup.add(label);
     spots.push({ point, el, at: label.position });
-    const fig = (point.story ? emblemGeometry(point.story) : figureGeometry(point.figure ?? { main: 'cabecera' })).clone();
-    fig.rotateY(-Math.PI / 2); // el frente (las puertas) hacia el mar
-    fig.translate(at.x, ground - 2, at.z);
-    emblemParts.push(fig);
   }
   for (const point of CHOCO_POINTS) addSpot(point);
   // Prueba: ?punto=lat,lon,Nombre pone una historia de ejemplo en el mapa (así llegarán las aprobadas).
