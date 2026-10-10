@@ -827,8 +827,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   };
 
   // ───────── Viaje a un punto del Chocó ─────────
-  // Al tocar un punto, la cámara deja la costa y vuela hasta él (subiendo un poco en el camino); allá gira despacio
-  // alrededor. Al cerrar la ficha (o con Escape) vuelve por el mismo aire a la costa, donde estaba.
+  // Al tocar un punto, la cámara deja la costa y vuela hasta él (subiendo un poco en el camino); allá se queda quieta y
+  // se mueve a mano. Al cerrar la ficha (o con Escape) vuelve por el mismo aire a la costa, donde estaba.
   let tour: { at: Vector3; yaw: number; pitch: number; dist: number } | null = null;
   let flight: { start: number; pos: Vector3; look: Vector3; back: boolean } | null = null;
   const FLIGHT = 2.4;
@@ -857,9 +857,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     tourPos.set(Math.sin(t.yaw) * Math.cos(p), Math.sin(p), Math.cos(t.yaw) * Math.cos(p)).multiplyScalar(t.dist).add(t.at);
   };
   /** Después de `placeCamera` (que deja la cámara en la costa): si hay viaje, la lleva al punto o de vuelta. */
-  const applyTour = (dt: number) => {
+  const applyTour = () => {
     if (!tour) return;
-    if (!flight) tour.yaw += dt * 0.05;
     posePoint();
     if (flight) {
       const u = Math.min(1, (performance.now() - flight.start) / 1000 / FLIGHT);
@@ -1155,7 +1154,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     for (const g of details) g.visible = showDetails;
     for (const p of pins) p.pin.visible = showDetails;
     placeCamera();
-    applyTour(dt);
+    applyTour();
     // Los puntos del resto del Chocó (y sus figuritas) solo de lejos, o mientras se visita uno.
     const reveal = tour ? 1 : smoothstep(view.dist, 1250, 1600);
     if ((reveal > 0.5) !== host.classList.contains('show-spots')) host.classList.toggle('show-spots', reveal > 0.5);
