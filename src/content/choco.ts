@@ -7,6 +7,15 @@
 
 export type Subregion = 'Pacífico Norte' | 'Pacífico Sur' | 'Atrato' | 'San Juan' | 'Darién';
 
+/**
+ * Los seis tipos de figurita del mapa (ver map/emblems.ts). Los puntos del Chocó usan pueblo, selva o mar; las
+ * historias que manden las personas se clasifican solas en uno de los seis según lo que cuentan (ver `categorize`).
+ */
+export type Emblem = 'pueblo' | 'selva' | 'mar' | 'rio' | 'cultura' | 'cocina';
+export const EMBLEM_LABEL: Record<Emblem, string> = {
+  pueblo: 'Pueblo', selva: 'Selva y monte', mar: 'Mar y playa', rio: 'Río', cultura: 'Música y fiesta', cocina: 'Cocina',
+};
+
 export interface ChocoPoint {
   id: string;
   name: string;
@@ -16,49 +25,58 @@ export interface ChocoPoint {
   subregion: Subregion;
   /** Municipio al que pertenece (en los municipios, es el mismo). */
   municipio?: string;
+  /** Una línea para la ficha (solo datos generales y comprobables). */
+  info?: string;
+  /** Si es una historia (no un lugar): su tipo, que decide su figurita. */
+  story?: Emblem;
 }
+
+/** La figurita de cada tipo de punto. */
+export const EMBLEM_OF_KIND: Record<ChocoPoint['kind'], Emblem> = {
+  municipio: 'pueblo', corregimiento: 'pueblo', parque: 'selva', cerro: 'selva', playa: 'mar', cabo: 'mar',
+};
 
 const m = (id: string, name: string, lat: number, lon: number, subregion: Subregion): ChocoPoint =>
   ({ id, name, kind: 'municipio', lat, lon, subregion, municipio: name });
 
 export const CHOCO_POINTS: ChocoPoint[] = [
   // Costa norte (Pacífico Norte), de norte a sur.
-  m('jurado', 'Juradó', 7.103169, -77.76232, 'Pacífico Norte'),
-  m('bahia-solano', 'Bahía Solano', 6.224564, -77.40343, 'Pacífico Norte'),
-  { id: 'el-valle', name: 'El Valle', kind: 'corregimiento', lat: 6.104202, lon: -77.42656, subregion: 'Pacífico Norte', municipio: 'Bahía Solano' },
-  { id: 'utria', name: 'Parque Nacional Natural Utría', kind: 'parque', lat: 5.994606, lon: -77.34117, subregion: 'Pacífico Norte' },
-  { id: 'morromico', name: 'Morromico', kind: 'playa', lat: 5.873466, lon: -77.2953, subregion: 'Pacífico Norte', municipio: 'Nuquí' },
+  { ...m('jurado', 'Juradó', 7.103169, -77.76232, 'Pacífico Norte'), info: 'El municipio más al norte de la costa pacífica del Chocó, cerca de la frontera con Panamá.' },
+  { ...m('bahia-solano', 'Bahía Solano', 6.224564, -77.40343, 'Pacífico Norte'), info: 'Su cabecera es Ciudad Mutis. Con Nuquí, uno de los lugares para ver las ballenas jorobadas entre julio y octubre.' },
+  { id: 'el-valle', name: 'El Valle', kind: 'corregimiento', lat: 6.104202, lon: -77.42656, subregion: 'Pacífico Norte', municipio: 'Bahía Solano', info: 'Corregimiento de Bahía Solano, junto a la playa El Almejal.' },
+  { id: 'utria', name: 'Parque Nacional Natural Utría', kind: 'parque', lat: 5.994606, lon: -77.34117, subregion: 'Pacífico Norte', info: 'Parque nacional entre Bahía Solano y Nuquí: una ensenada rodeada de manglar y selva.' },
+  { id: 'morromico', name: 'Morromico', kind: 'playa', lat: 5.873466, lon: -77.2953, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa al norte de Jurubidá, entre la selva y el mar.' },
   // Costa al sur de Coquí (Nuquí) y Baudó (Pacífico Sur).
-  { id: 'jovi', name: 'Joví', kind: 'corregimiento', lat: 5.615605, lon: -77.38296, subregion: 'Pacífico Norte', municipio: 'Nuquí' },
-  { id: 'guachalito', name: 'Guachalito', kind: 'playa', lat: 5.628702, lon: -77.40592, subregion: 'Pacífico Norte', municipio: 'Nuquí' },
-  { id: 'termales', name: 'Termales', kind: 'corregimiento', lat: 5.606169, lon: -77.44128, subregion: 'Pacífico Norte', municipio: 'Nuquí' },
-  { id: 'partado', name: 'Partadó', kind: 'corregimiento', lat: 5.596871, lon: -77.4552, subregion: 'Pacífico Norte', municipio: 'Nuquí' },
-  { id: 'arusi', name: 'Arusí', kind: 'corregimiento', lat: 5.595341, lon: -77.47415, subregion: 'Pacífico Norte', municipio: 'Nuquí' },
-  { id: 'cabo-corrientes', name: 'Cabo Corrientes', kind: 'cabo', lat: 5.480395, lon: -77.53943, subregion: 'Pacífico Sur' },
-  { id: 'virudo', name: 'Virudó', kind: 'corregimiento', lat: 5.399466, lon: -77.40189, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó' },
-  { ...m('pizarro', 'Pizarro', 4.953752, -77.36678, 'Pacífico Sur'), municipio: 'Bajo Baudó' },
-  { id: 'siviru', name: 'Sivirú', kind: 'corregimiento', lat: 4.8056, lon: -77.34244, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó' },
-  { ...m('docordo', 'Docordó', 4.258038, -77.36467, 'Pacífico Sur'), municipio: 'El Litoral del San Juan' },
+  { id: 'jovi', name: 'Joví', kind: 'corregimiento', lat: 5.615605, lon: -77.38296, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, en la desembocadura del río Joví.' },
+  { id: 'guachalito', name: 'Guachalito', kind: 'playa', lat: 5.628702, lon: -77.40592, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Playa larga entre Coquí y Termales.' },
+  { id: 'termales', name: 'Termales', kind: 'corregimiento', lat: 5.606169, lon: -77.44128, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí que debe su nombre a sus aguas termales.' },
+  { id: 'partado', name: 'Partadó', kind: 'corregimiento', lat: 5.596871, lon: -77.4552, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, camino a Cabo Corrientes.' },
+  { id: 'arusi', name: 'Arusí', kind: 'corregimiento', lat: 5.595341, lon: -77.47415, subregion: 'Pacífico Norte', municipio: 'Nuquí', info: 'Corregimiento de Nuquí, cerca de Cabo Corrientes.' },
+  { id: 'cabo-corrientes', name: 'Cabo Corrientes', kind: 'cabo', lat: 5.480395, lon: -77.53943, subregion: 'Pacífico Sur', info: 'La punta que cierra por el sur el golfo de Tribugá.' },
+  { id: 'virudo', name: 'Virudó', kind: 'corregimiento', lat: 5.399466, lon: -77.40189, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó', info: 'Corregimiento de la costa de Bajo Baudó.' },
+  { ...m('pizarro', 'Pizarro', 4.953752, -77.36678, 'Pacífico Sur'), municipio: 'Bajo Baudó', info: 'Cabecera de Bajo Baudó, cerca de la desembocadura del río Baudó.' },
+  { id: 'siviru', name: 'Sivirú', kind: 'corregimiento', lat: 4.8056, lon: -77.34244, subregion: 'Pacífico Sur', municipio: 'Bajo Baudó', info: 'Corregimiento de la costa de Bajo Baudó.' },
+  { ...m('docordo', 'Docordó', 4.258038, -77.36467, 'Pacífico Sur'), municipio: 'El Litoral del San Juan', info: 'Cabecera del Litoral del San Juan, en el delta del río San Juan.' },
   // Serranía y valle del Baudó.
-  { id: 'alto-del-buey', name: 'Alto del Buey', kind: 'cerro', lat: 6.081154, lon: -77.28832, subregion: 'Atrato' },
-  { ...m('pie-de-pato', 'Pie de Pató', 5.516015, -76.97428, 'Pacífico Sur'), municipio: 'Alto Baudó' },
-  { ...m('puerto-meluk', 'Puerto Meluk', 5.192699, -76.95127, 'Pacífico Sur'), municipio: 'Medio Baudó' },
+  { id: 'alto-del-buey', name: 'Alto del Buey', kind: 'cerro', lat: 6.081154, lon: -77.28832, subregion: 'Atrato', info: 'Uno de los cerros más altos de la serranía del Baudó.' },
+  { ...m('pie-de-pato', 'Pie de Pató', 5.516015, -76.97428, 'Pacífico Sur'), municipio: 'Alto Baudó', info: 'Cabecera de Alto Baudó, a orillas del río Baudó.' },
+  { ...m('puerto-meluk', 'Puerto Meluk', 5.192699, -76.95127, 'Pacífico Sur'), municipio: 'Medio Baudó', info: 'Cabecera de Medio Baudó, a orillas del río Baudó.' },
   // Atrato.
-  m('quibdo', 'Quibdó', 5.691283, -76.65313, 'Atrato'),
-  { id: 'tutunendo', name: 'Tutunendo', kind: 'corregimiento', lat: 5.744297, lon: -76.54077, subregion: 'Atrato', municipio: 'Quibdó' },
-  { ...m('bete', 'Beté', 5.994886, -76.78227, 'Atrato'), municipio: 'Medio Atrato' },
-  { ...m('bellavista', 'Bellavista', 6.557252, -76.88358, 'Atrato'), municipio: 'Bojayá' },
-  { ...m('paimado', 'Paimadó', 5.483774, -76.73957, 'Atrato'), municipio: 'Río Quito' },
-  m('lloro', 'Lloró', 5.499783, -76.54263, 'Atrato'),
-  m('carmen-de-atrato', 'El Carmen de Atrato', 5.899266, -76.14245, 'Atrato'),
+  { ...m('quibdo', 'Quibdó', 5.691283, -76.65313, 'Atrato'), info: 'La capital del Chocó, a orillas del río Atrato.' },
+  { id: 'tutunendo', name: 'Tutunendo', kind: 'corregimiento', lat: 5.744297, lon: -76.54077, subregion: 'Atrato', municipio: 'Quibdó', info: 'Corregimiento de Quibdó, famoso por ser uno de los lugares más lluviosos del mundo.' },
+  { ...m('bete', 'Beté', 5.994886, -76.78227, 'Atrato'), municipio: 'Medio Atrato', info: 'Cabecera de Medio Atrato, a orillas del río Atrato.' },
+  { ...m('bellavista', 'Bellavista', 6.557252, -76.88358, 'Atrato'), municipio: 'Bojayá', info: 'Cabecera de Bojayá, a orillas del río Atrato.' },
+  { ...m('paimado', 'Paimadó', 5.483774, -76.73957, 'Atrato'), municipio: 'Río Quito', info: 'Cabecera de Río Quito.' },
+  { ...m('lloro', 'Lloró', 5.499783, -76.54263, 'Atrato'), info: 'Municipio del Atrato, entre los lugares más lluviosos del planeta.' },
+  { ...m('carmen-de-atrato', 'El Carmen de Atrato', 5.899266, -76.14245, 'Atrato'), info: 'Municipio en la cordillera Occidental, cerca del límite con Antioquia.' },
   // San Juan.
-  m('certegui', 'Cértegui', 5.371904, -76.60857, 'San Juan'),
-  m('tado', 'Tadó', 5.263378, -76.56212, 'San Juan'),
-  m('istmina', 'Istmina', 5.159309, -76.68552, 'San Juan'),
-  { ...m('andagoya', 'Andagoya', 5.096587, -76.69479, 'San Juan'), municipio: 'Medio San Juan' },
-  m('condoto', 'Condoto', 5.092196, -76.65135, 'San Juan'),
+  { ...m('certegui', 'Cértegui', 5.371904, -76.60857, 'San Juan'), info: 'Municipio de la subregión del San Juan.' },
+  { ...m('tado', 'Tadó', 5.263378, -76.56212, 'San Juan'), info: 'Municipio a orillas del río San Juan.' },
+  { ...m('istmina', 'Istmina', 5.159309, -76.68552, 'San Juan'), info: 'Municipio a orillas del río San Juan, el centro de su subregión.' },
+  { ...m('andagoya', 'Andagoya', 5.096587, -76.69479, 'San Juan'), municipio: 'Medio San Juan', info: 'Cabecera de Medio San Juan, donde el río Condoto llega al San Juan.' },
+  { ...m('condoto', 'Condoto', 5.092196, -76.65135, 'San Juan'), info: 'Municipio del San Juan, de larga tradición minera.' },
   // Darién.
-  m('riosucio', 'Riosucio', 7.436557, -77.11225, 'Darién'),
+  { ...m('riosucio', 'Riosucio', 7.436557, -77.11225, 'Darién'), info: 'Municipio del Darién, a orillas del río Atrato.' },
 ];
 
 /** Nombre de cada subregión en el mapa: un rótulo tenue en su centro aproximado. */
@@ -81,3 +99,29 @@ export const SUBREGION_OF: Record<string, Subregion> = {
   'Unión Panamericana': 'San Juan', 'El Cantón del San Pablo': 'San Juan',
   'Riosucio': 'Darién', 'Carmen del Darién': 'Darién', 'Belén de Bajirá': 'Darién', 'Unguía': 'Darién', 'Acandí': 'Darién',
 };
+
+/**
+ * Clasifica una historia en uno de los seis tipos según lo que cuenta (título y relato), para ponerle su figurita en
+ * el mapa. Gana el tipo con más palabras encontradas; si no hay ninguna, «pueblo». El equipo puede cambiarlo al revisar.
+ */
+const WORDS: Record<Exclude<Emblem, 'pueblo'>, string[]> = {
+  cocina: ['receta', 'cocin*', 'comida', 'comer', 'sabor', 'viche', 'arroz', 'pescado', 'coco', 'plátano', 'platano', 'sancocho', 'fogón', 'fogon', 'olla', 'dulce', 'borojó', 'borojo'],
+  cultura: ['música', 'musica', 'canto', 'cantar', 'canción', 'cancion', 'baile', 'bail*', 'danza', 'fiesta', 'tambor', 'cununo', 'marimba', 'chirimía', 'chirimia', 'alabao', 'arrullo', 'tradición', 'tradicion', 'fiestas patronales', 'carnaval'],
+  mar: ['mar', 'playa', 'ballena', 'pesc*', 'lancha', 'ola', 'tortuga', 'marea', 'bahía', 'bahia', 'golfo', 'arena'],
+  rio: ['río', 'rio', 'quebrada', 'canoa', 'potrillo', 'champa', 'remo', 'atrato', 'san juan', 'baudó', 'baudo', 'corriente'],
+  selva: ['selva', 'monte', 'árbol', 'arbol', 'bosque', 'pájaro', 'pajaro', 'rana', 'cerro', 'montaña', 'montana', 'lluvia', 'manglar', 'cacao', 'planta', 'mono', 'jaguar'],
+};
+export function categorize(text: string): Emblem {
+  const t = ` ${text.toLowerCase()} `;
+  let best: Emblem = 'pueblo';
+  let most = 0;
+  for (const [kind, words] of Object.entries(WORDS) as [Emblem, string[]][]) {
+    // Palabra completa (con su plural); las que terminan en * valen como raíz (cocinar, cocinaba…).
+    const n = words.filter((w) => new RegExp(w.endsWith('*') ? `[^a-záéíóúñü]${w.slice(0, -1)}` : `[^a-záéíóúñü]${w}(e?s)?[^a-záéíóúñü]`).test(t)).length;
+    if (n > most) {
+      most = n;
+      best = kind;
+    }
+  }
+  return best;
+}

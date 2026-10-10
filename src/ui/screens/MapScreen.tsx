@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
-import type { ChocoPoint } from '../../content/choco';
+import { EMBLEM_LABEL, type ChocoPoint } from '../../content/choco';
 import { Arrow, TopBar } from '../components/Chrome';
 import { LineIcon } from '../components/Sheet';
 import Shop from './Shop';
@@ -294,12 +294,16 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
       {onMap && spot && !place && (
         <aside className="map-card map-card--spot" aria-live="polite">
           <div className="map-card__head">
-            <p className="eyebrow">{spot.subregion} · {SPOT_KIND[spot.kind]}</p>
+            <p className="eyebrow">{spot.story ? `Historia · ${EMBLEM_LABEL[spot.story]}` : `${spot.subregion} · ${SPOT_KIND[spot.kind]}`}</p>
             <h2 className="map-card__title">{spot.name}</h2>
           </div>
-          {spot.municipio && spot.municipio !== spot.name && (
+          {!spot.story && spot.municipio && spot.municipio !== spot.name && (
             <p className="map-card__sci">{spot.kind === 'municipio' ? 'Cabecera de' : 'Municipio de'} {spot.municipio}</p>
           )}
+          {spot.info && <p className="map-card__info">{spot.info}</p>}
+          <button type="button" className="map-card__back" onClick={() => handle.current?.select(null)}>
+            <Arrow dir="left" /> Volver a la costa
+          </button>
           <button type="button" className="map-card__close" aria-label="Cerrar" onClick={() => handle.current?.select(null)}>
             ×
           </button>

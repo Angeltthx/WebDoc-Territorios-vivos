@@ -621,6 +621,12 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   background: #e8ede5; color: var(--ink); font-size: 20px; line-height: 1;
 }
 .map-card__close:hover { background: #dbe3d8; }
+.map-card__info { margin-top: 8px; font-size: 14px; line-height: 1.45; }
+.map-card__back {
+  margin-top: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none;
+  color: #b8264e; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.map-card__back svg { width: 14px; height: 14px; }
 
 /* Aviso mientras se arma la escena (tarda unos segundos la primera vez). */
 .map-loading {
@@ -795,9 +801,12 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 }
 
 /* ───────── El resto del Chocó: puntos con su nombre al pasar el mouse ───────── */
+/* Solo de lejos (o durante la visita a uno): de cerca, la costa es la protagonista. */
 .map-spot {
-  position: relative; width: 22px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto;
+  position: relative; width: 22px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer;
+  opacity: 0; pointer-events: none; transition: opacity 0.5s;
 }
+.show-spots .map-spot { opacity: 1; pointer-events: auto; }
 .map-spot::before {
   content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--p-pink);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 1px 6px rgba(10, 30, 40, 0.45); transition: transform 0.2s var(--ease);

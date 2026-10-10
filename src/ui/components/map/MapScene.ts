@@ -14,10 +14,11 @@ import {
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MapPlace } from '../../../content/map';
-import { CHOCO_POINTS, SUBREGION_LABELS, type ChocoPoint } from '../../../content/choco';
+import { CHOCO_POINTS, EMBLEM_OF_KIND, SUBREGION_LABELS, categorize, type ChocoPoint, type Emblem } from '../../../content/choco';
+import { EMBLEM_SIZE, emblemGeometry } from './emblems';
 import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
-import { Batch, type Pace, clearKitCache, pacer, sticker } from './kit';
-import { buildFlora, buildMist } from './flora';
+import { Batch, type Pace, clearKitCache, pacer, paint, sticker } from './kit';
+import { buildFlora, buildMist, clearPlants } from './flora';
 import { buildPlaces } from './places';
 import { loadAnimals } from './animals';
 import { ASCENT, DIVE, diveProgress, fovs, mapUnitsPerKm, type Handoff } from './dive';
@@ -717,12 +718,13 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   }
 
   // ───────── El resto del Chocó ─────────
-  // Puntos discretos en su lugar real (la costa al norte y al sur, y detrás de la serranía el Atrato y el San Juan);
-  // el nombre aparece al pasar el mouse o al tocarlos. Son rótulos de la página, no figuras 3D: se ven igual de
-  // nítidos a 100 km y no le cuestan nada a la tarjeta gráfica. Las historias que manden las personas usarán el mismo
-  // camino: latitud y longitud → lugar en la escena (ver `addSpot`).
+  // Puntos en su lugar real (la costa al norte y al sur, y detrás de la serranía el Atrato y el San Juan), cada uno con
+  // su figurita 3D (casitas, árboles, palma…). Solo aparecen al alejarse (de cerca, la costa es la protagonista); el
+  // nombre sale al pasar el mouse y, al tocarlos, la cámara viaja hasta allá. Las historias que manden las personas
+  // usarán el mismo camino: latitud y longitud → lugar en la escena (ver `addSpot`).
   const spots: { point: ChocoPoint; el: HTMLButtonElement; at: Vector3; behind?: boolean }[] = [];
-  const inFine = (x: number, z: number) => x > BOUNDS.x0 && x < BOUNDS.x1 && z > BOUNDS.z0 && z < BOUNDS.z1;
+  // La malla fina (con su vegetación) llega un poco más allá del relieve medido, hacia el este.
+  const inFine = (x: number, z: number) => x > GRID.x0 && x < GRID.x0 + GRID.w && z > GRID.z0 && z < GRID.z0 + GRID.d;
   /** Altura del suelo en cualquier punto del Chocó (relieve fino cerca de Nuquí; el de fondo en el resto). */
   const groundAt = (x: number, z: number) => Math.max(inFine(x, z) ? heightAt(x, z) : farHeight(x, z), 0);
   let openSpot: string | null = null;
@@ -730,9 +732,13 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     openSpot = id;
     for (const s of spots) s.el.classList.toggle('is-open', s.point.id === id);
     if (id && selected) select(null);
-    onSpot?.(spots.find((s) => s.point.id === id)?.point ?? null);
+    const spot = spots.find((s) => s.point.id === id);
+    if (spot) visit(spot.at);
+    else if (tour) leaveTour();
+    onSpot?.(spot?.point ?? null);
   }
-  function addSpot(point: ChocoPoint, kind: string = point.kind) {
+  const emblemParts: BufferGeometry[] = [];
+  function addSpot(point: ChocoPoint, emblem: Emblem = EMBLEM_OF_KIND[point.kind], kind: string = point.kind) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = `map-spot map-spot--${kind}`;
@@ -745,16 +751,34 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     el.addEventListener('click', () => selectSpot(openSpot === point.id ? null : point.id));
     const label = new CSS2DObject(el);
     const at = toScene(point.lat, point.lon);
-    label.position.set(at.x, groundAt(at.x, at.z) + 30, at.z);
+    const ground = groundAt(at.x, at.z);
+    // En la selva de la costa, un claro alrededor para que la figurita no quede tapada por los árboles.
+    if (inFine(at.x, at.z)) clearPlants(flora, at.x, at.z, EMBLEM_SIZE * 1.1);
+    // El punto flota sobre su figurita.
+    label.position.set(at.x, ground + EMBLEM_SIZE + 22, at.z);
     pinGroup.add(label);
     spots.push({ point, el, at: label.position });
+    const fig = emblemGeometry(emblem).clone();
+    fig.rotateY(-Math.PI / 2); // el frente (las puertas) hacia el mar
+    fig.translate(at.x, ground - 2, at.z);
+    emblemParts.push(fig);
   }
   for (const point of CHOCO_POINTS) addSpot(point);
   // Prueba: ?punto=lat,lon,Nombre pone una historia de ejemplo en el mapa (así llegarán las aprobadas).
   const test = new URLSearchParams(location.search).get('punto')?.split(',');
   if (test && test.length >= 2 && test.slice(0, 2).every((v) => Number.isFinite(+v))) {
-    addSpot({ id: 'historia-prueba', name: test.slice(2).join(',').trim() || 'Historia de prueba', kind: 'corregimiento', lat: +test[0], lon: +test[1], subregion: 'Pacífico Norte' }, 'historia');
+    const name = test.slice(2).join(',').trim() || 'Historia de prueba';
+    // Se clasifica sola por lo que dice (aquí, por su nombre): ver `categorize`.
+    const story = categorize(name);
+    addSpot({ id: 'historia-prueba', name, kind: 'corregimiento', lat: +test[0], lon: +test[1], subregion: 'Pacífico Norte', story }, story, 'historia');
   }
+  // Todas las figuritas en una sola malla: un solo dibujo. Aparecen (y se desvanecen) junto con los puntos.
+  const emblemMat = paint.clone();
+  emblemMat.transparent = true;
+  const emblems = new Mesh(mergeGeometries(emblemParts)!, emblemMat);
+  emblems.matrixAutoUpdate = false;
+  emblems.visible = false;
+  scene.add(emblems);
   /** Los que quedan detrás de la serranía (vistos desde la cámara) se atenúan: así se leen en segundo plano. */
   const ray = new Vector3();
   const updateBehind = () => {
@@ -793,6 +817,55 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     camera.position.copy(target).addScaledVector(r.sea, view.dist * Math.cos(p));
     camera.position.y += view.dist * Math.sin(p);
     camera.lookAt(target);
+    look.copy(target);
+    sky.position.copy(camera.position);
+  };
+
+  // ───────── Viaje a un punto del Chocó ─────────
+  // Al tocar un punto, la cámara deja la costa y vuela hasta él (subiendo un poco en el camino); allá gira despacio
+  // alrededor. Al cerrar la ficha (o con Escape) vuelve por el mismo aire a la costa, donde estaba.
+  let tour: { at: Vector3; yaw: number; pitch: number; dist: number } | null = null;
+  let flight: { start: number; pos: Vector3; look: Vector3; back: boolean } | null = null;
+  const FLIGHT = 2.4;
+  const look = new Vector3();
+  const tourPos = new Vector3();
+  const tourLook = new Vector3();
+  function visit(at: Vector3) {
+    const yaw = Math.atan2(camera.position.x - at.x, camera.position.z - at.z);
+    tour = { at: at.clone().setY(at.y - EMBLEM_SIZE * 0.4), yaw, pitch: 24, dist: 900 };
+    flight = { start: performance.now(), pos: camera.position.clone(), look: look.clone(), back: false };
+  }
+  function leaveTour() {
+    flight = { start: performance.now(), pos: camera.position.clone(), look: look.clone(), back: true };
+  }
+  const posePoint = () => {
+    const t = tour!;
+    const p = MathUtils.degToRad(t.pitch);
+    tourLook.copy(t.at);
+    tourPos.set(Math.sin(t.yaw) * Math.cos(p), Math.sin(p), Math.cos(t.yaw) * Math.cos(p)).multiplyScalar(t.dist).add(t.at);
+  };
+  /** Después de `placeCamera` (que deja la cámara en la costa): si hay viaje, la lleva al punto o de vuelta. */
+  const applyTour = (dt: number) => {
+    if (!tour) return;
+    if (!flight) tour.yaw += dt * 0.05;
+    posePoint();
+    if (flight) {
+      const u = Math.min(1, (performance.now() - flight.start) / 1000 / FLIGHT);
+      const e = MathUtils.smootherstep(u, 0, 1);
+      const [toPos, toLook] = flight.back ? [camera.position.clone(), look.clone()] : [tourPos, tourLook];
+      const span = flight.pos.distanceTo(toPos);
+      camera.position.lerpVectors(flight.pos, toPos, e);
+      camera.position.y += Math.sin(Math.PI * e) * MathUtils.clamp(span * 0.18, 200, 2500);
+      look.lerpVectors(flight.look, toLook, e);
+      if (u >= 1) {
+        if (flight.back) tour = null;
+        flight = null;
+      }
+    } else {
+      camera.position.copy(tourPos);
+      look.copy(tourLook);
+    }
+    camera.lookAt(look);
     sky.position.copy(camera.position);
   };
 
@@ -852,6 +925,13 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
           if (pull >= 1) onZoomOut?.();
         }
       }
+    } else if (tour) {
+      // En un punto: arrastrar gira alrededor de él.
+      if (!flight) {
+        tour.yaw -= dx * 0.006;
+        tour.pitch = MathUtils.clamp(tour.pitch + dy * 0.12, 8, 60);
+      }
+      return;
     } else {
       // Arrastrar a los lados recorre la costa; arriba y abajo cambia la inclinación de la mirada.
       goal.s -= dx * worldPerPixel() * 1.15;
@@ -868,6 +948,10 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     if (intro || outro) return;
+    if (tour) {
+      if (!flight) tour.dist = MathUtils.clamp(tour.dist * Math.exp(e.deltaY * (e.ctrlKey ? 0.006 : 0.0012)), 320, 2600);
+      return;
+    }
     // Con el panel táctil (pellizco = rueda con Ctrl) llegan pasos pequeños: cuentan más.
     if (e.deltaY > 0 && atMax()) pullOut(e.deltaY / (e.ctrlKey ? 250 : 1000));
     else if (e.deltaY < 0) pull = 0;
@@ -894,6 +978,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
+    if (tour) return;
     const hit = raycaster.intersectObjects(pins.filter((p) => p.place.kind === 'site').map((p) => p.pin), true)[0];
     let o: Object3D | null = hit?.object ?? null;
     while (o && !o.userData.id) o = o.parent;
@@ -1049,6 +1134,13 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     for (const g of details) g.visible = showDetails;
     for (const p of pins) p.pin.visible = showDetails;
     placeCamera();
+    applyTour(dt);
+    // Los puntos del resto del Chocó (y sus figuritas) solo de lejos, o mientras se visita uno.
+    const reveal = tour ? 1 : smoothstep(view.dist, 1250, 1600);
+    if ((reveal > 0.5) !== host.classList.contains('show-spots')) host.classList.toggle('show-spots', reveal > 0.5);
+    emblems.visible = reveal > 0.01;
+    emblemMat.opacity = reveal;
+    emblemMat.depthWrite = reveal > 0.99;
     uniforms.uTime.value = t;
     clouds.update(t);
     mist.update(t);
@@ -1079,7 +1171,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     }
     if (ticks % 10 === 0) {
       updateBehind();
-      const op = smoothstep(view.dist, 1100, 1600).toFixed(2);
+      const op = (tour ? 0.7 : smoothstep(view.dist, 1250, 1600)).toFixed(2);
       for (const el of regionEls) if (el.style.opacity !== op) el.style.opacity = op;
     }
     if (ticks++ % 6 === 0) declutter();
@@ -1166,6 +1258,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     },
     ascend: (onHandoff) => {
       select(null);
+      tour = null;
+      flight = null;
       pull = 0;
       outro = {
         start: performance.now(),

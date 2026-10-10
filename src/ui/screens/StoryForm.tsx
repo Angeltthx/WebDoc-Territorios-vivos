@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CHOCO_MUNICIPALITIES, MAX_FILE_MB } from '../../content/stories';
+import { EMBLEM_LABEL, SUBREGION_OF, categorize, type Emblem } from '../../content/choco';
 import { Sheet } from '../components/Sheet';
 
 interface Attachment {
@@ -22,7 +23,7 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
   const [fileNote, setFileNote] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [locating, setLocating] = useState<'idle' | 'busy' | 'error'>('idle');
-  const [sent, setSent] = useState<{ title: string; place: string } | null>(null);
+  const [sent, setSent] = useState<{ title: string; place: string; kind: Emblem; region?: string } | null>(null);
 
   // Las vistas previas se sueltan al quitarlas o al salir.
   const current = useRef(files);
@@ -63,7 +64,14 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    setSent({ title: String(data.get('title')), place: [data.get('spot'), data.get('town')].filter(Boolean).join(', ') });
+    const town = String(data.get('town'));
+    setSent({
+      title: String(data.get('title')),
+      place: [data.get('spot'), town].filter(Boolean).join(', '),
+      // Se clasifica sola por lo que cuenta (el equipo puede cambiarla al revisar) y queda en su subregión.
+      kind: categorize(`${data.get('title')} ${data.get('story')}`),
+      region: SUBREGION_OF[town],
+    });
   };
 
   const aside = (
@@ -81,6 +89,9 @@ export default function StoryForm({ onClose }: { onClose?: () => void }) {
           <p className="story-sent__lead">
             «{sent.title}», en {sent.place}, llegaría al equipo de Territorios Vivos. Después de revisarla, aparecería en el
             mapa, en su lugar.
+          </p>
+          <p className="story-help">
+            Aparecería en {sent.region ? `la subregión ${sent.region}` : 'el mapa'} con la figurita de <strong>{EMBLEM_LABEL[sent.kind]}</strong>.
           </p>
           <p className="notice">Versión de prueba: todavía no se envía ni se guarda nada.</p>
           <button type="button" className="story-send" onClick={() => setSent(null)}>Volver al formulario</button>
