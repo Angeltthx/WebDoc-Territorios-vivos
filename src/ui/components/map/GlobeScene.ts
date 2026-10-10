@@ -271,6 +271,9 @@ export interface GlobeOptions {
   onReady?: () => void;
   /** El navegador quitó el 3D (por ejemplo, el equipo se quedó sin memoria). */
   onLost?: () => void;
+  /** Si la rueda es del planeta. Dentro del recorrido, mientras no se juegue con él, la rueda mueve la página (así se
+   * puede volver a subir a la historia sin que el planeta baje al Chocó). */
+  wheelGate?: () => boolean;
 }
 
 /**
@@ -287,7 +290,7 @@ function faceQ(lat: number, lon: number, bearing: number) {
   return new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(right, up, out)).invert();
 }
 
-export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onLost }: GlobeOptions): GlobeHandle {
+export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onLost, wheelGate }: GlobeOptions): GlobeHandle {
   step('planeta: armando');
   const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, alpha: true });
   renderer.setPixelRatio(pixelRatioCap());
@@ -514,6 +517,7 @@ export function createGlobe(host: HTMLElement, { onDive, onHandoff, onReady, onL
   // La rueda (o el pellizco del panel táctil) aleja el planeta; al acercarlo hasta su distancia de siempre y
   // seguir, se viaja al Chocó.
   const onWheel = (e: WheelEvent) => {
+    if (wheelGate && !wheelGate()) return;
     e.preventDefault();
     if (state.diving || state.ascent) return;
     if (e.deltaY < 0 && atRest()) {

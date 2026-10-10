@@ -21,9 +21,12 @@ const INVITE_SEEN = 'mapa-invitacion-vista';
  * las dos escenas 3D en memoria más que durante el cambio. */
 const RELEASE_GLOBE = TIER === 'baja' || TIER === 'minima' || TIER === 'segura';
 
-export default function MapScreen({ embedded = false, onBack }: {
+export default function MapScreen({ embedded = false, active = true, onBack }: {
   /** Dentro del recorrido (última página): ocupa su página y «Volver al recorrido» sube a la anterior. */
   embedded?: boolean;
+  /** Dentro del recorrido, si su página es la visible. El planeta se arma desde la página anterior (para que la
+   * llegada sea suave) pero la costa, que es lo pesado, solo cuando se llega. */
+  active?: boolean;
   onBack?: () => void;
 } = {}) {
   const stage = useRef<HTMLDivElement>(null);
@@ -35,6 +38,26 @@ export default function MapScreen({ embedded = false, onBack }: {
   const [town, setTown] = useState('nuqui');
   const [hint, setHint] = useState(true);
   const [pull, setPull] = useState(0);
+  /** Dentro del recorrido: el visitante ya está jugando con el planeta (lo tocó o lo giró). Antes de eso, la rueda y
+   * deslizar el dedo hacia abajo mueven la página, para poder volver a la historia; después, la rueda acerca el
+   * planeta y baja al Chocó. */
+  const [engaged, setEngagedState] = useState(!embedded);
+  const engagedRef = useRef(!embedded);
+  const setEngaged = (on: boolean) => {
+    engagedRef.current = on || !embedded;
+    setEngagedState(on || !embedded);
+  };
+  const activeRef = useRef(active);
+  /** La costa se arma cuando la página es la visible (ver `active`). */
+  const wantMap = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    activeRef.current = active;
+    if (!active) setEngaged(false);
+    if (active && wantMap.current) {
+      wantMap.current();
+      wantMap.current = null;
+    }
+  }, [active]);
   /** El navegador quitó el 3D: se reintenta un nivel más liviano o, si ya era el mínimo, se avisa. */
   const [lost, setLost] = useState<'retry' | 'final' | null>(null);
   const onLost = () => {
@@ -103,13 +126,20 @@ export default function MapScreen({ embedded = false, onBack }: {
           onReady: () => {
             if (!live) return;
             resolve(g);
-            // La primera vez: se muestra el planeta y se empieza a armar la costa (salvo si se prueba solo el planeta).
-            if (!map) {
+            // La primera vez: se muestra el planeta y se empieza a armar la costa (salvo si se prueba solo el planeta),
+            // en cuanto su página sea la visible.
+            if (!map && !wantMap.current) {
               setPhase('globe');
-              if (SOLO !== 'planeta') map = buildMap();
+              if (SOLO === 'planeta') return;
+              const start = () => {
+                if (live) map ??= buildMap();
+              };
+              if (activeRef.current) start();
+              else wantMap.current = start;
             }
           },
           onLost,
+          wheelGate: () => engagedRef.current,
           onDive: () => {
             step('bajando');
             setPhase('diving');
@@ -171,6 +201,7 @@ export default function MapScreen({ embedded = false, onBack }: {
         g.setActive(true);
         g.ascend();
         setPhase('globe');
+        setEngaged(false);
         setTimeout(() => handle.current?.setActive(false), DIVE.fade * 1000 + 400);
       });
     });
@@ -179,10 +210,15 @@ export default function MapScreen({ embedded = false, onBack }: {
   const onMap = phase === 'map';
 
   return (
-    // En el recorrido, el mapa usa las flechas del teclado (no pasan de página: ver `data-no-arrows`).
-    <div className={`map-screen is-${phase}${embedded ? ' map-screen--embedded' : ''}`} data-no-arrows={embedded || undefined}>
+    // En el recorrido, la costa usa las flechas del teclado (no pasan de página: ver `data-no-arrows`); en el planeta,
+    // las flechas siguen moviendo el recorrido.
+    <div
+      className={`map-screen is-${phase}${embedded ? ' map-screen--embedded' : ''}${engaged ? ' is-engaged' : ''}`}
+      data-no-arrows={(embedded && phase !== 'globe' && phase !== 'loading') || undefined}
+    >
       <div ref={stage} className="map-stage" />
-      <div ref={globeStage} className="globe-stage" aria-hidden={onMap} />
+      {/* Tocar o girar el planeta (sin deslizar la página) es la señal de que se quiere explorar. */}
+      <div ref={globeStage} className="globe-stage" aria-hidden={onMap} onPointerUp={() => phase === 'globe' && setEngaged(true)} />
       <p className={`map-loading${phase !== 'loading' ? ' is-hidden' : ''}`}>Cargando el mapa…</p>
       {lost === 'retry' && (
         <div className="map-lost" role="status">
@@ -208,6 +244,11 @@ export default function MapScreen({ embedded = false, onBack }: {
           <span className="poster-title__script">Chocó</span>
         </p>
         {invite && <p className="globe-title__hint">El sol se está poniendo sobre Nuquí. Toca el Chocó y baja a la costa.</p>}
+        {embedded && (
+          <p className="globe-title__gate">
+            {engaged ? 'Acércate con la rueda o pellizca para bajar a Nuquí' : 'Toca el planeta para explorarlo · sube para volver a la historia'}
+          </p>
+        )}
       </div>
 
       <TopBar
