@@ -1,8 +1,9 @@
 // Base de datos de las historias (Neon Postgres, conectada desde el Marketplace de Vercel: DATABASE_URL).
 //
-// Una historia llega «pendiente»; el equipo la lee en /admin-historias y la aprueba (entonces sale en el mapa) o la
-// rechaza. Los archivos (voz, fotos, video) van a Vercel Blob, en un almacén privado: solo se ven con un enlace
-// firmado que da el servidor, y solo los de historias aprobadas (o al equipo, para revisarlas).
+// Una historia llega «pendiente»; el equipo la revisa y la aprueba (entonces sale en el mapa) o la rechaza. La
+// revisión (/admin-historias) está en la rama revision-historias; mientras tanto, se puede aprobar desde la consola
+// de Neon (ver docs/historias.md). Los archivos (voz, fotos, video) van a Vercel Blob, en un almacén privado: solo se
+// ven con un enlace firmado que da el servidor, y solo los de historias aprobadas.
 
 import { neon } from '@neondatabase/serverless';
 

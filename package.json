@@ -18,7 +18,8 @@
     "map:region": "node scripts/map-region.mjs",
     "map:models": "node scripts/map-models.mjs",
     "map:world": "node scripts/map-world.mjs",
-    "db:setup": "node scripts/db-setup.mjs"
+    "db:setup": "node scripts/db-setup.mjs",
+    "dev:api": "vercel dev --listen 3000"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",

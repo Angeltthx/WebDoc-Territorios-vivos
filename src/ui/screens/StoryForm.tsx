@@ -1,6 +1,6 @@
 // «Cuéntanos tu historia»: el formulario completo, con fotos, audios y videos y el lugar de la historia. Al enviarla,
-// los archivos suben directo al almacén (privado) y la historia llega «pendiente» a la revisión del equipo
-// (/admin-historias); si se aprueba, aparece en el mapa en su lugar (ver application/stories-api y api/historias).
+// los archivos suben directo al almacén (privado) y la historia llega «pendiente» a la revisión del equipo; si se
+// aprueba, aparece en el mapa en su lugar (ver application/stories-api y api/historias).
 //
 // No es una página que cuenta una historia: es el espacio para que alguien cuente la suya. Por eso es sobria (blanco,
 // líneas finas, la letra del webdoc) y deja el protagonismo a lo que se escribe. La primera vez, un tutorial corto

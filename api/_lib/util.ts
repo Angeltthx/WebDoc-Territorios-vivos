@@ -1,7 +1,7 @@
-// Utilidades de las funciones de la API: respuestas JSON, la huella anónima de quien envía, la clave del equipo y los
-// enlaces firmados a los archivos privados.
+// Utilidades de las funciones de la API: respuestas JSON, la huella anónima de quien envía y los enlaces firmados a
+// los archivos privados.
 
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { issueSignedToken, presignUrl } from '@vercel/blob';
 import type { Archivo } from './db';
 
@@ -15,16 +15,6 @@ export const json = (data: unknown, status = 200, headers: Record<string, string
 export function ipHash(request: Request) {
   const ip = request.headers.get('x-real-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
   return createHash('sha256').update(`${process.env.HASH_SALT ?? process.env.ADMIN_TOKEN ?? ''}|${ip}`).digest('hex').slice(0, 32);
-}
-
-/** ¿La petición trae la clave del equipo (cabecera Authorization: Bearer …)? */
-export function isAdmin(request: Request) {
-  const expected = process.env.ADMIN_TOKEN;
-  const given = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
-  if (!expected || expected.length < 16) return false;
-  const a = createHash('sha256').update(given).digest();
-  const b = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(a, b);
 }
 
 // Un permiso de lectura para todo el almacén, renovado antes de vencer; con él se firma cada enlace (sin más llamadas).

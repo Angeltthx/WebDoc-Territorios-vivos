@@ -5,7 +5,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!media/|assets/|api/).*)",
+      "source": "/((?!media/|assets/|api/|@)[^.]*)",
       "destination": "/index.html"
     }
   ],

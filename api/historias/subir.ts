@@ -8,7 +8,8 @@ import { ipHash, json } from '../_lib/util';
 const MAX_MB = 50;
 /** Permisos por persona (huella de IP) en una hora: una historia lleva hasta 8 archivos. */
 const POR_HORA = 24;
-const TIPOS = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'audio/*', 'video/mp4', 'video/quicktime', 'video/webm'];
+/** Fotos, audios y videos de cualquier formato (los del celular varían: HEIC, 3GP, M4A…). */
+const TIPOS = ['image/*', 'audio/*', 'video/*'];
 
 export async function POST(request: Request) {
   const body = (await request.json()) as HandleUploadBody;
