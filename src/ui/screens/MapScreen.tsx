@@ -303,6 +303,26 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
             <p className="map-card__sci">{spot.kind === 'municipio' ? 'Cabecera de' : 'Municipio de'} {spot.municipio}</p>
           )}
           {spot.info && <p className="map-card__info">{spot.info}</p>}
+          {spot.tale && (
+            <div className="map-card__tale">
+              <p className="map-card__sci">
+                Contada por {spot.tale.author}
+                {spot.tale.place && ` · ${spot.tale.place}`}
+                {spot.tale.when && ` · ${spot.tale.when}`}
+              </p>
+              <div className="map-card__text">
+                {spot.tale.text.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
+              </div>
+              {spot.tale.media.length > 0 && (
+                <div className="map-card__media">
+                  {spot.tale.media.map((m) =>
+                    m.kind === 'foto' ? <img key={m.url} src={m.url} alt={m.name} loading="lazy" />
+                      : m.kind === 'video' ? <video key={m.url} src={m.url} controls playsInline preload="metadata" />
+                        : <audio key={m.url} src={m.url} controls preload="none" />)}
+                </div>
+              )}
+            </div>
+          )}
           <button type="button" className="map-card__back" onClick={() => handle.current?.select(null)}>
             <Arrow dir="left" /> Volver a la costa
           </button>

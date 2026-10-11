@@ -1,6 +1,6 @@
-// «Cuéntanos tu historia» (interfaz de prueba): el formulario completo, con fotos, audios y videos y el lugar de la
-// historia. Todavía no envía nada: al final muestra cómo quedaría el envío. Cuando se conecte, cada historia llega
-// «pendiente» a la revisión del equipo y, si se aprueba, aparece en el mapa en su lugar.
+// «Cuéntanos tu historia»: el formulario completo, con fotos, audios y videos y el lugar de la historia. Al enviarla,
+// los archivos suben directo al almacén (privado) y la historia llega «pendiente» a la revisión del equipo
+// (/admin-historias); si se aprueba, aparece en el mapa en su lugar (ver application/stories-api y api/historias).
 //
 // No es una página que cuenta una historia: es el espacio para que alguien cuente la suya. Por eso es sobria (blanco,
 // líneas finas, la letra del webdoc) y deja el protagonismo a lo que se escribe. La primera vez, un tutorial corto
@@ -14,6 +14,7 @@ import { EMBLEM_LABEL, SUBREGION_OF, categorize, type Emblem } from '../../conte
 import { Sheet, type Origin } from '../components/Sheet';
 import { EmblemIcon } from '../components/EmblemIcon';
 import { StoryTutorial, TUTORIAL_SEEN } from '../components/StoryTutorial';
+import { type StoryFile, sendStory, uploadFile } from '../../application/stories-api';
 
 interface Attachment {
   file: File;
@@ -29,6 +30,8 @@ const size = (bytes: number) => (bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 /** Lo mínimo que pide el relato. */
 const MIN_STORY = 40;
+/** Archivos por historia. */
+const MAX_FILES = 8;
 /** Una grabación dura como mucho esto (segundos). */
 const MAX_RECORDING = 300;
 
@@ -89,9 +92,13 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
   const [fileNote, setFileNote] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [locating, setLocating] = useState<'idle' | 'busy' | 'error'>('idle');
-  /** Ya se mostró una vez (al volver del agradecimiento, el formulario no repite la entrada). */
-  const [visited, setVisited] = useState(false);
   const [sent, setSent] = useState(false);
+  /** El envío: subiendo archivos (con su avance) y guardando la historia, o el error si algo falló. */
+  const [sending, setSending] = useState<number | null>(null);
+  const [error, setError] = useState('');
+  /** Lo ya subido (si el envío falla después, no se vuelve a subir). */
+  const uploaded = useRef(new Map<File, StoryFile>());
+  const folder = useRef(crypto.randomUUID());
   // El tutorial: solo la primera vez (y cuando se pide con «¿Cómo funciona?»).
   const [tutorial, setTutorial] = useState(() => {
     try {
@@ -110,11 +117,16 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
     if (!list) return;
     const skipped: string[] = [];
     const next: Attachment[] = [];
+    let room = MAX_FILES - files.length;
     for (const file of list) {
       const k = kindOf(file);
-      if (!k) skipped.push(`${file.name} (no es foto, audio ni video)`);
+      if (room <= 0) skipped.push(`${file.name} (máximo ${MAX_FILES} archivos)`);
+      else if (!k) skipped.push(`${file.name} (no es foto, audio ni video)`);
       else if (file.size > MAX_FILE_MB * 1e6) skipped.push(`${file.name} (pesa más de ${MAX_FILE_MB} MB)`);
-      else next.push({ file, kind: k, url: URL.createObjectURL(file) });
+      else {
+        next.push({ file, kind: k, url: URL.createObjectURL(file) });
+        room--;
+      }
     }
     setFiles((f) => [...f, ...next]);
     setFileNote(skipped.length ? `No se agregaron: ${skipped.join(', ')}.` : '');
@@ -151,9 +163,48 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
   const region = town ? SUBREGION_OF[town] : undefined;
   const place = [spot, town].filter(Boolean).join(', ');
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSent(true);
+    if (sending !== null) return;
+    const form = new FormData(e.currentTarget);
+    setError('');
+    setSending(0);
+    try {
+      // Los archivos, uno tras otro (el avance total, por peso).
+      const total = files.reduce((n, a) => n + a.file.size, 0) || 1;
+      let done = 0;
+      const archivos: StoryFile[] = [];
+      for (const a of files) {
+        let f = uploaded.current.get(a.file);
+        if (!f) {
+          f = await uploadFile(a.file, a.kind, folder.current, (p) => setSending(((done + p * a.file.size) / total) * 0.95));
+          uploaded.current.set(a.file, f);
+        }
+        done += a.file.size;
+        archivos.push(f);
+      }
+      setSending(0.97);
+      await sendStory({
+        titulo: title.trim(),
+        relato: story.trim(),
+        cuando: String(form.get('when') ?? ''),
+        tipo: kind,
+        municipio: town,
+        lugar: spot.trim(),
+        lat: coords?.lat ?? null,
+        lon: coords?.lon ?? null,
+        autor: name.trim(),
+        contacto: String(form.get('contact') ?? ''),
+        consentimiento: consent,
+        archivos,
+        web: String(form.get('web') ?? ''),
+      });
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'No se pudo enviar. Intenta otra vez.');
+    } finally {
+      setSending(null);
+    }
   };
 
   /** Cómo se verá en el mapa: el punto dorado con su nombre, su figurita y su ficha. Se arma mientras se escribe. */
@@ -177,11 +228,11 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
       <Sheet eyebrow="Tu historia" title="Gracias por contarla" onClose={onClose} aside={preview} origin={origin} still>
         <div className="story-sent">
           <p className="story-sent__lead">
-            «{title}», en {place}, llegaría al equipo de Territorios Vivos. Después de revisarla, aparecería en el mapa,
+            «{title}», en {place}, ya le llegó al equipo de Territorios Vivos. Después de leerla, aparecerá en el mapa,
             en su lugar, con la figurita de <strong>{EMBLEM_LABEL[kind]}</strong>.
           </p>
-          <p className="story-help">Versión de prueba: todavía no se envía ni se guarda nada.</p>
-          <button type="button" className="story-send" onClick={() => { setVisited(true); setSent(false); }}>Volver al formulario</button>
+          <p className="story-help">La revisamos en los próximos días. Si dejaste un contacto, te avisamos cuando esté publicada.</p>
+          {onClose && <button type="button" className="story-send" onClick={onClose}>Volver al mapa</button>}
         </div>
       </Sheet>
     );
@@ -190,7 +241,6 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
   return (
     <Sheet
       origin={origin}
-      still={visited}
       eyebrow="Tu historia"
       title="Este espacio es tuyo"
       intro="Para que lo que viviste en el Chocó —un recuerdo, una receta, un canto— tenga su lugar en el mapa."
@@ -347,15 +397,22 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
           </div>
           <label className="story-check">
             <input type="checkbox" name="consent" required checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span>Autorizo a Territorios Vivos a revisar mi historia y, si se aprueba, publicarla en el mapa con los archivos que adjunté.</span>
+            <span>
+              Autorizo a Territorios Vivos a revisar mi historia y, si se aprueba, publicarla en el mapa con mi nombre y los
+              archivos que adjunté. Mi contacto solo se usa para hablar conmigo sobre ella y nunca se publica (Ley 1581
+              de 2012). Puedo pedir que la retiren cuando quiera.
+            </span>
           </label>
         </section>
 
         {/* En el celular, la vista previa va aquí (en el computador está al lado, sobre el atardecer). */}
         <div className="story-preview-mobile">{preview}</div>
 
-        <button type="submit" className={`story-send${ready ? ' is-ready' : ''}`}>
-          Enviar mi historia
+        {/* Campo trampa: escondido para las personas; los robots lo llenan y su envío se descarta. */}
+        <input className="story-trap" name="web" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+        {error && <p className="story-error" role="alert">{error}</p>}
+        <button type="submit" className={`story-send${ready ? ' is-ready' : ''}`} disabled={sending !== null}>
+          {sending !== null ? (sending < 0.96 && files.length ? `Subiendo archivos… ${Math.round(sending * 100)} %` : 'Enviando…') : error ? 'Intentar de nuevo' : 'Enviar mi historia'}
           <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M10 4.5 14.5 9 10 13.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
       </form>

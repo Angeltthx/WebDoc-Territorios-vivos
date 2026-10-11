@@ -29,6 +29,14 @@ export interface ChocoPoint {
   info?: string;
   /** Si es una historia (no un lugar): su tipo, que decide su figurita. */
   story?: Emblem;
+  /** Lo que contó quien la envió (las historias aprobadas; ver api/historias). */
+  tale?: {
+    text: string;
+    author: string;
+    when: string;
+    place: string;
+    media: { kind: 'foto' | 'video' | 'audio'; url: string; name: string }[];
+  };
   /** Su figurita en el mapa (los lugares; las historias usan la de su tipo). */
   figure?: Figure;
 }

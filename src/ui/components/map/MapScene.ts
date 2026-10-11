@@ -14,7 +14,8 @@ import {
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MapPlace } from '../../../content/map';
-import { CHOCO_POINTS, SUBREGION_LABELS, categorize, type ChocoPoint } from '../../../content/choco';
+import { CHOCO_POINTS, SUBREGION_LABELS, categorize, type ChocoPoint, SUBREGION_OF } from '../../../content/choco';
+import { type PublishedStory, fetchStories } from '../../../application/stories-api';
 import { EMBLEM_SIZE, figureChunks, storyChunks } from './emblems';
 import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
 import { BALL, BLADE, Batch, type Pace, ROCK, clearKitCache, pacer, paint, part, sticker } from './kit';
@@ -601,6 +602,8 @@ const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
  * compila sus sombreadores sin congelar la página. Se resuelve cuando ya se puede llegar a ella.
  */
 export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost, onSpot }: MapSceneOptions): Promise<MapSceneHandle> {
+  // Las historias aprobadas se piden de una vez: llegan mientras se arma la costa.
+  const stories = fetchStories();
   const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, powerPreference: 'high-performance' });
   renderer.setPixelRatio(pixelRatioCap());
   renderer.outputColorSpace = SRGBColorSpace;
@@ -964,6 +967,28 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     spots.push({ point, el, at: label.position });
   }
   for (const point of CHOCO_POINTS) addSpot(point);
+  // Las historias que aprobó el equipo, cada una en su lugar con la figurita de su tipo (si tardan más de unos
+  // segundos, la costa no las espera).
+  const approved = await Promise.race([stories, new Promise<PublishedStory[]>((r) => setTimeout(() => r([]), 4000))]);
+  for (const h of approved) {
+    addSpot({
+      id: `historia-${h.id}`,
+      name: h.titulo,
+      kind: 'corregimiento',
+      lat: h.lat,
+      lon: h.lon,
+      subregion: SUBREGION_OF[h.municipio] ?? 'Atrato',
+      municipio: h.municipio,
+      story: h.tipo,
+      tale: {
+        text: h.relato,
+        author: h.autor,
+        when: h.cuando,
+        place: [h.lugar, h.municipio].filter(Boolean).join(', '),
+        media: h.archivos.filter((a) => a.url).map((a) => ({ kind: a.tipo, url: a.url!, name: a.nombre })),
+      },
+    }, 'historia');
+  }
   // Prueba: ?punto=lat,lon,Nombre pone una historia de ejemplo en el mapa (así llegarán las aprobadas).
   const test = new URLSearchParams(location.search).get('punto')?.split(',');
   if (test && test.length >= 2 && test.slice(0, 2).every((v) => Number.isFinite(+v))) {

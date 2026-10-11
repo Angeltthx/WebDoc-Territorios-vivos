@@ -17,9 +17,12 @@
     "map:relief": "node scripts/map-relief.mjs",
     "map:region": "node scripts/map-region.mjs",
     "map:models": "node scripts/map-models.mjs",
-    "map:world": "node scripts/map-world.mjs"
+    "map:world": "node scripts/map-world.mjs",
+    "db:setup": "node scripts/db-setup.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "@vercel/blob": "^2.8.1",
     "hls.js": "^1.7.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

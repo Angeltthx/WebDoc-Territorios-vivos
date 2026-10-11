@@ -9,6 +9,8 @@ const MAP_PATH = '/costa-k7q4x';
 // La tienda y «Cuéntanos tu historia» se abren desde la costa; también tienen su propia dirección.
 const Shop = lazy(() => import('./ui/screens/Shop'));
 const StoryForm = lazy(() => import('./ui/screens/StoryForm'));
+// Revisión de las historias (para el equipo, con su clave).
+const AdminStories = lazy(() => import('./ui/screens/AdminStories'));
 const sheet = (el: ReactNode) => <Suspense fallback={null}><div className="sheet-page">{el}</div></Suspense>;
 
 export function App() {
@@ -19,6 +21,7 @@ export function App() {
         <Route path={MAP_PATH} element={<Suspense fallback={<p className="map-loading">Cargando el mapa…</p>}><MapScreen /></Suspense>} />
         <Route path="/tienda" element={sheet(<Shop />)} />
         <Route path="/cuenta-tu-historia" element={sheet(<StoryForm />)} />
+        <Route path="/admin-historias" element={<Suspense fallback={null}><AdminStories /></Suspense>} />
         <Route path="/:page" element={<Webdoc />} />
         <Route path="*" element={<Webdoc />} />
       </Routes>
