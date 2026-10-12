@@ -1,0 +1,485 @@
+// «Cuéntanos tu historia»: el formulario completo, con fotos, audios y videos y el lugar de la historia. Al enviarla,
+// los archivos suben directo al almacén (privado) y la historia llega «pendiente» a la revisión del equipo; si se
+// aprueba, aparece en el mapa en su lugar (ver application/stories-api y api/historias).
+//
+// No es una página que cuenta una historia: es el espacio para que alguien cuente la suya. Por eso es sobria (blanco,
+// líneas finas, la letra del webdoc) y deja el protagonismo a lo que se escribe. La primera vez, un tutorial corto
+// explica para qué es (ver StoryTutorial). Vivo sin ruido: pasos que se marcan, el tipo de historia con las figuritas
+// del mapa (se elige solo según lo que se cuenta, y se puede cambiar), grabar la voz ahí mismo y, al lado, cómo se
+// verá en el mapa.
+
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { CHOCO_MUNICIPALITIES, MAX_FILE_MB } from '../../content/stories';
+import { EMBLEM_LABEL, SUBREGION_OF, categorize, type Emblem } from '../../content/choco';
+import { Sheet, type Origin } from '../components/Sheet';
+import { EmblemIcon } from '../components/EmblemIcon';
+import { StoryTutorial, TUTORIAL_SEEN } from '../components/StoryTutorial';
+import { type StoryFile, sendStory, uploadFile } from '../../application/stories-api';
+
+interface Attachment {
+  file: File;
+  kind: 'foto' | 'audio' | 'video';
+  /** Vista previa local (solo en este navegador). */
+  url: string;
+}
+
+const KINDS: Emblem[] = ['pueblo', 'selva', 'mar', 'rio', 'cultura', 'cocina'];
+const kindOf = (f: File): Attachment['kind'] | null =>
+  f.type.startsWith('image/') ? 'foto' : f.type.startsWith('audio/') ? 'audio' : f.type.startsWith('video/') ? 'video' : null;
+const size = (bytes: number) => (bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.ceil(bytes / 1e3)} KB`);
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+/** Lo mínimo que pide el relato. */
+const MIN_STORY = 40;
+/** Archivos por historia. */
+const MAX_FILES = 8;
+/** Una grabación dura como mucho esto (segundos). */
+const MAX_RECORDING = 300;
+
+/** Grabar un audio con el micrófono del celular o del computador. */
+function useRecorder(onDone: (file: File) => void) {
+  const [state, setState] = useState<'idle' | 'recording' | 'denied'>('idle');
+  const [seconds, setSeconds] = useState(0);
+  const rec = useRef<MediaRecorder | null>(null);
+  const tick = useRef(0);
+  const stop = () => rec.current?.state === 'recording' && rec.current.stop();
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: Blob[] = [];
+      const r = new MediaRecorder(stream);
+      r.ondataavailable = (e) => chunks.push(e.data);
+      r.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        window.clearInterval(tick.current);
+        setState('idle');
+        const type = r.mimeType || 'audio/webm';
+        const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+        onDone(new File(chunks, `grabacion-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}.${ext}`, { type }));
+      };
+      rec.current = r;
+      r.start();
+      setSeconds(0);
+      setState('recording');
+      const t0 = performance.now();
+      tick.current = window.setInterval(() => {
+        const s = (performance.now() - t0) / 1000;
+        setSeconds(s);
+        if (s >= MAX_RECORDING) stop();
+      }, 250);
+    } catch {
+      setState('denied');
+    }
+  };
+  useEffect(() => () => {
+    window.clearInterval(tick.current);
+    if (rec.current?.state === 'recording') rec.current.stop();
+  }, []);
+  return { state, seconds, start, stop };
+}
+
+export default function StoryForm({ onClose, origin }: { onClose?: () => void; origin?: Origin }) {
+  const [title, setTitle] = useState('');
+  const [story, setStory] = useState('');
+  const [town, setTown] = useState('');
+  const [spot, setSpot] = useState('');
+  const [name, setName] = useState('');
+  const [when, setWhen] = useState('');
+  const [consent, setConsent] = useState(false);
+  /** El tipo que eligió la persona; sin elegir, el que sale de lo que cuenta. */
+  const [picked, setPicked] = useState<Emblem | null>(null);
+  const guessed = categorize(`${title} ${story}`);
+  const kind = picked ?? guessed;
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [fileNote, setFileNote] = useState('');
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [locating, setLocating] = useState<'idle' | 'busy' | 'error'>('idle');
+  const [sent, setSent] = useState(false);
+  /** El envío: subiendo archivos (con su avance) y guardando la historia, o el error si algo falló. */
+  const [sending, setSending] = useState<number | null>(null);
+  const [error, setError] = useState('');
+  /** Lo ya subido (si el envío falla después, no se vuelve a subir). */
+  const uploaded = useRef(new Map<File, StoryFile>());
+  const folder = useRef(crypto.randomUUID());
+  // El tutorial: solo la primera vez (y cuando se pide con «¿Cómo funciona?»).
+  const [tutorial, setTutorial] = useState(() => {
+    try {
+      return !localStorage.getItem(TUTORIAL_SEEN);
+    } catch {
+      return true;
+    }
+  });
+
+  // Las vistas previas se sueltan al quitarlas o al salir.
+  const current = useRef(files);
+  current.current = files;
+  useEffect(() => () => current.current.forEach((a) => URL.revokeObjectURL(a.url)), []);
+
+  const addFiles = (list: Iterable<File> | null) => {
+    if (!list) return;
+    const skipped: string[] = [];
+    const next: Attachment[] = [];
+    let room = MAX_FILES - files.length;
+    for (const file of list) {
+      const k = kindOf(file);
+      if (room <= 0) skipped.push(`${file.name} (máximo ${MAX_FILES} archivos)`);
+      else if (!k) skipped.push(`${file.name} (no es foto, audio ni video)`);
+      else if (file.size > MAX_FILE_MB * 1e6) skipped.push(`${file.name} (pesa más de ${MAX_FILE_MB} MB)`);
+      else {
+        next.push({ file, kind: k, url: URL.createObjectURL(file) });
+        room--;
+      }
+    }
+    setFiles((f) => [...f, ...next]);
+    setFileNote(skipped.length ? `No se agregaron: ${skipped.join(', ')}.` : '');
+  };
+  const removeFile = (i: number) => {
+    URL.revokeObjectURL(files[i].url);
+    setFiles((f) => f.filter((_, k) => k !== i));
+  };
+  const recorder = useRecorder((file) => addFiles([file]));
+
+  const locate = () => {
+    if (!navigator.geolocation) return setLocating('error');
+    setLocating('busy');
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setCoords({ lat: +p.coords.latitude.toFixed(5), lon: +p.coords.longitude.toFixed(5) });
+        setLocating('idle');
+      },
+      () => setLocating('error'),
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  };
+
+  // Cómo va: cada paso se marca al completarse (los archivos son opcionales: cuentan si se agregó alguno).
+  const steps = [
+    { label: 'Cuéntala', done: title.trim().length > 2 && story.trim().length >= MIN_STORY },
+    { label: 'Dónde', done: !!town },
+    { label: 'Voz y fotos', done: files.length > 0 },
+    { label: 'Tú', done: name.trim().length > 1 && consent },
+  ];
+  const progress = steps.filter((s) => s.done).length / steps.length;
+  /** Lo obligatorio está completo (los archivos son opcionales). */
+  const ready = steps[0].done && steps[1].done && steps[3].done;
+  /** Lo que falta para poder enviarla, dicho como frase («el municipio y tu nombre»). */
+  const missingList = [
+    title.trim().length <= 2 && 'el título',
+    story.trim().length < MIN_STORY && 'contar un poco más la historia',
+    !town && 'el municipio',
+    name.trim().length <= 1 && 'tu nombre',
+    !consent && 'marcar la autorización',
+  ].filter(Boolean) as string[];
+  const missing = missingList.length > 1 ? `${missingList.slice(0, -1).join(', ')} y ${missingList.at(-1)}` : missingList[0] ?? '';
+  const region = town ? SUBREGION_OF[town] : undefined;
+  const place = [spot, town].filter(Boolean).join(', ');
+
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (sending !== null) return;
+    const form = new FormData(e.currentTarget);
+    setError('');
+    setSending(0);
+    try {
+      // Los archivos, uno tras otro (el avance total, por peso).
+      const total = files.reduce((n, a) => n + a.file.size, 0) || 1;
+      let done = 0;
+      const archivos: StoryFile[] = [];
+      for (const a of files) {
+        let f = uploaded.current.get(a.file);
+        if (!f) {
+          f = await uploadFile(a.file, a.kind, folder.current, (p) => setSending(((done + p * a.file.size) / total) * 0.95));
+          uploaded.current.set(a.file, f);
+        }
+        done += a.file.size;
+        archivos.push(f);
+      }
+      setSending(0.97);
+      await sendStory({
+        titulo: title.trim(),
+        relato: story.trim(),
+        cuando: when.trim(),
+        tipo: kind,
+        municipio: town,
+        lugar: spot.trim(),
+        lat: coords?.lat ?? null,
+        lon: coords?.lon ?? null,
+        autor: name.trim(),
+        contacto: String(form.get('contact') ?? ''),
+        consentimiento: consent,
+        archivos,
+        web: String(form.get('web') ?? ''),
+      });
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'No se pudo enviar. Intenta otra vez.');
+    } finally {
+      setSending(null);
+    }
+  };
+
+  /** Así se verá: la misma ficha que se abre en el mapa, en pequeño, que se va llenando mientras se escribe. Lo que
+   * falta se ve como un espacio gris, para que se entienda qué va en cada parte. */
+  const visual = files.find((a) => a.kind === 'video') ?? files.find((a) => a.kind === 'foto');
+  const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
+  const preview = (
+    <div className="story-preview" aria-label="Así se verá tu historia">
+      <p className="story-preview__eyebrow">Así se verá tu historia</p>
+      <p className="story-preview__step"><span>1</span>En el mapa aparece así, en {town || 'el lugar donde pasó'}</p>
+      {/* Un pedacito de la costa: el mar, la tierra y el punto dorado con su nombre, como en el mapa. */}
+      <div className="story-preview__map" aria-hidden="true">
+        <svg viewBox="0 0 320 96" preserveAspectRatio="xMidYMid slice">
+          <rect width="320" height="96" fill="#2a6478" />
+          <rect width="320" height="40" fill="#3b7f8f" opacity="0.6" />
+          <path d="M150 96 C160 70 148 52 168 36 C186 22 178 8 196 0 H320 V96 Z" fill="#3d7650" />
+          <path d="M150 96 C160 70 148 52 168 36 C186 22 178 8 196 0" fill="none" stroke="#e9dcb4" strokeWidth="3" opacity="0.8" />
+          <path d="M236 96 C246 66 270 58 284 34 C292 20 306 12 320 10 V96 Z" fill="#2f6342" />
+          <g fill="#295a3a">
+            <circle cx="214" cy="58" r="7" /><circle cx="226" cy="64" r="6" /><circle cx="250" cy="30" r="7" /><circle cx="292" cy="62" r="8" /><circle cx="206" cy="20" r="6" />
+          </g>
+          <g stroke="#ffffff" strokeOpacity="0.25" strokeWidth="1.5" fill="none">
+            <path d="M24 30 q8 -4 16 0 t16 0" /><path d="M70 66 q8 -4 16 0 t16 0" /><path d="M110 22 q8 -4 16 0 t16 0" />
+          </g>
+        </svg>
+        <span className="story-preview__marker">
+          <span className="story-preview__label">{title.trim() || 'Tu historia'}</span>
+          <span className="story-preview__dot-map" />
+        </span>
+      </div>
+      <p className="story-preview__step"><span>2</span>Al tocarlo, se abre tu historia</p>
+      <div className="story-preview__card">
+        <div className={`story-preview__hero${visual ? '' : ' is-empty'}`}>
+          {visual?.kind === 'video' && <video src={visual.url} muted playsInline preload="metadata" />}
+          {visual?.kind === 'foto' && <img src={visual.url} alt="" />}
+          {!visual && <span>Aquí va tu foto o video</span>}
+        </div>
+        <div className="story-preview__paper">
+          <p className="story-preview__kind"><span className="story-preview__dot" />Historia de {EMBLEM_LABEL[kind].toLowerCase()}</p>
+          <p className={`story-preview__title${title.trim() ? '' : ' is-empty'}`}>{title.trim() || 'El título de tu historia'}</p>
+          <div className="story-preview__by">
+            <span className="story-preview__avatar">{initials || '?'}</span>
+            <span>
+              <strong className={name.trim() ? '' : 'is-empty'}>{name.trim() ? `Contada por ${name.trim()}` : 'Tu nombre'}</strong>
+              <small>{[place || region, when.trim()].filter(Boolean).join(', ') || 'El lugar y cuándo pasó'}</small>
+            </span>
+          </div>
+          {story.trim()
+            ? <p className="story-preview__text">{story.trim().slice(0, 160)}{story.trim().length > 160 ? '…' : ''}</p>
+            : <span className="story-preview__lines" aria-hidden="true"><i /><i /><i /></span>}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (sent) {
+    return (
+      <Sheet className="sheet--story" eyebrow="Tu historia" title="Gracias por contarla" onClose={onClose} aside={preview} origin={origin} still>
+        <div className="story-sent">
+          <p className="story-sent__lead">
+            «{title}», en {place}, ya le llegó al equipo de Territorios Vivos. Después de leerla, aparecerá en el mapa,
+            en su lugar, con la figurita de <strong>{EMBLEM_LABEL[kind]}</strong>.
+          </p>
+          <p className="story-help">La revisamos en los próximos días. Si dejaste un contacto, te avisamos cuando esté publicada.</p>
+          {onClose && <button type="button" className="story-send story-send--plain is-ready" onClick={onClose}><span className="story-send__label">Volver al mapa</span></button>}
+        </div>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Sheet
+      className="sheet--story"
+      origin={origin}
+      eyebrow="Tu historia"
+      title="Este espacio es tuyo"
+      intro="Un recuerdo, una receta, un canto. Lo que viviste en el Chocó también tiene su lugar en el mapa."
+      onClose={onClose}
+      aside={preview}
+      overlay={tutorial && <StoryTutorial onDone={() => setTutorial(false)} />}
+    >
+      <button type="button" className="story-how" onClick={() => setTutorial(true)}>¿Cómo funciona?</button>
+      {/* Cómo va: cuatro pasos que se llenan. */}
+      <ol className="story-progress" aria-label="Pasos">
+        {steps.map((s, i) => (
+          <li key={s.label} className={s.done ? 'is-done' : ''}>
+            <span className="story-progress__n">{s.done ? '✓' : i + 1}</span>
+            <span className="story-progress__label">{s.label}</span>
+          </li>
+        ))}
+        <span className="story-progress__bar" style={{ transform: `scaleX(${progress})` }} aria-hidden="true" />
+      </ol>
+
+      <form className="story-form" onSubmit={submit}>
+        <section className="story-step">
+          <h3 className="story-step__title"><span className="story-step__n">1</span>Cuéntala</h3>
+          <label className="story-field">
+            <span className="story-field__label">Título</span>
+            <input name="title" required maxLength={90} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="La noche que llegaron las ballenas" />
+          </label>
+          <label className="story-field">
+            <span className="story-field__label">
+              Cuéntanos qué pasó
+              <em className={story.trim().length >= MIN_STORY ? 'is-ok' : ''}>
+                {story.trim().length >= MIN_STORY ? '¡Así va bien!' : `${MIN_STORY - story.trim().length} letras más, mínimo`}
+              </em>
+            </span>
+            <textarea name="story" required minLength={MIN_STORY} rows={6} value={story} onChange={(e) => setStory(e.target.value)} placeholder="Escríbela como si se la contaras a alguien en la playa." />
+          </label>
+          <div className="story-field">
+            <span className="story-field__label">
+              ¿De qué trata? <em>{picked ? 'Esta la escogiste tú' : 'Te sugerimos una categoría según lo que cuentas, pero puedes cambiarla'}</em>
+            </span>
+            <div className="story-kinds" role="radiogroup" aria-label="Tipo de historia">
+              {KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={k === kind}
+                  className={`story-kind${k === kind ? ' is-on' : ''}`}
+                  onClick={() => setPicked(k === picked ? null : k)}
+                >
+                  <EmblemIcon kind={k} />
+                  <span>{EMBLEM_LABEL[k]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="story-field">
+            <span className="story-field__label">¿Cuándo pasó? <em>opcional</em></span>
+            <input name="when" maxLength={60} value={when} onChange={(e) => setWhen(e.target.value)} placeholder="Un año o una época: en los 90, de niña…" />
+          </label>
+        </section>
+
+        <section className="story-step">
+          <h3 className="story-step__title"><span className="story-step__n">2</span>¿Dónde pasó?</h3>
+          <div className="story-row">
+            <label className="story-field">
+              <span className="story-field__label">Municipio</span>
+              <select name="town" required value={town} onChange={(e) => setTown(e.target.value)}>
+                <option value="" disabled>Elige el municipio</option>
+                {CHOCO_MUNICIPALITIES.map((m) => <option key={m}>{m}</option>)}
+              </select>
+            </label>
+            <label className="story-field">
+              <span className="story-field__label">Lugar <em>corregimiento, vereda, playa, río…</em></span>
+              <input name="spot" maxLength={90} value={spot} onChange={(e) => setSpot(e.target.value)} placeholder="Playa de Guachalito" />
+            </label>
+          </div>
+          {region && <p className="story-help story-help--live">Queda en la subregión <strong>{region}</strong>.</p>}
+          <div className="story-geo">
+            <button type="button" className="story-chip" onClick={locate} disabled={locating === 'busy'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              </svg>
+              {locating === 'busy' ? 'Buscando…' : coords ? `${coords.lat}, ${coords.lon}` : 'Usar mi ubicación'}
+            </button>
+            <p className="story-help">
+              {coords
+                ? <>Listo: la historia queda en ese punto. <button type="button" className="story-link" onClick={() => setCoords(null)}>Quitar</button></>
+                : locating === 'error'
+                  ? 'No se pudo leer la ubicación. No pasa nada: con el municipio y el lugar el equipo la ubica.'
+                  : 'Solo si estás donde pasó. Si no, con el municipio y el lugar el equipo la ubica en el mapa.'}
+            </p>
+            {coords && (
+              <>
+                <input type="hidden" name="lat" value={coords.lat} />
+                <input type="hidden" name="lon" value={coords.lon} />
+              </>
+            )}
+          </div>
+        </section>
+
+        <section className="story-step">
+          <h3 className="story-step__title"><span className="story-step__n">3</span>Tu voz, fotos o video <em>opcional</em></h3>
+          <div className="story-media">
+            <label className="story-drop">
+              <input type="file" multiple accept="image/*,audio/*,video/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+              <span className="story-drop__icons" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="2" /><path d="M21 16l-5-5-8 8" /></svg>
+                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2" /><path d="M16 10l5-3v10l-5-3" /></svg>
+              </span>
+              <span className="story-drop__text">Agrega fotos o videos</span>
+              <span className="story-help">Hasta {MAX_FILE_MB} MB cada uno</span>
+            </label>
+            {recorder.state === 'recording' ? (
+              <button type="button" className="story-record is-on" onClick={recorder.stop}>
+                <span className="story-record__dot" />
+                <span className="story-drop__text">Grabando {clock(recorder.seconds)}</span>
+                <span className="story-help">Toca para terminar</span>
+              </button>
+            ) : (
+              <button type="button" className="story-record" onClick={() => void recorder.start()}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+                <span className="story-drop__text">Grábala con tu voz</span>
+                <span className="story-help">{recorder.state === 'denied' ? 'No se pudo usar el micrófono' : `Hasta ${MAX_RECORDING / 60} minutos`}</span>
+              </button>
+            )}
+          </div>
+          {fileNote && <p className="story-help" role="status">{fileNote}</p>}
+          {files.length > 0 && (
+            <ul className="story-files">
+              {files.map((a, i) => (
+                <li key={a.url}>
+                  {a.kind === 'foto' && <img src={a.url} alt="" />}
+                  {a.kind === 'video' && <video src={a.url} muted playsInline preload="metadata" />}
+                  {a.kind === 'audio' && <audio src={a.url} controls preload="none" />}
+                  <span className="story-files__name">{a.file.name}<small>{a.kind}, {size(a.file.size)}</small></span>
+                  <button type="button" className="story-files__x" onClick={() => removeFile(i)} aria-label={`Quitar ${a.file.name}`}>×</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="story-step">
+          <h3 className="story-step__title"><span className="story-step__n">4</span>Tú</h3>
+          <div className="story-row">
+            <label className="story-field">
+              <span className="story-field__label">Tu nombre <em>o cómo quieres aparecer</em></span>
+              <input name="name" required maxLength={60} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <label className="story-field">
+              <span className="story-field__label">Correo o WhatsApp <em>opcional, no se publica</em></span>
+              <input name="contact" maxLength={90} autoComplete="email" />
+            </label>
+          </div>
+          <label className="story-check">
+            <input type="checkbox" name="consent" required checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>
+              Autorizo a Territorios Vivos a revisar mi historia y, si se aprueba, publicarla en el mapa con mi nombre y los
+              archivos que adjunté. Mi contacto solo se usa para hablar conmigo sobre ella y nunca se publica (Ley 1581
+              de 2012). Puedo pedir que la retiren cuando quiera.
+            </span>
+          </label>
+        </section>
+
+        {/* En el celular, la vista previa va aquí (en el computador está al lado, sobre el atardecer). */}
+        <div className="story-preview-mobile">{preview}</div>
+
+        {/* Campo trampa: escondido para las personas; los robots lo llenan y su envío se descarta. */}
+        <input className="story-trap" name="web" tabIndex={-1} autoComplete="off" aria-hidden="true" />
+        {/* El envío: qué falta (o que ya está lista), el botón con el dibujo de su categoría y, al enviar, el avance. */}
+        <div className={`story-submit${ready ? ' is-ready' : ''}`}>
+          {error && <p className="story-error" role="alert">{error}</p>}
+          <p className="story-submit__status" aria-live="polite">
+            {ready ? <><span className="story-submit__check" aria-hidden="true">✓</span>Tu historia está lista para enviar.</> : `Para enviarla te falta ${missing}.`}
+          </p>
+          <button
+            type="submit"
+            className={`story-send${ready ? ' is-ready' : ''}${sending !== null ? ' is-sending' : ''}`}
+            disabled={sending !== null}
+            style={{ '--p': sending ?? 0 } as CSSProperties}
+          >
+            <span className="story-send__bar" aria-hidden="true" />
+            <span className="story-send__icon" aria-hidden="true"><EmblemIcon kind={kind} size={30} /></span>
+            <span className="story-send__label">
+              {sending !== null ? (sending < 0.96 && files.length ? `Subiendo archivos ${Math.round(sending * 100)} %` : 'Enviando…') : error ? 'Intentar de nuevo' : 'Enviar mi historia'}
+            </span>
+            <svg className="story-send__arrow" width="20" height="20" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M10 4.5 14.5 9 10 13.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <p className="story-help story-before-send">Antes de salir en el mapa, el equipo de Territorios Vivos la lee. Te avisamos si dejaste un contacto.</p>
+        </div>
+      </form>
+    </Sheet>
+  );
+}

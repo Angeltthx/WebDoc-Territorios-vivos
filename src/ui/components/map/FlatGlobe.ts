@@ -66,7 +66,7 @@ function starTile() {
   return tile.toDataURL();
 }
 
-export function createFlatGlobe(host: HTMLElement, { onDive, onHandoff, onReady }: GlobeOptions): GlobeHandle {
+export function createFlatGlobe(host: HTMLElement, { onDive, onHandoff, onReady, wheelGate }: GlobeOptions): GlobeHandle {
   step('planeta plano: armando');
   const world = pixels(worldCanvas());
   const region = pixels(regionCanvas());
@@ -263,6 +263,7 @@ export function createFlatGlobe(host: HTMLElement, { onDive, onHandoff, onReady 
     }
   };
   const onWheel = (e: WheelEvent) => {
+    if (wheelGate && !wheelGate()) return;
     e.preventDefault();
     if (e.deltaY < 0) startDive();
   };

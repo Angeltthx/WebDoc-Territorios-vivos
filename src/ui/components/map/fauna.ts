@@ -1010,16 +1010,24 @@ export const NATURE_LABEL_HEIGHT: Record<string, number> = {
 export async function buildFauna(rand: () => number, pace: Pace, onSplash: OnSplash = () => {}): Promise<Living> {
   const spray = new Spray(200);
   const splashes = new SplashPool();
-  const builders: (() => Living)[] = [
-    () => buildWhales(spray, splashes, onSplash, rand), buildTurtle, buildCrab, buildPava, buildFrog, () => buildBirds(rand, spray), () => buildButterflies(rand),
+  // Cada especie del afiche con su id (el de su ficha): al tocar el animal, el mapa sabe cuál es y lo sigue.
+  const builders: [string | null, () => Living][] = [
+    ['ballena', () => buildWhales(spray, splashes, onSplash, rand)], ['tortuga', buildTurtle], ['cangrejo', buildCrab], ['pava', buildPava],
+    ['rana', buildFrog], [null, () => buildBirds(rand, spray)], [null, () => buildButterflies(rand)],
   ];
   const parts: Living[] = [];
-  for (const build of builders) {
+  for (const [id, build] of builders) {
     await pace();
-    parts.push(build());
+    const p = build();
+    if (id) p.group.userData.natureId = id;
+    parts.push(p);
   }
+  const cacao = buildCacao(rand);
+  cacao.userData.natureId = 'cacao';
+  const mangrove = buildPosterMangrove();
+  mangrove.userData.natureId = 'manglar';
   const group = new Group();
-  group.add(spray.group, splashes.group, buildCacao(rand), buildPosterMangrove(), ...parts.map((p) => p.group));
+  group.add(spray.group, splashes.group, cacao, mangrove, ...parts.map((p) => p.group));
   return {
     group,
     update: (t, dt) => {

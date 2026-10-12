@@ -6,7 +6,7 @@
 // y el sur (Coquí) a la derecha, como en el afiche. Ver `terrain.ts` para las coordenadas.
 
 import {
-  BackSide, type BufferGeometry, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
+  BackSide, BufferGeometry, Color, ConeGeometry, DataTexture, DirectionalLight, DodecahedronGeometry, Float32BufferAttribute,
   Fog, Group, HemisphereLight, Matrix4, IcosahedronGeometry, MathUtils, Mesh, LinearFilter, Object3D, UnsignedByteType,
   PerspectiveCamera, PlaneGeometry, Quaternion, Raycaster, RedFormat, SRGBColorSpace, Scene, ShaderMaterial,
   SphereGeometry, Timer, UniformsLib, UniformsUtils, Vector2, Vector3, Vector4, WebGLRenderer, type Texture, type WebGLProgramParametersWithUniforms,
@@ -14,16 +14,19 @@ import {
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MapPlace } from '../../../content/map';
+import { CHOCO_POINTS, SUBREGION_LABELS, categorize, type ChocoPoint, SUBREGION_OF } from '../../../content/choco';
+import { type PublishedStory, fetchStories } from '../../../application/stories-api';
+import { EMBLEM_SIZE, figureChunks, storyChunks } from './emblems';
 import { buildFauna, NATURE_LABEL_HEIGHT, VIEWER } from './fauna';
-import { Batch, type Pace, clearKitCache, pacer, sticker } from './kit';
-import { buildFlora, buildMist } from './flora';
+import { BALL, BLADE, Batch, type Pace, ROCK, clearKitCache, pacer, paint, part, sticker } from './kit';
+import { buildFlora, buildMist, clearPlants } from './flora';
 import { buildPlaces } from './places';
 import { loadAnimals } from './animals';
 import { ASCENT, DIVE, diveProgress, fovs, mapUnitsPerKm, type Handoff } from './dive';
 import { DUSK_AT_NUQUI, DUSK_GLSL, REGION, posterTexture, regionCanvas } from './posterArt';
 import {
   ARRIVAL, BOUNDS, FAR_GRID, FAR_SHORE_FIELD, GRID, HEIGHTS, RAIL, SHORE_FIELD, farVertex, nature, placeNear, placed, railAt, rng, SUN_DIR,
-  shore, smoothstep, toScene, valueNoise, type PlacedPlace,
+  farHeight, heightAt, shore, smoothstep, toScene, valueNoise, type PlacedPlace,
 } from './terrain';
 import { QUALITY, litMaterial, pixelRatioCap } from './quality';
 import { step } from './diag';
@@ -573,8 +576,16 @@ export interface MapSceneHandle {
   ascend: (onHandoff: () => void) => void;
   /** Pausa o reanuda la escena. */
   setActive: (active: boolean) => void;
+  /** Qué puntos del resto del Chocó se ven: todos, solo los lugares o solo las historias. */
+  setFilter: (filter: SpotFilter) => void;
+  /** Cuántas historias hay en el mapa. */
+  storyCount: number;
+  /** Un elemento que sigue en pantalla a la historia abierta: recibe su posición en `--sx` / `--sy` (px). */
+  track: (el: HTMLElement | null) => void;
   dispose: () => void;
 }
+
+export type SpotFilter = 'todo' | 'lugares' | 'historias';
 
 export interface MapSceneOptions {
   onSelect: (place: MapPlace | null) => void;
@@ -587,6 +598,8 @@ export interface MapSceneOptions {
   onPull?: (amount: number) => void;
   /** El navegador quitó el 3D (por ejemplo, el equipo se quedó sin memoria). */
   onLost?: () => void;
+  /** Se eligió (o se soltó) uno de los puntos del resto del Chocó. */
+  onSpot?: (point: ChocoPoint | null) => void;
 }
 
 /** Cede el turno a la página entre las etapas pesadas: en un teléfono modesto, armar todo de corrido la congela. */
@@ -596,7 +609,9 @@ const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
  * Arma la costa por etapas (cediendo el turno entre una y otra, así el planeta de la entrada sigue respondiendo) y
  * compila sus sombreadores sin congelar la página. Se resuelve cuando ya se puede llegar a ella.
  */
-export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost }: MapSceneOptions): Promise<MapSceneHandle> {
+export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost, onSpot }: MapSceneOptions): Promise<MapSceneHandle> {
+  // Las historias aprobadas se piden de una vez: llegan mientras se arma la costa.
+  const stories = fetchStories();
   const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, powerPreference: 'high-performance' });
   renderer.setPixelRatio(pixelRatioCap());
   renderer.outputColorSpace = SRGBColorSpace;
@@ -613,10 +628,10 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
 
   const scene = new Scene();
   // Solo en desarrollo: para medir el rendimiento desde la consola.
-  if (import.meta.env.DEV) Object.assign(window, { __map: { renderer, scene } });
   const fog = new Fog(HAZE, FOG.near, FOG.far);
   scene.fog = fog;
   const camera = new PerspectiveCamera(52, 1, 5, 60000);
+  if (import.meta.env.DEV) Object.assign(window, { __map: { renderer, scene, camera } });
 
   const rand = rng(20261008);
   const sky = buildSky();
@@ -677,7 +692,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   /** Altura del alfiler: encima de lo que haya construido en el sitio. */
   const pinBase = (place: PlacedPlace) => place.pos.y + (places.heights.get(place.id) ?? 10) + 16;
 
-  for (const place of [...placed, ...nature]) {
+  // La fauna no lleva rótulo: se toca el animal mismo (ver `pick`) y la cámara lo sigue.
+  for (const place of placed) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = `map-label map-label--${place.kind}`;
@@ -713,6 +729,329 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     pins.push({ place, pin, label, el });
   }
 
+  // ───────── El resto del Chocó ─────────
+  // Puntos en su lugar real (la costa al norte y al sur, y detrás de la serranía el Atrato y el San Juan), cada uno con
+  // su figurita 3D (casitas, árboles, palma…). Solo aparecen al alejarse (de cerca, la costa es la protagonista); el
+  // nombre sale al pasar el mouse y, al tocarlos, la cámara viaja hasta allá. Las historias que manden las personas
+  // usarán el mismo camino: latitud y longitud → lugar en la escena (ver `addSpot`).
+  const spots: { point: ChocoPoint; el: HTMLButtonElement; at: Vector3; behind?: boolean }[] = [];
+  // La malla fina (con su vegetación) llega un poco más allá del relieve medido, hacia el este.
+  const inFine = (x: number, z: number) => x > GRID.x0 && x < GRID.x0 + GRID.w && z > GRID.z0 && z < GRID.z0 + GRID.d;
+  /** Altura del suelo en cualquier punto del Chocó (relieve fino cerca de Nuquí; el de fondo en el resto). */
+  const groundAt = (x: number, z: number) => Math.max(inFine(x, z) ? heightAt(x, z) : farHeight(x, z), 0);
+  let openSpot: string | null = null;
+  let filter: SpotFilter = 'todo';
+  let tracked: HTMLElement | null = null;
+  const onScreen = new Vector3();
+  function selectSpot(id: string | null) {
+    if (selected) {
+      selected = null;
+      for (const p of pins) p.el.classList.remove('is-selected');
+      onSelect(null);
+    }
+    openSpot = id;
+    for (const s of spots) s.el.classList.toggle('is-open', s.point.id === id);
+    const spot = spots.find((s) => s.point.id === id);
+    if (spot?.point.story) {
+      // Una historia: la cámara mira por encima de ella, para que quede abajo en la pantalla y su ficha quepa arriba.
+      const dist = 760;
+      const lift = (0.5 * dist * Math.tan(MathUtils.degToRad(camera.fov / 2))) / Math.cos(MathUtils.degToRad(24));
+      visit(spot.at.clone().setY(spot.at.y + lift), dist);
+    } else if (spot) visit(spot.at.clone().setY(spot.at.y - EMBLEM_SIZE * 0.4), spot.point.figure?.main === 'montana' ? 1300 : 900);
+    else if (tour) leaveTour();
+    onSpot?.(spot?.point ?? null);
+  }
+  const emblemParts: BufferGeometry[] = [];
+  /** Las figuritas de las historias van aparte: el filtro las muestra u oculta solas. */
+  const storyParts: BufferGeometry[] = [];
+  /** El punto de tierra más empinado cerca de (x, z), con la dirección cuesta abajo (dx, dz, unitaria). */
+  const steepest = (x: number, z: number, max: number) => {
+    let best = { x, z, dx: 0, dz: 1, slope: -1 };
+    const e = 25;
+    for (let r = 0; r <= max; r += 40) {
+      for (let k = 0; k < (r ? 16 : 1); k++) {
+        const a = (k / 16) * Math.PI * 2;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (isSea(px, pz)) continue;
+        const gx = groundAt(px + e, pz) - groundAt(px - e, pz);
+        const gz = groundAt(px, pz + e) - groundAt(px, pz - e);
+        const slope = Math.hypot(gx, gz) - r * 0.0004;
+        if (slope > best.slope && slope > 0.01) best = { x: px, z: pz, dx: -gx / Math.hypot(gx, gz), dz: -gz / Math.hypot(gx, gz), slope };
+      }
+    }
+    return best;
+  };
+  /**
+   * Una cascada pegada a la ladera: desde la pendiente más empinada cerca del lugar se sube por la loma (siguiendo la
+   * pendiente) y se baja hasta donde se calma; por ese camino corre una cinta de agua que copia la forma del terreno,
+   * blanca donde la caída es fuerte y azul donde el agua se calma, y al pie, un pozo con su borde de espuma. Así no es un
+   * objeto encima del paisaje: es parte de él.
+   */
+  const buildFall = (x0: number, z0: number) => {
+    const start = steepest(x0, z0, 260);
+    if (start.slope < 0.25) return null;
+    const step = 18;
+    const grad = (x: number, z: number) => {
+      const e = 12;
+      const gx = groundAt(x + e, z) - groundAt(x - e, z);
+      const gz = groundAt(x, z + e) - groundAt(x, z - e);
+      const l = Math.hypot(gx, gz) || 1;
+      return { x: gx / l, z: gz / l, steep: Math.hypot(gx, gz) / (2 * e) };
+    };
+    // Camino: subir por la loma desde el punto más empinado y bajar hasta que se aplana.
+    const up: [number, number][] = [];
+    let p: [number, number] = [start.x, start.z];
+    for (let k = 0; k < 9; k++) {
+      const g = grad(p[0], p[1]);
+      if (g.steep < 0.1) break;
+      p = [p[0] + g.x * step, p[1] + g.z * step];
+      up.push(p);
+    }
+    const down: [number, number][] = [];
+    p = [start.x, start.z];
+    for (let k = 0; k < 8; k++) {
+      const g = grad(p[0], p[1]);
+      p = [p[0] - g.x * step, p[1] - g.z * step];
+      if (isSea(p[0], p[1])) break;
+      down.push(p);
+      if (g.steep < 0.12) break;
+    }
+    const path = [...up.reverse(), [start.x, start.z] as [number, number], ...down];
+    if (path.length < 3) return null;
+    const pos: number[] = [];
+    const col: number[] = [];
+    const white = new Color('#f4fcff');
+    const light = new Color('#b8ecfb');
+    const blue = new Color('#5cc6e6');
+    const tri = (a: Vector3, b: Vector3, c: Vector3, ca: Color, cb: Color, cc: Color) => {
+      pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b, cc.r, cc.g, cc.b);
+    };
+    // Tres hilos por tramo (orilla, centro, orilla): el centro más claro; más ancha abajo.
+    const rows = path.map(([x, z], k) => {
+      const [nx, nz] = path[Math.min(k + 1, path.length - 1)];
+      const [px, pz] = path[Math.max(k - 1, 0)];
+      const dx = nx - px;
+      const dz = nz - pz;
+      const l = Math.hypot(dx, dz) || 1;
+      const w = 10 + (k / path.length) * 12;
+      const sx = (-dz / l) * w;
+      const sz = (dx / l) * w;
+      // Un poco sobre el terreno (la malla de fondo es más gruesa que la altura medida: que no quede por debajo).
+      const at = (f: number) => new Vector3(x + sx * f, groundAt(x + sx * f, z + sz * f) + (inFine(x, z) ? 2 : 6), z + sz * f);
+      const fall = grad(x, z).steep;
+      const c = fall > 0.6 ? white : fall > 0.3 ? light : blue;
+      return { l: at(-1), m: at(0), r: at(1), c, edge: fall > 0.6 ? light : blue };
+    });
+    for (let k = 0; k < rows.length - 1; k++) {
+      const a = rows[k];
+      const b = rows[k + 1];
+      // (en este orden miran hacia arriba)
+      tri(a.l, a.m, b.l, a.edge, a.c, b.edge);
+      tri(a.m, b.m, b.l, a.c, b.c, b.edge);
+      tri(a.m, a.r, b.m, a.c, a.edge, b.c);
+      tri(a.r, b.r, b.m, a.edge, b.edge, b.c);
+    }
+    // El pozo al pie: agua quieta a la altura más baja de su borde, con piedras alrededor.
+    const [fx, fz] = path[path.length - 1];
+    const R = 20;
+    let low = Infinity;
+    for (let k = 0; k < 12; k++) low = Math.min(low, groundAt(fx + Math.cos((k / 12) * Math.PI * 2) * R, fz + Math.sin((k / 12) * Math.PI * 2) * R));
+    const py = Math.max(low, groundAt(fx, fz) - 3) + 1.4;
+    const center = new Vector3(fx, py, fz);
+    for (let k = 0; k < 14; k++) {
+      const a0 = (k / 14) * Math.PI * 2;
+      const a1 = ((k + 1) / 14) * Math.PI * 2;
+      const r0 = R * (0.85 + 0.15 * Math.sin(k * 2.3));
+      const r1 = R * (0.85 + 0.15 * Math.sin((k + 1) * 2.3));
+      tri(center, new Vector3(fx + Math.cos(a1) * r1, py, fz + Math.sin(a1) * r1), new Vector3(fx + Math.cos(a0) * r0, py, fz + Math.sin(a0) * r0), blue, blue, blue);
+    }
+    // Piedras, espuma y helechos: en el borde del pozo, en las orillas de la caída y a los lados.
+    const extras: BufferGeometry[] = [];
+    const rock = (x: number, z: number, r: number, c: string) =>
+      extras.push(part(ROCK, c, { p: [x, groundAt(x, z) + r * 0.25, z], s: [r, r * 0.8, r], r: [0, x * 0.1, 0] }));
+    for (let k = 0; k < 9; k++) {
+      const a = (k / 9) * Math.PI * 2 + 0.3;
+      rock(fx + Math.cos(a) * (R + 2), fz + Math.sin(a) * (R + 2), 3.5 + (k % 3) * 1.5, k % 2 ? '#7c8a80' : '#6f7d73');
+    }
+    rows.forEach((r, k) => {
+      if (k % 2) return;
+      rock(r.l.x, r.l.z, 3 + (k % 3), '#7c8a80');
+      rock(r.r.x, r.r.z, 2.5 + ((k + 1) % 3), '#869488');
+      for (const side of [r.l, r.r]) {
+        const out = side.clone().sub(r.m).setY(0).normalize().multiplyScalar(9).add(side);
+        for (const a of [0, 1.6, 3.2, 4.8]) extras.push(part(BLADE, k % 4 ? '#3d7f4c' : '#2f6b45', { p: [out.x, groundAt(out.x, out.z) + 0.6, out.z], r: [-0.45, a + k, 0], s: [1.6, 0.2, 6], o: 'YXZ' }));
+      }
+      // Espuma donde cae fuerte.
+      if (r.c === white) extras.push(part(BALL, '#ffffff', { p: [r.m.x, r.m.y + 0.6, r.m.z], s: [5, 1.2, 4] }));
+    });
+    extras.push(part(BALL, '#ffffff', { p: [fx, py + 0.5, fz], s: [8, 1.4, 6] }));
+    if (inFine(fx, fz)) {
+      clearPlants(flora, fx, fz, R + 10);
+      for (const r of rows) clearPlants(flora, r.m.x, r.m.z, 14);
+    }
+    // Que todos los triángulos miren hacia arriba (el material solo dibuja la cara de adelante).
+    for (let i = 0; i < pos.length; i += 9) {
+      const ux = pos[i + 3] - pos[i], uz = pos[i + 5] - pos[i + 2];
+      const vx = pos[i + 6] - pos[i], vz = pos[i + 8] - pos[i + 2];
+      if (uz * vx - ux * vz < 0) {
+        for (const k of [0, 1, 2]) [pos[i + 3 + k], pos[i + 6 + k]] = [pos[i + 6 + k], pos[i + 3 + k]];
+        for (const k of [0, 1, 2]) [col[i + 3 + k], col[i + 6 + k]] = [col[i + 6 + k], col[i + 3 + k]];
+      }
+    }
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new Float32BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    return mergeGeometries([geo, ...extras])!;
+  };
+  /** ¿Es mar? (el relieve sin recortar en cero: negativo en el agua). */
+  const isSea = (x: number, z: number) => (inFine(x, z) ? heightAt(x, z) : farHeight(x, z)) < 0;
+  /** El punto de mar más cercano a (x, z), hasta `max` unidades; un poco mar adentro para que no toque la orilla. */
+  const nearestSea = (x: number, z: number, max: number): [number, number] | null => {
+    if (isSea(x, z) && isSea(x + 40, z) && isSea(x - 40, z)) return [x, z];
+    for (let r = 60; r <= max; r += 60) {
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (isSea(px, pz) && isSea(px + Math.cos(a) * 50, pz + Math.sin(a) * 50)) return [px + Math.cos(a) * 30, pz + Math.sin(a) * 30];
+      }
+    }
+    return null;
+  };
+  function addSpot(point: ChocoPoint, kind: string = point.kind) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = `map-spot map-spot--${kind}`;
+    el.setAttribute('aria-label', point.name);
+    const name = document.createElement('span');
+    name.className = 'map-spot__name';
+    name.textContent = point.name;
+    el.append(name);
+    el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    el.addEventListener('click', () => selectSpot(openSpot === point.id ? null : point.id));
+    const label = new CSS2DObject(el);
+    const at = toScene(point.lat, point.lon);
+    // El relieve de fondo es grueso (≈ 2,8 km): una punta o un pueblo de la orilla pueden caer en el agua. Se corren a
+    // la tierra más cercana (como mucho 2,5 km).
+    if (isSea(at.x, at.z)) {
+      search: for (let r = 40; r <= 2500; r += 40) {
+        for (let k = 0; k < 24; k++) {
+          const a = (k / 24) * Math.PI * 2;
+          const x = at.x + Math.cos(a) * r;
+          const z = at.z + Math.sin(a) * r;
+          if (!isSea(x, z) && !isSea(x + Math.cos(a) * 60, z + Math.sin(a) * 60)) {
+            at.set(x + Math.cos(a) * 40, 0, z + Math.sin(a) * 40);
+            break search;
+          }
+        }
+      }
+    }
+    // Cada pieza de la figurita (una casa, una palma, una roca, la lancha) se apoya por separado en el terreno real.
+    // El frente de la figurita (+z) mira al oeste, al mar: (x, z) local → (−z, x) en la escena.
+    const chunks = point.story ? storyChunks(point.story) : figureChunks(point.figure ?? { main: 'cabecera' }, [...point.id].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619), 2166136261));
+    let top = groundAt(at.x, at.z);
+    for (const c of chunks) {
+      let x = at.x - c.z;
+      let z = at.z + c.x;
+      let y: number;
+      if (c.on === 'air') y = groundAt(at.x, at.z);
+      else {
+        const water = c.on === 'ground' ? null : nearestSea(x, z, c.on === 'sea' ? 3000 : 700);
+        if (water) {
+          [x, z] = water;
+          y = -0.5;
+        } else if (c.on === 'sea') continue; // sin mar cerca: sin lancha ni ballena
+        else y = groundAt(x, z) - 1;
+        top = Math.max(top, y);
+        // En la selva de la costa, un claro para que los árboles no la tapen.
+        if (inFine(x, z) && c.r > 0) clearPlants(flora, x, z, c.r * 1.4 + 12);
+      }
+      const g = c.geo.clone();
+      g.rotateY(-Math.PI / 2);
+      g.translate(x, y, z);
+      (point.story ? storyParts : emblemParts).push(g);
+    }
+    // La cascada (en pocos lugares): no es una pieza, es agua sobre la ladera misma.
+    if (point.figure?.extra?.includes('cascada')) {
+      const fall = buildFall(at.x, at.z);
+      if (fall) emblemParts.push(fall);
+    }
+    // El punto flota sobre su figurita.
+    label.position.set(at.x, top + EMBLEM_SIZE + 22, at.z);
+    pinGroup.add(label);
+    spots.push({ point, el, at: label.position });
+  }
+  for (const point of CHOCO_POINTS) addSpot(point);
+  // Las historias que aprobó el equipo, cada una en su lugar con la figurita de su tipo (si tardan más de unos
+  // segundos, la costa no las espera).
+  const approved = await Promise.race([stories, new Promise<PublishedStory[]>((r) => setTimeout(() => r([]), 4000))]);
+  for (const h of approved) {
+    addSpot({
+      id: `historia-${h.id}`,
+      name: h.titulo,
+      kind: 'corregimiento',
+      lat: h.lat,
+      lon: h.lon,
+      subregion: SUBREGION_OF[h.municipio] ?? 'Atrato',
+      municipio: h.municipio,
+      story: h.tipo,
+      tale: {
+        text: h.relato,
+        author: h.autor,
+        when: h.cuando,
+        place: [h.lugar, h.municipio].filter(Boolean).join(', '),
+        media: h.archivos.filter((a) => a.url).map((a) => ({ kind: a.tipo, url: a.url!, name: a.nombre })),
+      },
+    }, 'historia');
+  }
+  // Prueba: ?punto=lat,lon,Nombre pone una historia de ejemplo en el mapa (así llegarán las aprobadas).
+  const test = new URLSearchParams(location.search).get('punto')?.split(',');
+  if (test && test.length >= 2 && test.slice(0, 2).every((v) => Number.isFinite(+v))) {
+    const name = test.slice(2).join(',').trim() || 'Historia de prueba';
+    // Se clasifica sola por lo que dice (aquí, por su nombre): ver `categorize`.
+    const story = categorize(name);
+    addSpot({ id: 'historia-prueba', name, kind: 'corregimiento', lat: +test[0], lon: +test[1], subregion: 'Pacífico Norte', story }, 'historia');
+  }
+  // Todas las figuritas en una sola malla: un solo dibujo. Aparecen (y se desvanecen) junto con los puntos.
+  const emblemMat = paint.clone();
+  emblemMat.transparent = true;
+  const emblems = new Mesh(mergeGeometries(emblemParts)!, emblemMat);
+  emblems.matrixAutoUpdate = false;
+  emblems.visible = false;
+  scene.add(emblems);
+  const storyMat = emblemMat.clone();
+  const storyEmblems = new Mesh(storyParts.length ? mergeGeometries(storyParts)! : new BufferGeometry(), storyMat);
+  storyEmblems.matrixAutoUpdate = false;
+  storyEmblems.visible = false;
+  scene.add(storyEmblems);
+  /** Los que quedan detrás de la serranía (vistos desde la cámara) se atenúan: así se leen en segundo plano. */
+  const ray = new Vector3();
+  const updateBehind = () => {
+    for (const s of spots) {
+      let behind = false;
+      for (let k = 1; k < 28 && !behind; k++) {
+        ray.lerpVectors(camera.position, s.at, k / 28);
+        behind = groundAt(ray.x, ray.z) > ray.y + 4;
+      }
+      if (behind !== s.behind) s.el.classList.toggle('is-behind', (s.behind = behind));
+    }
+  };
+  // Las cinco subregiones: su nombre, tenue, sobre su territorio (solo con la cámara lejos, para no estorbar de cerca).
+  const regionEls: HTMLElement[] = [];
+  for (const r of SUBREGION_LABELS) {
+    const el = document.createElement('div');
+    el.className = 'map-region';
+    el.textContent = r.name;
+    regionEls.push(el);
+    const label = new CSS2DObject(el);
+    const at = toScene(r.lat, r.lon);
+    label.position.set(at.x, groundAt(at.x, at.z) + 400, at.z);
+    pinGroup.add(label);
+  }
+
   // ───────── Cámara: siempre en el mar, mirando hacia la costa ─────────
   const startS = placed.find((p) => p.id === 'nuqui')!.s;
   const view = { s: startS, dist: 1500, pitch: 22 };
@@ -726,6 +1065,75 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     camera.position.copy(target).addScaledVector(r.sea, view.dist * Math.cos(p));
     camera.position.y += view.dist * Math.sin(p);
     camera.lookAt(target);
+    look.copy(target);
+    sky.position.copy(camera.position);
+  };
+
+  // ───────── Viaje a un punto del Chocó ─────────
+  // Al tocar un punto, la cámara deja la costa y vuela hasta él (subiendo un poco en el camino); allá se queda quieta y
+  // se mueve a mano. Al cerrar la ficha (o con Escape) vuelve por el mismo aire a la costa, donde estaba.
+  /** La visita: el punto que se mira y desde dónde. Con `follow`, la cámara acompaña a ese animal mientras se mueve. */
+  let tour: { at: Vector3; yaw: number; pitch: number; dist: number; follow?: Object3D; lift: number } | null = null;
+  let flight: { start: number; pos: Vector3; look: Vector3; back: boolean } | null = null;
+  const FLIGHT = 2.4;
+  const look = new Vector3();
+  const tourPos = new Vector3();
+  const tourLook = new Vector3();
+  function visit(at: Vector3, dist = 900, follow?: Object3D, lift = 0) {
+    const yaw = Math.atan2(camera.position.x - at.x, camera.position.z - at.z);
+    tour = { at: at.clone(), yaw, pitch: dist < 600 ? 20 : 24, dist, follow, lift };
+    flight = { start: performance.now(), pos: camera.position.clone(), look: look.clone(), back: false };
+  }
+  const TOUR_DIST = { min: 140, max: 2600 };
+  const followAt = new Vector3();
+  /** Acerca o aleja la visita; si ya estaba en el máximo y sigue alejándose, vuelve a la costa. */
+  function zoomTour(factor: number) {
+    if (!tour) return;
+    if (factor > 1 && tour.dist >= TOUR_DIST.max * 0.99) return selectSpot(null);
+    tour.dist = MathUtils.clamp(tour.dist * factor, TOUR_DIST.min, TOUR_DIST.max);
+  }
+  function leaveTour() {
+    flight = { start: performance.now(), pos: camera.position.clone(), look: look.clone(), back: true };
+  }
+  const posePoint = () => {
+    const t = tour!;
+    const p = MathUtils.degToRad(t.pitch);
+    tourLook.copy(t.at);
+    tourPos.set(Math.sin(t.yaw) * Math.cos(p), Math.sin(p), Math.cos(t.yaw) * Math.cos(p)).multiplyScalar(t.dist).add(t.at);
+  };
+  /** Después de `placeCamera` (que deja la cámara en la costa): si hay viaje, la lleva al punto o de vuelta. */
+  const applyTour = (dt: number) => {
+    if (!tour) return;
+    // Siguiendo a un animal: el centro de la visita va tras él, suave. Si su figura se cambió por el modelo animado
+    // (ya no está en la escena), se queda donde estaba.
+    if (tour.follow) {
+      let root: Object3D = tour.follow;
+      while (root.parent) root = root.parent;
+      if (root !== scene) tour.follow = undefined;
+      else {
+        tour.follow.getWorldPosition(followAt);
+        followAt.y = Math.max(followAt.y, 0) + tour.lift;
+        tour.at.lerp(followAt, Math.min(1, dt * 3));
+      }
+    }
+    posePoint();
+    if (flight) {
+      const u = Math.min(1, (performance.now() - flight.start) / 1000 / FLIGHT);
+      const e = MathUtils.smootherstep(u, 0, 1);
+      const [toPos, toLook] = flight.back ? [camera.position.clone(), look.clone()] : [tourPos, tourLook];
+      const span = flight.pos.distanceTo(toPos);
+      camera.position.lerpVectors(flight.pos, toPos, e);
+      camera.position.y += Math.sin(Math.PI * e) * MathUtils.clamp(span * 0.18, 200, 2500);
+      look.lerpVectors(flight.look, toLook, e);
+      if (u >= 1) {
+        if (flight.back) tour = null;
+        flight = null;
+      }
+    } else {
+      camera.position.copy(tourPos);
+      look.copy(tourLook);
+    }
+    camera.lookAt(look);
     sky.position.copy(camera.position);
   };
 
@@ -750,6 +1158,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   let downAt: { x: number; y: number; t: number } | null = null;
   let pinchStart = 0;
   let pinchDist = 0;
+  let lastPinch = 0;
   const canvas = renderer.domElement;
 
   const worldPerPixel = () => (2 * view.dist * Math.tan(MathUtils.degToRad(camera.fov / 2))) / Math.max(host.clientHeight, 1);
@@ -776,7 +1185,11 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchStart > 0) {
+      if (pinchStart > 0 && tour) {
+        // En una visita: pellizcar acerca o aleja el punto (y al límite, vuelve a la costa).
+        if (!flight) zoomTour(pinchStart / d / (lastPinch || 1));
+        lastPinch = pinchStart / d;
+      } else if (pinchStart > 0) {
         goal.dist = pinchDist * (pinchStart / d);
         // Pellizcar hacia adentro más allá del máximo también lleva al planeta.
         if (goal.dist > DIST.max) {
@@ -785,6 +1198,13 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
           if (pull >= 1) onZoomOut?.();
         }
       }
+    } else if (tour) {
+      // En un punto: arrastrar gira alrededor de él.
+      if (!flight) {
+        tour.yaw -= dx * 0.006;
+        tour.pitch = MathUtils.clamp(tour.pitch + dy * 0.12, 8, 60);
+      }
+      return;
     } else {
       // Arrastrar a los lados recorre la costa; arriba y abajo cambia la inclinación de la mirada.
       goal.s -= dx * worldPerPixel() * 1.15;
@@ -794,13 +1214,21 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   };
   const onUp = (e: PointerEvent) => {
     pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinchStart = 0;
+    if (pointers.size < 2) {
+      pinchStart = 0;
+      lastPinch = 0;
+    }
     if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6 && performance.now() - downAt.t < 500) pick(e);
     downAt = null;
   };
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     if (intro || outro) return;
+    if (tour) {
+      // Alejarse hasta el límite cierra la visita y vuelve a la costa.
+      if (!flight) zoomTour(Math.exp(e.deltaY * (e.ctrlKey ? 0.006 : 0.0012)));
+      return;
+    }
     // Con el panel táctil (pellizco = rueda con Ctrl) llegan pasos pequeños: cuentan más.
     if (e.deltaY > 0 && atMax()) pullOut(e.deltaY / (e.ctrlKey ? 250 : 1000));
     else if (e.deltaY < 0) pull = 0;
@@ -823,14 +1251,39 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
 
   const raycaster = new Raycaster();
   const ndc = new Vector2();
+  const probe = new Vector3();
+  /** El animal (una de sus piezas) más cercano en pantalla al punto tocado, si está a menos de 40 px. */
+  const nearestAnimal = (px: number, py: number, w: number, h: number) => {
+    let best: { id: string; mesh: Object3D; d: number } | null = null;
+    for (const species of fauna.group.children) {
+      const id = species.userData.natureId as string | undefined;
+      if (!id) continue;
+      species.traverseVisible((m) => {
+        if (!(m as Mesh).isMesh) return;
+        m.getWorldPosition(probe).project(camera);
+        if (probe.z > 1) return;
+        const d = Math.hypot(((probe.x + 1) / 2) * w - px, ((1 - probe.y) / 2) * h - py);
+        if (d < 40 && (!best || d < best.d)) best = { id, mesh: m, d };
+      });
+    }
+    return best as { id: string; mesh: Object3D; d: number } | null;
+  };
   const pick = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    const hit = raycaster.intersectObjects(pins.filter((p) => p.place.kind === 'site').map((p) => p.pin), true)[0];
+    // Los alfileres de los sitios y los animales (y el cacao y el manglar): el que esté más cerca de la cámara.
+    const targets = [...pins.filter((p) => p.place.kind === 'site').map((p) => p.pin), ...fauna.group.children.filter((c) => c.userData.natureId)];
+    const hit = raycaster.intersectObjects(targets, true)[0];
     let o: Object3D | null = hit?.object ?? null;
-    while (o && !o.userData.id) o = o.parent;
-    select(o ? (o.userData.id as string) : null);
+    while (o && !o.userData.id && !o.userData.natureId) o = o.parent;
+    if (o?.userData.natureId) return select(o.userData.natureId as string, hit!.object);
+    if (o) return select(o.userData.id as string);
+    // Los animales son chicos y se mueven: tocar cerca (a unos 40 px) también vale.
+    const near = nearestAnimal(e.clientX - r.left, e.clientY - r.top, r.width, r.height);
+    if (near) return select(near.id, near.mesh);
+    // Tocar el vacío durante una visita no la cierra (se cierra con la ficha, Escape o alejándose).
+    if (!tour) select(null);
   };
 
   canvas.addEventListener('pointerdown', onDown);
@@ -841,21 +1294,31 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   window.addEventListener('keydown', onKey);
 
   let selected: string | null = null;
-  function select(id: string | null) {
+  /**
+   * Elige un pueblo, un sitio o una especie: la cámara viaja hasta allá (como con los puntos del Chocó) y se abre su
+   * ficha. Con `follow` (el animal que se tocó), la cámara lo acompaña. Sin nada, vuelve a la costa.
+   */
+  function select(id: string | null, follow?: Object3D) {
+    if (openSpot) {
+      openSpot = null;
+      for (const s of spots) s.el.classList.remove('is-open');
+      onSpot?.(null);
+    }
     selected = id;
     for (const p of pins) p.el.classList.toggle('is-selected', p.place.id === id);
     const place = [...placed, ...nature].find((p) => p.id === id) ?? null;
     if (place) {
-      goal.s = place.s;
-      // La fauna es pequeña: al elegirla, la cámara se acerca más.
-      goal.dist = Math.min(goal.dist, place.kind === 'town' ? 760 : place.kind === 'nature' ? 380 : 560);
-      clampGoal();
-    }
+      const top = place.kind === 'nature' ? (NATURE_LABEL_HEIGHT[place.id] ?? 30) * 0.4 : (places.heights.get(place.id) ?? 20) * 0.5;
+      // Más cerca de los animales chicos (la rana, el cangrejo, la pava) que de la ballena o el manglar.
+      const dist = place.kind === 'town' ? 620 : place.kind === 'site' ? 380 : ({ ballena: 480, manglar: 420, cacao: 260, tortuga: 200 } as Record<string, number>)[place.id] ?? 150;
+      visit(place.pos.clone().setY(Math.max(place.pos.y, 0) + top), dist, follow, top);
+    } else if (tour) leaveTour();
     onSelect(place);
   }
   function focus(id: string) {
     const place = placed.find((p) => p.id === id);
     if (!place) return;
+    if (selected || openSpot) select(null);
     goal.s = place.s;
     goal.dist = 820;
     clampGoal();
@@ -981,6 +1444,20 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     for (const g of details) g.visible = showDetails;
     for (const p of pins) p.pin.visible = showDetails;
     placeCamera();
+    applyTour(dt);
+    // Los puntos del resto del Chocó (y sus figuritas) solo de lejos, o mientras se visita uno.
+    // (visitando algo de la costa no se muestran, aunque la vista de la costa haya quedado alejada).
+    const reveal = openSpot ? 1 : tour ? 0 : smoothstep(view.dist, 1250, 1600);
+    if ((reveal > 0.5) !== host.classList.contains('show-spots')) host.classList.toggle('show-spots', reveal > 0.5);
+    emblems.visible = filter !== 'historias' && reveal > 0.01;
+    emblemMat.opacity = reveal;
+    emblemMat.depthWrite = reveal > 0.99;
+    // Con el filtro de historias, las historias se ven también de cerca (salvo en los recorridos de la costa).
+    const storyReveal = filter === 'historias' && !tour ? 1 : reveal;
+    if ((storyReveal > 0.5) !== host.classList.contains('show-stories')) host.classList.toggle('show-stories', storyReveal > 0.5);
+    storyEmblems.visible = filter !== 'lugares' && storyReveal > 0.01;
+    storyMat.opacity = storyReveal;
+    storyMat.depthWrite = storyReveal > 0.99;
     uniforms.uTime.value = t;
     clouds.update(t);
     mist.update(t);
@@ -1008,6 +1485,20 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     if (moved || ticks % 3 === 0) {
       labels.render(pinGroup as unknown as Scene, camera); // basta un grupo: solo recorre lo que se le da
       lastCam.copy(camera.matrixWorld);
+    }
+    // La ficha de la historia abierta va pegada a su punto.
+    if (tracked && openSpot) {
+      const s = spots.find((x) => x.point.id === openSpot);
+      if (s) {
+        onScreen.copy(s.at).project(camera);
+        tracked.style.setProperty('--sx', `${((onScreen.x + 1) / 2) * host.clientWidth}px`);
+        tracked.style.setProperty('--sy', `${((1 - onScreen.y) / 2) * host.clientHeight}px`);
+      }
+    }
+    if (ticks % 10 === 0) {
+      updateBehind();
+      const op = (openSpot ? 0.7 : tour ? 0 : smoothstep(view.dist, 1250, 1600)).toFixed(2);
+      for (const el of regionEls) if (el.style.opacity !== op) el.style.opacity = op;
     }
     if (ticks++ % 6 === 0) declutter();
   };
@@ -1093,6 +1584,8 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     },
     ascend: (onHandoff) => {
       select(null);
+      tour = null;
+      flight = null;
       pull = 0;
       outro = {
         start: performance.now(),
@@ -1105,6 +1598,18 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     setActive: (on) => {
       if (on && !active) timer.reset();
       active = on;
+    },
+    setFilter: (f) => {
+      filter = f;
+      host.classList.toggle('spots-lugares', f === 'lugares');
+      host.classList.toggle('spots-historias', f === 'historias');
+      // Si la que estaba abierta queda oculta, se cierra.
+      const open = spots.find((s) => s.point.id === openSpot);
+      if (open && (f === 'lugares' ? !!open.point.story : f === 'historias' ? !open.point.story : false)) selectSpot(null);
+    },
+    storyCount: spots.filter((s) => s.point.story).length,
+    track: (el) => {
+      tracked = el;
     },
     dispose: () => {
       disposed = true;

@@ -334,20 +334,22 @@ function SoundOff() {
 const MapScreen = lazy(() => import('./MapScreen'));
 
 /**
- * Cierre del recorrido: el mapa 3D, desde el planeta. Se arma al llegar a esta página (no antes, para no cargar el
- * celular mientras se ven los videos) y se suelta al alejarse más de una página.
+ * Cierre del recorrido: el mapa 3D, desde el planeta. El planeta se arma desde la página anterior (así, al bajar, ya
+ * está ahí y la llegada es suave); la costa, solo al llegar. Todo se suelta al alejarse más de una página.
  */
 function ClosingMap({ playing, near, onBack }: { playing: boolean; near: boolean; onBack: () => void }) {
-  const [mounted, setMounted] = useState(playing);
+  const [mounted, setMounted] = useState(near);
   useEffect(() => {
-    if (playing) setMounted(true);
-    else if (!near) setMounted(false);
+    if (!near) return setMounted(false);
+    // Desde la página anterior, con un respiro: que primero arranque su video.
+    const t = setTimeout(() => setMounted(true), playing ? 0 : 1500);
+    return () => clearTimeout(t);
   }, [playing, near]);
   return (
     <div className="screen screen--closing" aria-label="Cierre · Mapa 3D">
       {mounted ? (
         <Suspense fallback={<p className="map-loading">Cargando el mapa…</p>}>
-          <MapScreen embedded onBack={onBack} />
+          <MapScreen embedded active={playing} onBack={onBack} />
         </Suspense>
       ) : (
         <p className="map-loading">Cargando el mapa…</p>

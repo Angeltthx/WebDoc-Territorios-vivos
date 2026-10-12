@@ -157,15 +157,28 @@ function plantTiles(plantings: Planting[]) {
     mesh.sortObjects = false;
     mesh.perObjectFrustumCulled = false;
     const ids = new Map(geos.map((g) => [g, mesh.addGeometry(g)]));
+    const items: { i: number; x: number; z: number }[] = [];
     for (const { geo, m, c } of list) {
       const i = mesh.addInstance(ids.get(geo)!);
       mesh.setMatrixAt(i, m);
       mesh.setColorAt(i, c);
+      items.push({ i, x: m.elements[12], z: m.elements[14] });
     }
+    mesh.userData.items = items;
     mesh.computeBoundingSphere();
     group.add(mesh);
   }
   return group;
+}
+
+/** Abre un claro en la vegetación (para que se vea la figurita de un punto o de una historia). */
+export function clearPlants(root: Object3D, x: number, z: number, r: number) {
+  root.traverse((o) => {
+    if (!(o instanceof BatchedMesh) || !o.userData.items) return;
+    for (const it of o.userData.items as { i: number; x: number; z: number }[]) {
+      if (Math.abs(it.x - x) < r && Math.abs(it.z - z) < r && Math.hypot(it.x - x, it.z - z) < r) o.setVisibleAt(it.i, false);
+    }
+  });
 }
 
 export async function buildFlora(rand: () => number, pace: Pace) {

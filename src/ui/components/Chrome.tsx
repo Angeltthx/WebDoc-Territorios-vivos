@@ -73,8 +73,8 @@ export function PageTabs({ tabs }: { tabs: Tabs }) {
   );
 }
 
-export function Arrow({ dir }: { dir: 'left' | 'right' | 'down' }) {
-  const d = { left: 'M11 3 5 9l6 6', right: 'M7 3l6 6-6 6', down: 'M3 7l6 6 6-6' }[dir];
+export function Arrow({ dir }: { dir: 'left' | 'right' | 'up' | 'down' }) {
+  const d = { left: 'M11 3 5 9l6 6', right: 'M7 3l6 6-6 6', up: 'M3 11l6-6 6 6', down: 'M3 7l6 6 6-6' }[dir];
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
       <path d={d} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

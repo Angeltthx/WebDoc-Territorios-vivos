@@ -54,8 +54,14 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     const el = scroller.current;
     if (!el) return;
     let idle = 0;
+    // Mientras la pantalla cambia de tamaño (zoom del navegador, rotar el celular, la barra que aparece o se oculta),
+    // el desplazamiento cambia solo, sin que el visitante se mueva: no cuenta como pasar de página.
+    let resizingUntil = 0;
+    let realign = 0;
+    const resizing = () => performance.now() < resizingUntil;
 
     const settle = () => {
+      if (resizing()) return;
       if (settling.current) {
         settling.current = false;
         anchor.current = Math.round(el.scrollTop / el.clientHeight);
@@ -73,6 +79,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     };
 
     const onScroll = () => {
+      if (resizing()) return;
       const i = clamp(Math.round(el.scrollTop / el.clientHeight));
       if (i !== activeRef.current) {
         activeRef.current = i;
@@ -98,21 +105,33 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       else if (e.key === 'End') { e.preventDefault(); scrollToIndex(TOTAL_PAGES - 1); }
     };
 
-    // Si cambia el alto de la pantalla (rotar el celular, barra del navegador que aparece o se
-    // oculta), se mantiene la misma página alineada arriba.
-    let lastHeight = el.clientHeight;
-    const resize = new ResizeObserver(() => {
-      if (el.clientHeight === lastHeight) return;
-      lastHeight = el.clientHeight;
+    // Si cambia el tamaño de la pantalla, se mantiene la misma página alineada arriba: al instante y otra vez cuando
+    // el cambio termina (el zoom y la rotación llegan en varios pasos).
+    let size = `${el.clientWidth}x${el.clientHeight}`;
+    const onResize = () => {
+      const now = `${el.clientWidth}x${el.clientHeight}`;
+      if (now === size) return;
+      size = now;
+      resizingUntil = performance.now() + 350;
+      settling.current = false;
       el.scrollTop = anchor.current * el.clientHeight;
-    });
+      window.clearTimeout(realign);
+      realign = window.setTimeout(() => {
+        el.scrollTop = anchor.current * el.clientHeight;
+        resizingUntil = 0;
+      }, 360);
+    };
+    const resize = new ResizeObserver(onResize);
     resize.observe(el);
+    window.addEventListener('resize', onResize);
 
     el.addEventListener('scroll', onScroll, { passive: true });
     el.addEventListener('scrollend', settle);
     window.addEventListener('keydown', onKey);
     return () => {
       resize.disconnect();
+      window.removeEventListener('resize', onResize);
+      window.clearTimeout(realign);
       el.removeEventListener('scroll', onScroll);
       el.removeEventListener('scrollend', settle);
       window.removeEventListener('keydown', onKey);
