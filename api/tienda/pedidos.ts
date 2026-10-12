@@ -94,7 +94,7 @@ export async function POST(request: Request) {
 
   const subtotal = apartados.reduce((t, a) => t + a.precio * a.cantidad, 0);
   const total = subtotal + ENVIO;
-  const referencia = `TV-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`;
+  const referencia = `TV-${Date.now().toString(36).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`;
   const expira = new Date(Date.now() + PLAZO_MIN * 60 * 1000);
   expira.setMilliseconds(0);
   try {
@@ -117,13 +117,18 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
-  const ref = clean(q.get('ref'), 40);
+  // El código como lo escriba la persona: sin espacios, en mayúsculas y con o sin el «TV-» del comienzo.
+  let ref = clean(q.get('ref'), 40).toUpperCase().replace(/\s+/g, '');
+  if (ref && !ref.startsWith('TV-')) ref = `TV-${ref}`;
   const txId = clean(q.get('id'), 60);
   if (!ref) return json({ error: 'Falta la referencia.' }, 400);
   const db = sql();
   const find = async () => {
-    const [p] = (await db`select id, estado, total, subtotal, envio, nombre, expira, metodo, pagado from pedidos where referencia = ${ref}`) as {
-      id: string; estado: string; total: number; subtotal: number; envio: number; nombre: string; expira: string; metodo: string | null; pagado: string | null;
+    const [p] = (await db`
+      select id, estado, total, subtotal, envio, nombre, ciudad, creado, expira, metodo, pagado, empacado, enviado, entregado, guia, transportadora
+      from pedidos where referencia = ${ref}`) as {
+      id: string; estado: string; total: number; subtotal: number; envio: number; nombre: string; ciudad: string; creado: string; expira: string;
+      metodo: string | null; pagado: string | null; empacado: string | null; enviado: string | null; entregado: string | null; guia: string; transportadora: string;
     }[];
     return p;
   };
@@ -141,9 +146,10 @@ export async function GET(request: Request) {
     p = await find();
   }
   const items = await db`select nombre, cantidad, precio from pedido_items where pedido_id = ${p.id}`;
-  // Solo lo necesario para la página de vuelta (sin correo, celular ni dirección).
+  // Solo lo necesario para seguir el pedido (sin correo, celular ni dirección: basta el código para verlo).
   return json({
-    referencia: ref, estado: p.estado, subtotal: p.subtotal, envio: p.envio, total: p.total, metodo: p.metodo, pagado: p.pagado,
-    nombre: p.nombre.split(/\s+/)[0], items,
+    referencia: ref, estado: p.estado, subtotal: p.subtotal, envio: p.envio, total: p.total, metodo: p.metodo,
+    nombre: p.nombre.split(/\s+/)[0], ciudad: p.ciudad, items, guia: p.guia, transportadora: p.transportadora,
+    fechas: { creado: p.creado, pagado: p.pagado, empacado: p.empacado, enviado: p.enviado, entregado: p.entregado },
   });
 }

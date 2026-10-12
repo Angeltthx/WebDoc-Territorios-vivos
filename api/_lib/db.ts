@@ -60,7 +60,7 @@ export const SCHEMA = [
     referencia text not null unique,
     creado timestamptz not null default now(),
     estado text not null default 'pendiente'
-      check (estado in ('pendiente', 'pagado', 'rechazado', 'expirado', 'enviado', 'entregado')),
+      check (estado in ('pendiente', 'pagado', 'rechazado', 'expirado', 'empacando', 'enviado', 'entregado')),
     expira timestamptz not null,
     nombre text not null,
     correo text not null,
@@ -90,6 +90,27 @@ export const SCHEMA = [
     precio integer not null
   )`,
   `create index if not exists pedido_items_pedido on pedido_items (pedido_id)`,
+  // Seguimiento: el estado «empacando» y la fecha de cada paso, que se anota sola cuando el equipo cambia el estado
+  // (pagado → empacando → enviado → entregado), más la transportadora y la guía para que la persona rastree el envío.
+  `alter table pedidos add column if not exists transportadora text not null default ''`,
+  `alter table pedidos add column if not exists empacado timestamptz`,
+  `alter table pedidos add column if not exists enviado timestamptz`,
+  `alter table pedidos add column if not exists entregado timestamptz`,
+  `alter table pedidos drop constraint if exists pedidos_estado_check`,
+  `alter table pedidos add constraint pedidos_estado_check
+    check (estado in ('pendiente', 'pagado', 'rechazado', 'expirado', 'empacando', 'enviado', 'entregado'))`,
+  `create or replace function pedidos_fechas() returns trigger language plpgsql as $$
+    begin
+      if new.estado is distinct from old.estado then
+        if new.estado = 'pagado' then new.pagado := coalesce(new.pagado, now()); end if;
+        if new.estado = 'empacando' then new.empacado := coalesce(new.empacado, now()); end if;
+        if new.estado = 'enviado' then new.enviado := coalesce(new.enviado, now()); end if;
+        if new.estado = 'entregado' then new.entregado := coalesce(new.entregado, now()); end if;
+      end if;
+      return new;
+    end $$`,
+  `drop trigger if exists pedidos_fechas on pedidos`,
+  `create trigger pedidos_fechas before update of estado on pedidos for each row execute function pedidos_fechas()`,
   // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
   `insert into productos (sku, nombre, precio, existencias)
     values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 85000, 10)

@@ -38,9 +38,11 @@ Navegador                                   Servidor (api/tienda)               
 ## Tablas (en la misma base que las historias; esquema en `api/_lib/db.ts`, se crea con `npm run db:setup`)
 
 - **`productos`**: `sku`, `nombre`, `precio` (pesos), `existencias`, `activo`.
-- **`pedidos`**: `referencia` (la que ve la persona y Wompi), `estado` (`pendiente`, `pagado`, `rechazado`, `expirado`,
-  `enviado`, `entregado`), datos de envío, `subtotal`, `envio`, `total`, `wompi_id`, `wompi_estado`, `metodo`,
-  `pagado`, `guia` (número de la transportadora), `nota` (interna).
+- **`pedidos`**: `referencia` (el código que ve la persona y Wompi), `estado` (`pendiente`, `pagado`, `rechazado`,
+  `expirado`, `empacando`, `enviado`, `entregado`), datos de envío, `subtotal`, `envio`, `total`, `wompi_id`,
+  `wompi_estado`, `metodo`, `transportadora` y `guia` (para rastrear el envío), `nota` (interna) y la fecha de cada paso
+  (`pagado`, `empacado`, `enviado`, `entregado`: las anota sola la base, con el disparador `pedidos_fechas`, cuando
+  cambia el estado).
 - **`pedido_items`**: lo que lleva cada pedido, con el precio al que se vendió.
 
 ```sql
@@ -48,12 +50,21 @@ Navegador                                   Servidor (api/tienda)               
 select creado, referencia, nombre, celular, direccion, ciudad, departamento, total
 from pedidos where estado = 'pagado' order by creado;
 
--- Marcar uno como enviado
-update pedidos set estado = 'enviado', guia = '123456789' where referencia = 'TV-…';
+-- Avanzar un pedido (la fecha de cada paso se anota sola; la persona lo ve en «Consultar mi pedido»)
+update pedidos set estado = 'empacando' where referencia = 'TV-…';
+update pedidos set estado = 'enviado', transportadora = 'Servientrega', guia = '123456789' where referencia = 'TV-…';
+update pedidos set estado = 'entregado' where referencia = 'TV-…';
 
 -- Cambiar las existencias o el precio
 update productos set existencias = 20, precio = 90000 where sku = 'poster-mapa-pliego';
 ```
+
+## Seguimiento («Consultar mi pedido»)
+
+En la tienda, «Consultar mi pedido» pide el código (`TV-…`, se puede escribir sin el `TV-` y en minúsculas) y muestra
+el camino: pago aprobado → en empaque → en camino (con transportadora y guía) → entregado, con la fecha de cada paso.
+También en `/tienda/pedido/<código>`. Con el código solo se ve el estado, lo que lleva, el total, el primer nombre y la
+ciudad: nunca el correo, el celular ni la dirección.
 
 ## Wompi
 

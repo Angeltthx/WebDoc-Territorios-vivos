@@ -1137,6 +1137,50 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .shop-order__links { display: flex; gap: 10px; }
 .shop-order__links .shop-cta { display: inline-block; width: auto; text-align: center; text-decoration: none; }
 
+/* «Consultar mi pedido»: el botón de la barra, el código y el camino del pedido. */
+.shop-bar__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.shop-track-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--line);
+  background: none; color: var(--ink); font-size: 14px; transition: border-color 0.2s, background 0.2s;
+}
+.shop-track-btn:hover { border-color: var(--ink); }
+.shop-track-btn svg { width: 18px; height: 18px; }
+.shop-lookup { display: grid; gap: 26px; max-width: 560px; animation: rise 0.4s var(--ease) both; }
+.shop-lookup .shop-back { margin-bottom: -8px; }
+.shop-lookup__form { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 16px; }
+.shop-lookup__form input { text-transform: uppercase; letter-spacing: 0.04em; }
+.shop-lookup__form input::placeholder { text-transform: none; letter-spacing: 0; }
+.shop-lookup__form .shop-cta { width: auto; padding: 13px 26px; }
+.shop-order { margin-top: 4px; }
+.shop-order__links { margin-top: 24px; }
+
+.shop-track { list-style: none; margin: 4px 0 0; padding: 0; display: grid; }
+.shop-track li { position: relative; display: grid; grid-template-columns: 28px 1fr; gap: 14px; padding-bottom: 22px; color: var(--muted); }
+.shop-track li:last-child { padding-bottom: 0; }
+/* La línea que une los pasos: llena hasta donde va el pedido. */
+.shop-track li:not(:last-child)::before {
+  content: ''; position: absolute; left: 13px; top: 28px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--line);
+}
+.shop-track li.is-done:not(:last-child)::before { background: #2f8a5a; }
+.shop-track__dot {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600;
+  border: 1.5px solid var(--line); background: var(--paper-2); color: #fff;
+}
+.shop-track li.is-done .shop-track__dot { border-color: #2f8a5a; background: #2f8a5a; }
+.shop-track li.is-now .shop-track__dot { border-color: #2f8a5a; background: #2f8a5a; box-shadow: 0 0 0 5px rgba(47, 138, 90, 0.18); }
+.shop-track__text { display: grid; gap: 2px; padding-top: 3px; }
+.shop-track__text strong { font-weight: 400; font-size: 15px; }
+.shop-track li.is-done .shop-track__text strong, .shop-track li.is-now .shop-track__text strong { color: var(--ink); }
+.shop-track li.is-now .shop-track__text strong { font-weight: 600; }
+.shop-track__text small { font-size: 13px; }
+.shop-track__guia { color: var(--ink); }
+.shop-track__guia b { font-weight: 600; letter-spacing: 0.04em; }
+.shop-order.is-empacando .shop-order__icon { background: #2f8a5a; color: #fff; }
+@media (max-width: 640px) {
+  .shop-lookup__form { grid-template-columns: 1fr; }
+  .shop-lookup__form .shop-cta { width: 100%; }
+}
+
 @media (max-width: 1100px) {
   .shop-product__grid, .shop-info, .shop-checkout__grid { grid-template-columns: 1fr; }
   .shop-gallery, .shop-summary { position: static; }

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 
 import { SHOP_ITEMS, pesos, type ShopItem } from '../../content/stories';
 import { type Buyer, type Catalog, DEPARTAMENTOS, OrderError, createOrder, fetchCatalog, loadBag, saveBag } from '../../application/shop-api';
 import { LineIcon, Sheet, type Origin } from '../components/Sheet';
+import { OrderTracker } from '../components/OrderTracker';
 
 type Size = ShopItem['sizes'][number];
 /** Una línea de la bolsa: el producto en un tamaño. */
@@ -310,8 +311,47 @@ function Checkout({ lines, envio, onBack, onStock }: {
   );
 }
 
+/** «Consultar mi pedido»: con el código que le salió al pagar, la persona ve en qué va su pedido. */
+function Lookup({ onBack }: { onBack: () => void }) {
+  const [draft, setDraft] = useState('');
+  const [code, setCode] = useState('');
+  const top = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    top.current?.closest('.sheet__body')?.scrollTo({ top: 0 });
+  }, []);
+  return (
+    <div className="shop-lookup" ref={top}>
+      <button type="button" className="shop-back" onClick={onBack}>
+        <span aria-hidden="true">←</span> Volver a la tienda
+      </button>
+      <form
+        className="shop-lookup__form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setCode(draft.trim().toUpperCase());
+        }}
+      >
+        <label className="story-field">
+          <span className="story-field__label">Código del pedido <em>empieza por TV-, te salió al pagar</em></span>
+          <input
+            required
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="TV-MV5V0U53-FFF7E0A1"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={40}
+          />
+        </label>
+        <button type="submit" className="shop-cta">Consultar</button>
+      </form>
+      {code && <OrderTracker key={code} code={code} />}
+    </div>
+  );
+}
+
 export default function Shop({ onClose, origin }: { onClose?: () => void; origin?: Origin }) {
-  const [view, setView] = useState<ShopItem | 'lista' | 'pago'>('lista');
+  const [view, setView] = useState<ShopItem | 'lista' | 'pago' | 'consulta'>('lista');
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [bag, setBagState] = useState<Record<string, number>>(loadBag);
   const [bagOpen, setBagOpen] = useState(false);
@@ -344,8 +384,10 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
       className="sheet--story sheet--shop"
       origin={origin}
       eyebrow="Tienda"
-      title={view === 'pago' ? 'Ya casi es tuyo' : 'Lleva un pedazo del Pacífico'}
-      intro={view === 'pago' ? 'Déjanos tus datos de envío y paga seguro con Wompi.' : 'Cosas del recorrido para tener en la casa. Por ahora la tienda está en modo de prueba.'}
+      title={view === 'pago' ? 'Ya casi es tuyo' : view === 'consulta' ? '¿Cómo va tu pedido?' : 'Lleva un pedazo del Pacífico'}
+      intro={view === 'pago' ? 'Déjanos tus datos de envío y paga seguro con Wompi.'
+        : view === 'consulta' ? 'Escribe el código de tu pedido y te contamos en qué va: pago, empaque, en camino o entregado.'
+          : 'Cosas del recorrido para tener en la casa. Por ahora la tienda está en modo de prueba.'}
       onClose={onClose}
       aside={
         // En el atardecer, el póster colgado, un poco ladeado.
@@ -357,9 +399,16 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
       {view !== 'pago' && (
         <div className="shop-bar">
           <p className="shop-bar__count">{view === 'lista' ? `${SHOP_ITEMS.length} ${SHOP_ITEMS.length === 1 ? 'producto' : 'productos'}` : ''}</p>
-          <button type="button" className="shop-bag-btn" onClick={() => setBagOpen((o) => !o)} aria-expanded={bagOpen}>
-            <LineIcon name="shop" size={18} /> Tu bolsa{count > 0 && <span className="shop-bag-btn__count">{count}</span>}
-          </button>
+          <div className="shop-bar__actions">
+            {view !== 'consulta' && (
+              <button type="button" className="shop-track-btn" onClick={() => { setBagOpen(false); setView('consulta'); }}>
+                <PerkIcon name="truck" /> Consultar mi pedido
+              </button>
+            )}
+            <button type="button" className="shop-bag-btn" onClick={() => setBagOpen((o) => !o)} aria-expanded={bagOpen}>
+              <LineIcon name="shop" size={18} /> Tu bolsa{count > 0 && <span className="shop-bag-btn__count">{count}</span>}
+            </button>
+          </div>
         </div>
       )}
 
@@ -395,7 +444,9 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
         </section>
       )}
 
-      {view === 'pago' ? (
+      {view === 'consulta' ? (
+        <Lookup onBack={() => setView('lista')} />
+      ) : view === 'pago' ? (
         <Checkout
           lines={lines}
           envio={envio}

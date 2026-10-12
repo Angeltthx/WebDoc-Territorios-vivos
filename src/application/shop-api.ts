@@ -54,13 +54,19 @@ export async function createOrder(items: { sku: string; cantidad: number }[], co
 
 export interface OrderStatus {
   referencia: string;
-  estado: 'pendiente' | 'pagado' | 'rechazado' | 'expirado' | 'enviado' | 'entregado';
+  estado: 'pendiente' | 'pagado' | 'rechazado' | 'expirado' | 'empacando' | 'enviado' | 'entregado';
   subtotal: number;
   envio: number;
   total: number;
   metodo: string | null;
   nombre: string;
+  ciudad: string;
   items: { nombre: string; cantidad: number; precio: number }[];
+  /** Número de guía y transportadora, cuando el pedido ya salió. */
+  guia: string;
+  transportadora: string;
+  /** Cuándo pasó cada paso (null si todavía no). */
+  fechas: { creado: string; pagado: string | null; empacado: string | null; enviado: string | null; entregado: string | null };
 }
 
 /** Cómo va un pedido. Con el número de transacción que agrega Wompi, el servidor la consulta allá. */
