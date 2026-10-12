@@ -8,7 +8,7 @@
 // del mapa (se elige solo según lo que se cuenta, y se puede cambiar), grabar la voz ahí mismo y, al lado, cómo se
 // verá en el mapa.
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { CHOCO_MUNICIPALITIES, MAX_FILE_MB } from '../../content/stories';
 import { EMBLEM_LABEL, SUBREGION_OF, categorize, type Emblem } from '../../content/choco';
 import { Sheet, type Origin } from '../components/Sheet';
@@ -83,6 +83,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
   const [town, setTown] = useState('');
   const [spot, setSpot] = useState('');
   const [name, setName] = useState('');
+  const [when, setWhen] = useState('');
   const [consent, setConsent] = useState(false);
   /** El tipo que eligió la persona; sin elegir, el que sale de lo que cuenta. */
   const [picked, setPicked] = useState<Emblem | null>(null);
@@ -160,6 +161,15 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
   const progress = steps.filter((s) => s.done).length / steps.length;
   /** Lo obligatorio está completo (los archivos son opcionales). */
   const ready = steps[0].done && steps[1].done && steps[3].done;
+  /** Lo que falta para poder enviarla, dicho como frase («el municipio y tu nombre»). */
+  const missingList = [
+    title.trim().length <= 2 && 'el título',
+    story.trim().length < MIN_STORY && 'contar un poco más la historia',
+    !town && 'el municipio',
+    name.trim().length <= 1 && 'tu nombre',
+    !consent && 'marcar la autorización',
+  ].filter(Boolean) as string[];
+  const missing = missingList.length > 1 ? `${missingList.slice(0, -1).join(', ')} y ${missingList.at(-1)}` : missingList[0] ?? '';
   const region = town ? SUBREGION_OF[town] : undefined;
   const place = [spot, town].filter(Boolean).join(', ');
 
@@ -187,7 +197,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
       await sendStory({
         titulo: title.trim(),
         relato: story.trim(),
-        cuando: String(form.get('when') ?? ''),
+        cuando: when.trim(),
         tipo: kind,
         municipio: town,
         lugar: spot.trim(),
@@ -207,32 +217,69 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
     }
   };
 
-  /** Cómo se verá en el mapa: el punto dorado con su nombre, su figurita y su ficha. Se arma mientras se escribe. */
+  /** Así se verá: la misma ficha que se abre en el mapa, en pequeño, que se va llenando mientras se escribe. Lo que
+   * falta se ve como un espacio gris, para que se entienda qué va en cada parte. */
+  const visual = files.find((a) => a.kind === 'video') ?? files.find((a) => a.kind === 'foto');
+  const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
   const preview = (
-    <div className="story-preview" aria-label="Así se verá en el mapa">
-      <p className="story-preview__eyebrow">Así se verá en el mapa</p>
-      <div className="story-preview__pin">
-        <span className="story-preview__name">{title.trim() || 'Tu historia'}</span>
-        <span className="story-preview__dot" />
-        <span className="story-preview__fig"><EmblemIcon kind={kind} size={34} /></span>
+    <div className="story-preview" aria-label="Así se verá tu historia">
+      <p className="story-preview__eyebrow">Así se verá tu historia</p>
+      <p className="story-preview__step"><span>1</span>En el mapa aparece así, en {town || 'el lugar donde pasó'}</p>
+      {/* Un pedacito de la costa: el mar, la tierra y el punto dorado con su nombre, como en el mapa. */}
+      <div className="story-preview__map" aria-hidden="true">
+        <svg viewBox="0 0 320 96" preserveAspectRatio="xMidYMid slice">
+          <rect width="320" height="96" fill="#2a6478" />
+          <rect width="320" height="40" fill="#3b7f8f" opacity="0.6" />
+          <path d="M150 96 C160 70 148 52 168 36 C186 22 178 8 196 0 H320 V96 Z" fill="#3d7650" />
+          <path d="M150 96 C160 70 148 52 168 36 C186 22 178 8 196 0" fill="none" stroke="#e9dcb4" strokeWidth="3" opacity="0.8" />
+          <path d="M236 96 C246 66 270 58 284 34 C292 20 306 12 320 10 V96 Z" fill="#2f6342" />
+          <g fill="#295a3a">
+            <circle cx="214" cy="58" r="7" /><circle cx="226" cy="64" r="6" /><circle cx="250" cy="30" r="7" /><circle cx="292" cy="62" r="8" /><circle cx="206" cy="20" r="6" />
+          </g>
+          <g stroke="#ffffff" strokeOpacity="0.25" strokeWidth="1.5" fill="none">
+            <path d="M24 30 q8 -4 16 0 t16 0" /><path d="M70 66 q8 -4 16 0 t16 0" /><path d="M110 22 q8 -4 16 0 t16 0" />
+          </g>
+        </svg>
+        <span className="story-preview__marker">
+          <span className="story-preview__label">{title.trim() || 'Tu historia'}</span>
+          <span className="story-preview__dot-map" />
+        </span>
       </div>
-      <p className="story-preview__kind">Historia · {EMBLEM_LABEL[kind]}{region ? ` · ${region}` : ''}</p>
-      <p className="story-preview__title">{title.trim() || 'Tu historia'}</p>
-      {place && <p className="story-preview__place">{place}</p>}
-      {story.trim() && <p className="story-preview__text">{story.trim().slice(0, 140)}{story.trim().length > 140 ? '…' : ''}</p>}
+      <p className="story-preview__step"><span>2</span>Al tocarlo, se abre tu historia</p>
+      <div className="story-preview__card">
+        <div className={`story-preview__hero${visual ? '' : ' is-empty'}`}>
+          {visual?.kind === 'video' && <video src={visual.url} muted playsInline preload="metadata" />}
+          {visual?.kind === 'foto' && <img src={visual.url} alt="" />}
+          {!visual && <span>Aquí va tu foto o video</span>}
+        </div>
+        <div className="story-preview__paper">
+          <p className="story-preview__kind"><span className="story-preview__dot" />Historia de {EMBLEM_LABEL[kind].toLowerCase()}</p>
+          <p className={`story-preview__title${title.trim() ? '' : ' is-empty'}`}>{title.trim() || 'El título de tu historia'}</p>
+          <div className="story-preview__by">
+            <span className="story-preview__avatar">{initials || '?'}</span>
+            <span>
+              <strong className={name.trim() ? '' : 'is-empty'}>{name.trim() ? `Contada por ${name.trim()}` : 'Tu nombre'}</strong>
+              <small>{[place || region, when.trim()].filter(Boolean).join(', ') || 'El lugar y cuándo pasó'}</small>
+            </span>
+          </div>
+          {story.trim()
+            ? <p className="story-preview__text">{story.trim().slice(0, 160)}{story.trim().length > 160 ? '…' : ''}</p>
+            : <span className="story-preview__lines" aria-hidden="true"><i /><i /><i /></span>}
+        </div>
+      </div>
     </div>
   );
 
   if (sent) {
     return (
-      <Sheet eyebrow="Tu historia" title="Gracias por contarla" onClose={onClose} aside={preview} origin={origin} still>
+      <Sheet className="sheet--story" eyebrow="Tu historia" title="Gracias por contarla" onClose={onClose} aside={preview} origin={origin} still>
         <div className="story-sent">
           <p className="story-sent__lead">
             «{title}», en {place}, ya le llegó al equipo de Territorios Vivos. Después de leerla, aparecerá en el mapa,
             en su lugar, con la figurita de <strong>{EMBLEM_LABEL[kind]}</strong>.
           </p>
           <p className="story-help">La revisamos en los próximos días. Si dejaste un contacto, te avisamos cuando esté publicada.</p>
-          {onClose && <button type="button" className="story-send" onClick={onClose}>Volver al mapa</button>}
+          {onClose && <button type="button" className="story-send story-send--plain is-ready" onClick={onClose}><span className="story-send__label">Volver al mapa</span></button>}
         </div>
       </Sheet>
     );
@@ -240,10 +287,11 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
 
   return (
     <Sheet
+      className="sheet--story"
       origin={origin}
       eyebrow="Tu historia"
       title="Este espacio es tuyo"
-      intro="Para que lo que viviste en el Chocó —un recuerdo, una receta, un canto— tenga su lugar en el mapa."
+      intro="Un recuerdo, una receta, un canto. Lo que viviste en el Chocó también tiene su lugar en el mapa."
       onClose={onClose}
       aside={preview}
       overlay={tutorial && <StoryTutorial onDone={() => setTutorial(false)} />}
@@ -262,7 +310,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
 
       <form className="story-form" onSubmit={submit}>
         <section className="story-step">
-          <h3 className="story-step__title"><span className="story-step__n">01</span>Cuéntala</h3>
+          <h3 className="story-step__title"><span className="story-step__n">1</span>Cuéntala</h3>
           <label className="story-field">
             <span className="story-field__label">Título</span>
             <input name="title" required maxLength={90} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="La noche que llegaron las ballenas" />
@@ -278,7 +326,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
           </label>
           <div className="story-field">
             <span className="story-field__label">
-              ¿De qué trata? <em>{picked ? 'elegido por ti' : 'lo elegimos por lo que cuentas; cámbialo si quieres'}</em>
+              ¿De qué trata? <em>{picked ? 'Esta la escogiste tú' : 'Te sugerimos una categoría según lo que cuentas, pero puedes cambiarla'}</em>
             </span>
             <div className="story-kinds" role="radiogroup" aria-label="Tipo de historia">
               {KINDS.map((k) => (
@@ -298,12 +346,12 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
           </div>
           <label className="story-field">
             <span className="story-field__label">¿Cuándo pasó? <em>opcional</em></span>
-            <input name="when" maxLength={60} placeholder="Un año o una época: en los 90, de niña…" />
+            <input name="when" maxLength={60} value={when} onChange={(e) => setWhen(e.target.value)} placeholder="Un año o una época: en los 90, de niña…" />
           </label>
         </section>
 
         <section className="story-step">
-          <h3 className="story-step__title"><span className="story-step__n">02</span>¿Dónde pasó?</h3>
+          <h3 className="story-step__title"><span className="story-step__n">2</span>¿Dónde pasó?</h3>
           <div className="story-row">
             <label className="story-field">
               <span className="story-field__label">Municipio</span>
@@ -342,7 +390,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
         </section>
 
         <section className="story-step">
-          <h3 className="story-step__title"><span className="story-step__n">03</span>Tu voz, fotos o video <em>opcional</em></h3>
+          <h3 className="story-step__title"><span className="story-step__n">3</span>Tu voz, fotos o video <em>opcional</em></h3>
           <div className="story-media">
             <label className="story-drop">
               <input type="file" multiple accept="image/*,audio/*,video/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
@@ -375,7 +423,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
                   {a.kind === 'foto' && <img src={a.url} alt="" />}
                   {a.kind === 'video' && <video src={a.url} muted playsInline preload="metadata" />}
                   {a.kind === 'audio' && <audio src={a.url} controls preload="none" />}
-                  <span className="story-files__name">{a.file.name}<small>{a.kind} · {size(a.file.size)}</small></span>
+                  <span className="story-files__name">{a.file.name}<small>{a.kind}, {size(a.file.size)}</small></span>
                   <button type="button" className="story-files__x" onClick={() => removeFile(i)} aria-label={`Quitar ${a.file.name}`}>×</button>
                 </li>
               ))}
@@ -384,14 +432,14 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
         </section>
 
         <section className="story-step">
-          <h3 className="story-step__title"><span className="story-step__n">04</span>Tú</h3>
+          <h3 className="story-step__title"><span className="story-step__n">4</span>Tú</h3>
           <div className="story-row">
             <label className="story-field">
               <span className="story-field__label">Tu nombre <em>o cómo quieres aparecer</em></span>
               <input name="name" required maxLength={60} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
             </label>
             <label className="story-field">
-              <span className="story-field__label">Correo o WhatsApp <em>opcional · no se publica</em></span>
+              <span className="story-field__label">Correo o WhatsApp <em>opcional, no se publica</em></span>
               <input name="contact" maxLength={90} autoComplete="email" />
             </label>
           </div>
@@ -410,11 +458,27 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
 
         {/* Campo trampa: escondido para las personas; los robots lo llenan y su envío se descarta. */}
         <input className="story-trap" name="web" tabIndex={-1} autoComplete="off" aria-hidden="true" />
-        {error && <p className="story-error" role="alert">{error}</p>}
-        <button type="submit" className={`story-send${ready ? ' is-ready' : ''}`} disabled={sending !== null}>
-          {sending !== null ? (sending < 0.96 && files.length ? `Subiendo archivos… ${Math.round(sending * 100)} %` : 'Enviando…') : error ? 'Intentar de nuevo' : 'Enviar mi historia'}
-          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M10 4.5 14.5 9 10 13.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
+        {/* El envío: qué falta (o que ya está lista), el botón con el dibujo de su categoría y, al enviar, el avance. */}
+        <div className={`story-submit${ready ? ' is-ready' : ''}`}>
+          {error && <p className="story-error" role="alert">{error}</p>}
+          <p className="story-submit__status" aria-live="polite">
+            {ready ? <><span className="story-submit__check" aria-hidden="true">✓</span>Tu historia está lista para enviar.</> : `Para enviarla te falta ${missing}.`}
+          </p>
+          <button
+            type="submit"
+            className={`story-send${ready ? ' is-ready' : ''}${sending !== null ? ' is-sending' : ''}`}
+            disabled={sending !== null}
+            style={{ '--p': sending ?? 0 } as CSSProperties}
+          >
+            <span className="story-send__bar" aria-hidden="true" />
+            <span className="story-send__icon" aria-hidden="true"><EmblemIcon kind={kind} size={30} /></span>
+            <span className="story-send__label">
+              {sending !== null ? (sending < 0.96 && files.length ? `Subiendo archivos ${Math.round(sending * 100)} %` : 'Enviando…') : error ? 'Intentar de nuevo' : 'Enviar mi historia'}
+            </span>
+            <svg className="story-send__arrow" width="20" height="20" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 9h11M10 4.5 14.5 9 10 13.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+          <p className="story-help story-before-send">Antes de salir en el mapa, el equipo de Territorios Vivos la lee. Te avisamos si dejaste un contacto.</p>
+        </div>
       </form>
     </Sheet>
   );

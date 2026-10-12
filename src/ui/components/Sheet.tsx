@@ -38,7 +38,7 @@ export type Origin = { x: number; y: number };
 /** Lo que dura la salida (ver `.sheet.is-leaving` en los estilos). */
 const LEAVE_MS = 480;
 
-export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin, still, tone, overlay }: {
+export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin, still, tone, overlay, className }: {
   eyebrow: string;
   title: string;
   intro?: ReactNode;
@@ -55,6 +55,8 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
   tone?: 'dark';
   /** Algo encima de la hoja (el tutorial): en el computador tapa la columna del contenido; en el celular, todo. */
   overlay?: ReactNode;
+  /** Una clase más, para el estilo propio de cada hoja. */
+  className?: string;
 }) {
   const [leaving, setLeaving] = useState(false);
   const close = () => {
@@ -77,7 +79,7 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
   // contenido sobre papel claro. En el celular, el atardecer queda arriba.
   return (
     <div
-      className={`sheet${tone ? ` sheet--${tone}` : ''}${leaving ? ' is-leaving' : ''}${still ? ' is-still' : ''}${overlay ? ' has-overlay' : ''}`}
+      className={`sheet${className ? ` ${className}` : ''}${tone ? ` sheet--${tone}` : ''}${leaving ? ' is-leaving' : ''}${still ? ' is-still' : ''}${overlay ? ' has-overlay' : ''}`}
       style={at}
       role="dialog"
       aria-modal="true"

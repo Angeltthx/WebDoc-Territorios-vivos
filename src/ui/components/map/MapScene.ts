@@ -576,8 +576,16 @@ export interface MapSceneHandle {
   ascend: (onHandoff: () => void) => void;
   /** Pausa o reanuda la escena. */
   setActive: (active: boolean) => void;
+  /** Qué puntos del resto del Chocó se ven: todos, solo los lugares o solo las historias. */
+  setFilter: (filter: SpotFilter) => void;
+  /** Cuántas historias hay en el mapa. */
+  storyCount: number;
+  /** Un elemento que sigue en pantalla a la historia abierta: recibe su posición en `--sx` / `--sy` (px). */
+  track: (el: HTMLElement | null) => void;
   dispose: () => void;
 }
+
+export type SpotFilter = 'todo' | 'lugares' | 'historias';
 
 export interface MapSceneOptions {
   onSelect: (place: MapPlace | null) => void;
@@ -732,6 +740,9 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   /** Altura del suelo en cualquier punto del Chocó (relieve fino cerca de Nuquí; el de fondo en el resto). */
   const groundAt = (x: number, z: number) => Math.max(inFine(x, z) ? heightAt(x, z) : farHeight(x, z), 0);
   let openSpot: string | null = null;
+  let filter: SpotFilter = 'todo';
+  let tracked: HTMLElement | null = null;
+  const onScreen = new Vector3();
   function selectSpot(id: string | null) {
     if (selected) {
       selected = null;
@@ -741,11 +752,18 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     openSpot = id;
     for (const s of spots) s.el.classList.toggle('is-open', s.point.id === id);
     const spot = spots.find((s) => s.point.id === id);
-    if (spot) visit(spot.at.clone().setY(spot.at.y - EMBLEM_SIZE * 0.4), spot.point.figure?.main === 'montana' ? 1300 : 900);
+    if (spot?.point.story) {
+      // Una historia: la cámara mira por encima de ella, para que quede abajo en la pantalla y su ficha quepa arriba.
+      const dist = 760;
+      const lift = (0.5 * dist * Math.tan(MathUtils.degToRad(camera.fov / 2))) / Math.cos(MathUtils.degToRad(24));
+      visit(spot.at.clone().setY(spot.at.y + lift), dist);
+    } else if (spot) visit(spot.at.clone().setY(spot.at.y - EMBLEM_SIZE * 0.4), spot.point.figure?.main === 'montana' ? 1300 : 900);
     else if (tour) leaveTour();
     onSpot?.(spot?.point ?? null);
   }
   const emblemParts: BufferGeometry[] = [];
+  /** Las figuritas de las historias van aparte: el filtro las muestra u oculta solas. */
+  const storyParts: BufferGeometry[] = [];
   /** El punto de tierra más empinado cerca de (x, z), con la dirección cuesta abajo (dx, dz, unitaria). */
   const steepest = (x: number, z: number, max: number) => {
     let best = { x, z, dx: 0, dz: 1, slope: -1 };
@@ -954,7 +972,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
       const g = c.geo.clone();
       g.rotateY(-Math.PI / 2);
       g.translate(x, y, z);
-      emblemParts.push(g);
+      (point.story ? storyParts : emblemParts).push(g);
     }
     // La cascada (en pocos lugares): no es una pieza, es agua sobre la ladera misma.
     if (point.figure?.extra?.includes('cascada')) {
@@ -1004,6 +1022,11 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   emblems.matrixAutoUpdate = false;
   emblems.visible = false;
   scene.add(emblems);
+  const storyMat = emblemMat.clone();
+  const storyEmblems = new Mesh(storyParts.length ? mergeGeometries(storyParts)! : new BufferGeometry(), storyMat);
+  storyEmblems.matrixAutoUpdate = false;
+  storyEmblems.visible = false;
+  scene.add(storyEmblems);
   /** Los que quedan detrás de la serranía (vistos desde la cámara) se atenúan: así se leen en segundo plano. */
   const ray = new Vector3();
   const updateBehind = () => {
@@ -1426,9 +1449,15 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     // (visitando algo de la costa no se muestran, aunque la vista de la costa haya quedado alejada).
     const reveal = openSpot ? 1 : tour ? 0 : smoothstep(view.dist, 1250, 1600);
     if ((reveal > 0.5) !== host.classList.contains('show-spots')) host.classList.toggle('show-spots', reveal > 0.5);
-    emblems.visible = reveal > 0.01;
+    emblems.visible = filter !== 'historias' && reveal > 0.01;
     emblemMat.opacity = reveal;
     emblemMat.depthWrite = reveal > 0.99;
+    // Con el filtro de historias, las historias se ven también de cerca (salvo en los recorridos de la costa).
+    const storyReveal = filter === 'historias' && !tour ? 1 : reveal;
+    if ((storyReveal > 0.5) !== host.classList.contains('show-stories')) host.classList.toggle('show-stories', storyReveal > 0.5);
+    storyEmblems.visible = filter !== 'lugares' && storyReveal > 0.01;
+    storyMat.opacity = storyReveal;
+    storyMat.depthWrite = storyReveal > 0.99;
     uniforms.uTime.value = t;
     clouds.update(t);
     mist.update(t);
@@ -1456,6 +1485,15 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     if (moved || ticks % 3 === 0) {
       labels.render(pinGroup as unknown as Scene, camera); // basta un grupo: solo recorre lo que se le da
       lastCam.copy(camera.matrixWorld);
+    }
+    // La ficha de la historia abierta va pegada a su punto.
+    if (tracked && openSpot) {
+      const s = spots.find((x) => x.point.id === openSpot);
+      if (s) {
+        onScreen.copy(s.at).project(camera);
+        tracked.style.setProperty('--sx', `${((onScreen.x + 1) / 2) * host.clientWidth}px`);
+        tracked.style.setProperty('--sy', `${((1 - onScreen.y) / 2) * host.clientHeight}px`);
+      }
     }
     if (ticks % 10 === 0) {
       updateBehind();
@@ -1560,6 +1598,18 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
     setActive: (on) => {
       if (on && !active) timer.reset();
       active = on;
+    },
+    setFilter: (f) => {
+      filter = f;
+      host.classList.toggle('spots-lugares', f === 'lugares');
+      host.classList.toggle('spots-historias', f === 'historias');
+      // Si la que estaba abierta queda oculta, se cierra.
+      const open = spots.find((s) => s.point.id === openSpot);
+      if (open && (f === 'lugares' ? !!open.point.story : f === 'historias' ? !open.point.story : false)) selectSpot(null);
+    },
+    storyCount: spots.filter((s) => s.point.story).length,
+    track: (el) => {
+      tracked = el;
     },
     dispose: () => {
       disposed = true;

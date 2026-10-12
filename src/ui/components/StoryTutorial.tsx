@@ -8,7 +8,7 @@ export const TUTORIAL_SEEN = 'historia-tutorial-visto';
 const STEPS = [
   {
     title: 'Este espacio es tuyo',
-    text: 'El mapa del Chocó se va llenando con lo que vive su gente. Aquí puedes dejar lo tuyo: un recuerdo, una receta, un canto, algo que te pasó.',
+    text: 'Este mapa del Chocó lo vamos llenando entre todos, con lo que vive y recuerda su gente. Si tienes un recuerdo, la receta de la abuela o una historia que quieras contar, aquí lo puedes dejar.',
     icon: 'space',
   },
   {
@@ -18,12 +18,12 @@ const STEPS = [
   },
   {
     title: 'Ponla en su lugar',
-    text: 'Dinos dónde pasó: el municipio y el sitio. Allí aparecerá en el mapa, con una figurita según de qué trata.',
+    text: 'Cuéntanos en qué municipio y en qué sitio pasó, y ahí mismo aparecerá en el mapa. También puedes escoger una categoría, como mar, selva o cocina, y así se verá en el mapa.',
     icon: 'pin',
   },
   {
     title: 'La cuidamos contigo',
-    text: 'Antes de publicarla, el equipo de Territorios Vivos la lee. Tu contacto nunca se muestra.',
+    text: 'El equipo revisa tu historia y la aprueba.',
     icon: 'care',
   },
 ] as const;

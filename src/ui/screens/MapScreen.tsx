@@ -3,7 +3,7 @@
 // bajada con el mismo encuadre y las dos escenas se funden, hasta quedar frente a la costa, desde el mar.
 // Se carga bajo demanda para que three.js no pese en el resto del recorrido.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { MapPlace } from '../../content/map';
 import { EMBLEM_LABEL, type ChocoPoint } from '../../content/choco';
@@ -11,16 +11,19 @@ import { Arrow, TopBar } from '../components/Chrome';
 import { LineIcon, type Origin } from '../components/Sheet';
 import Shop from './Shop';
 import StoryForm from './StoryForm';
+import StoryCard from '../components/StoryCard';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { createFlatGlobe } from '../components/map/FlatGlobe';
 import { DIVE } from '../components/map/dive';
-import { MAP_TOWNS, createMapScene, type MapSceneHandle } from '../components/map/MapScene';
+import { MAP_TOWNS, createMapScene, type MapSceneHandle, type SpotFilter } from '../components/map/MapScene';
 import { QUALITY, TIER, TIER_LABEL, rememberCrash } from '../components/map/quality';
 import { SOLO, lastSteps, step } from '../components/map/diag';
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
 
 const INVITE_SEEN = 'mapa-invitacion-vista';
+const FILTER_KEY = 'mapa-filtro';
+const FILTERS: [SpotFilter, string][] = [['todo', 'Todo'], ['lugares', 'Lugares'], ['historias', 'Historias']];
 const SPOT_KIND: Record<ChocoPoint['kind'], string> = {
   municipio: 'Municipio', corregimiento: 'Corregimiento', parque: 'Parque nacional', cerro: 'Cerro', playa: 'Playa', cabo: 'Cabo',
 };
@@ -50,6 +53,24 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   const [panel, setPanel] = useState<'ayuda' | 'historia' | 'tienda' | null>(null);
   /** Dónde está el botón que abrió la tienda o el formulario: la hoja crece desde ahí. */
   const [origin, setOrigin] = useState<Origin | undefined>();
+  /** Qué puntos se ven: todos, solo los lugares (rosados y azules) o solo las historias (dorados). Se recuerda. */
+  const [filter, setFilter] = useState<SpotFilter>(() => {
+    try {
+      const f = localStorage.getItem(FILTER_KEY);
+      return FILTERS.some(([id]) => id === f) ? (f as SpotFilter) : 'todo';
+    } catch {
+      return 'todo';
+    }
+  });
+  const [stories, setStories] = useState(0);
+  useEffect(() => {
+    handle.current?.setFilter(filter);
+    try {
+      localStorage.setItem(FILTER_KEY, filter);
+    } catch {
+      // Sin almacenamiento: vuelve a «Todo» la próxima vez.
+    }
+  }, [filter]);
   useEffect(() => {
     const cover = panel === 'historia' || panel === 'tienda';
     handle.current?.setActive(!cover);
@@ -64,6 +85,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
     setEngagedState(on || !embedded);
   };
   const activeRef = useRef(active);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
   /** La costa se arma cuando la página es la visible (ver `active`). */
   const wantMap = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -134,6 +157,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
         onLost,
       }).then((m) => {
         handle.current = m;
+        m.setFilter(filterRef.current);
+        setStories(m.storyCount);
         return m;
       });
     makeGlobe.current = () =>
@@ -225,6 +250,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   };
 
   const onMap = phase === 'map';
+  const trackTale = useCallback((el: HTMLElement | null) => handle.current?.track(el), []);
+  const closeSpot = useCallback(() => handle.current?.select(null), []);
   const closePanel = () => setPanel(null);
 
   return (
@@ -293,7 +320,9 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
         }
       />
 
-      {onMap && spot && !place && (
+      {/* Una historia: su ficha flota encima de su figurita. */}
+      {onMap && spot?.tale && !place && <StoryCard key={spot.id} spot={{ ...spot, tale: spot.tale }} track={trackTale} onClose={closeSpot} />}
+      {onMap && spot && !spot.tale && !place && (
         <aside className="map-card map-card--spot" aria-live="polite">
           <div className="map-card__head">
             <p className="eyebrow">{spot.story ? `Historia · ${EMBLEM_LABEL[spot.story]}` : `${spot.subregion} · ${SPOT_KIND[spot.kind]}`}</p>
@@ -303,26 +332,6 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
             <p className="map-card__sci">{spot.kind === 'municipio' ? 'Cabecera de' : 'Municipio de'} {spot.municipio}</p>
           )}
           {spot.info && <p className="map-card__info">{spot.info}</p>}
-          {spot.tale && (
-            <div className="map-card__tale">
-              <p className="map-card__sci">
-                Contada por {spot.tale.author}
-                {spot.tale.place && ` · ${spot.tale.place}`}
-                {spot.tale.when && ` · ${spot.tale.when}`}
-              </p>
-              <div className="map-card__text">
-                {spot.tale.text.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
-              </div>
-              {spot.tale.media.length > 0 && (
-                <div className="map-card__media">
-                  {spot.tale.media.map((m) =>
-                    m.kind === 'foto' ? <img key={m.url} src={m.url} alt={m.name} loading="lazy" />
-                      : m.kind === 'video' ? <video key={m.url} src={m.url} controls playsInline preload="metadata" />
-                        : <audio key={m.url} src={m.url} controls preload="none" />)}
-                </div>
-              )}
-            </div>
-          )}
           <button type="button" className="map-card__back" onClick={() => handle.current?.select(null)}>
             <Arrow dir="left" /> Volver a la costa
           </button>
@@ -365,7 +374,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
           <nav className="map-tools" aria-label="Más del mapa">
             {([
               ['ayuda', 'help', 'Ayuda', 'Cómo moverte por el mapa y qué hay en cada lugar.'],
-              ['historia', 'story', 'Tu historia', 'Un espacio para contar algo que viviste en el Chocó —escrito o con tu voz— y que aparezca en el mapa, en su lugar.'],
+              ['historia', 'story', 'Tu historia', 'Un espacio para contar algo que viviste en el Chocó, escrito o con tu voz, y que aparezca en el mapa en su lugar.'],
               ['tienda', 'shop', 'Tienda', 'Afiches, postales y objetos del recorrido para llevarte un pedazo del Pacífico.'],
             ] as const).map(([id, icon, label, tip]) => (
               <button
@@ -402,6 +411,29 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
               </ul>
               <button type="button" className="map-card__close" aria-label="Cerrar ayuda" onClick={closePanel}>×</button>
             </aside>
+          )}
+          {/* Qué puntos del Chocó se ven: los lugares, las historias de la gente o todos. */}
+          <div className="map-filter" role="radiogroup" aria-label="Qué mostrar en el mapa">
+            {FILTERS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={filter === id}
+                className={`tab map-filter__opt map-filter__opt--${id}${filter === id ? ' is-active' : ''}`}
+                onClick={() => setFilter(id)}
+              >
+                {id !== 'todo' && <span className="map-filter__dot" aria-hidden="true" />}
+                {label}
+                {id === 'historias' && <span className="map-filter__count">{stories}</span>}
+              </button>
+            ))}
+          </div>
+          {filter === 'historias' && stories === 0 && !spot && !place && (
+            <p className="map-filter__empty">
+              Aún no hay historias en el mapa.{' '}
+              <button type="button" className="map-filter__cta" onClick={() => setPanel('historia')}>Cuenta la primera</button>
+            </p>
           )}
           <nav className="map-towns tabs" aria-label="Pueblos de la costa, de norte a sur">
             {MAP_TOWNS.map((t) => (
