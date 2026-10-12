@@ -89,7 +89,9 @@ export function OrderTracker({ code, txId, onState }: {
         <span className="shop-order__icon" aria-hidden="true">
           {state === 'cargando' || state === 'pendiente' ? <span className="shop-order__spin" /> : paid ? '✓' : '!'}
         </span>
-        {state === 'pendiente' && tries >= TRIES ? 'El pago sigue en proceso' : TRACK_TEXT[state].title}
+        {state === 'pendiente' && tries >= TRIES ? 'El pago sigue en proceso'
+          // Al volver de pagar, las gracias; al consultar después, en qué va.
+          : state === 'pagado' && !txId ? 'Tu pago está aprobado' : TRACK_TEXT[state].title}
       </p>
       {state === 'error' && <p className="shop-order__next">{TRACK_TEXT.error.intro}</p>}
 
