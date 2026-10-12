@@ -44,6 +44,56 @@ export const SCHEMA = [
   // Permisos de subida entregados (para frenar a quien quiera llenar el almacén).
   `create table if not exists subidas (ip_hash text not null, creada timestamptz not null default now())`,
   `create index if not exists subidas_ip on subidas (ip_hash, creada desc)`,
+
+  // ── Tienda ── El catálogo (precio y existencias: lo que manda al cobrar; las fotos y textos van en el código),
+  // los pedidos y lo que lleva cada uno. Ver docs/tienda.md.
+  `create table if not exists productos (
+    sku text primary key,
+    nombre text not null,
+    precio integer not null check (precio > 0),
+    existencias integer not null default 0,
+    activo boolean not null default true,
+    actualizado timestamptz not null default now()
+  )`,
+  `create table if not exists pedidos (
+    id uuid primary key default gen_random_uuid(),
+    referencia text not null unique,
+    creado timestamptz not null default now(),
+    estado text not null default 'pendiente'
+      check (estado in ('pendiente', 'pagado', 'rechazado', 'expirado', 'enviado', 'entregado')),
+    expira timestamptz not null,
+    nombre text not null,
+    correo text not null,
+    celular text not null,
+    direccion text not null,
+    ciudad text not null,
+    departamento text not null,
+    notas text not null default '',
+    subtotal integer not null,
+    envio integer not null,
+    total integer not null,
+    wompi_id text,
+    wompi_estado text,
+    metodo text,
+    pagado timestamptz,
+    guia text not null default '',
+    nota text not null default '',
+    ip_hash text not null
+  )`,
+  `create index if not exists pedidos_estado on pedidos (estado, creado desc)`,
+  `create index if not exists pedidos_ip on pedidos (ip_hash, creado desc)`,
+  `create table if not exists pedido_items (
+    pedido_id uuid not null references pedidos (id) on delete cascade,
+    sku text not null references productos (sku),
+    nombre text not null,
+    cantidad integer not null check (cantidad > 0),
+    precio integer not null
+  )`,
+  `create index if not exists pedido_items_pedido on pedido_items (pedido_id)`,
+  // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
+  `insert into productos (sku, nombre, precio, existencias)
+    values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 85000, 10)
+    on conflict (sku) do nothing`,
 ];
 
 /** Un archivo adjunto, como se guarda en la historia. */

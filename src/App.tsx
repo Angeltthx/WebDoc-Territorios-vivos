@@ -9,6 +9,7 @@ const MAP_PATH = '/costa-k7q4x';
 // La tienda y «Cuéntanos tu historia» se abren desde la costa; también tienen su propia dirección.
 const Shop = lazy(() => import('./ui/screens/Shop'));
 const StoryForm = lazy(() => import('./ui/screens/StoryForm'));
+const OrderPage = lazy(() => import('./ui/screens/OrderPage'));
 const sheet = (el: ReactNode) => <Suspense fallback={null}><div className="sheet-page">{el}</div></Suspense>;
 
 export function App() {
@@ -18,6 +19,8 @@ export function App() {
         <Route path="/" element={<Webdoc />} />
         <Route path={MAP_PATH} element={<Suspense fallback={<p className="map-loading">Cargando el mapa…</p>}><MapScreen /></Suspense>} />
         <Route path="/tienda" element={sheet(<Shop />)} />
+        {/* A donde vuelve la persona después de pagar en Wompi. */}
+        <Route path="/tienda/pedido/:ref" element={sheet(<OrderPage />)} />
         <Route path="/cuenta-tu-historia" element={sheet(<StoryForm />)} />
         <Route path="/:page" element={<Webdoc />} />
         <Route path="*" element={<Webdoc />} />
