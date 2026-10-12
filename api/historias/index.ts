@@ -2,9 +2,9 @@
 //   GET  → las historias aprobadas, para el mapa (con enlaces firmados a sus archivos).
 //   POST → una historia nueva, que queda pendiente hasta que el equipo la revise.
 
-import { CHOCO_MUNICIPALITIES } from '../../src/content/stories';
-import { type Archivo, type Historia, sql } from '../_lib/db';
-import { clean, ipHash, json, signed } from '../_lib/util';
+import { CHOCO_MUNICIPALITIES } from '../../src/content/stories.js';
+import { type Archivo, type Historia, sql } from '../_lib/db.js';
+import { clean, ipHash, json, signed } from '../_lib/util.js';
 
 const TIPOS = ['pueblo', 'selva', 'mar', 'rio', 'cultura', 'cocina'];
 const MIN_RELATO = 40;
