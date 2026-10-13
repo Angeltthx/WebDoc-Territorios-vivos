@@ -10,6 +10,8 @@ const MAP_PATH = '/costa-k7q4x';
 const Shop = lazy(() => import('./ui/screens/Shop'));
 const StoryForm = lazy(() => import('./ui/screens/StoryForm'));
 const OrderPage = lazy(() => import('./ui/screens/OrderPage'));
+// El panel del equipo (con su clave; no se indexa).
+const Admin = lazy(() => import('./ui/screens/Admin'));
 const sheet = (el: ReactNode) => <Suspense fallback={null}><div className="sheet-page">{el}</div></Suspense>;
 
 export function App() {
@@ -22,6 +24,7 @@ export function App() {
         {/* A donde vuelve la persona después de pagar en Wompi. */}
         <Route path="/tienda/pedido/:ref" element={sheet(<OrderPage />)} />
         <Route path="/cuenta-tu-historia" element={sheet(<StoryForm />)} />
+        <Route path="/admin" element={sheet(<Admin />)} />
         <Route path="/:page" element={<Webdoc />} />
         <Route path="*" element={<Webdoc />} />
       </Routes>

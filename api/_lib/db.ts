@@ -111,6 +111,9 @@ export const SCHEMA = [
     end $$`,
   `drop trigger if exists pedidos_fechas on pedidos`,
   `create trigger pedidos_fechas before update of estado on pedidos for each row execute function pedidos_fechas()`,
+  // ── Panel del equipo ── Intentos de entrar (para frenar a quien quiera adivinar la clave). Ver api/_lib/admin.ts.
+  `create table if not exists admin_intentos (ip_hash text not null, creada timestamptz not null default now(), ok boolean not null)`,
+  `create index if not exists admin_intentos_ip on admin_intentos (ip_hash, creada desc)`,
   // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
   `insert into productos (sku, nombre, precio, existencias)
     values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 85000, 10)

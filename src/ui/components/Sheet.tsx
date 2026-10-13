@@ -38,7 +38,7 @@ export type Origin = { x: number; y: number };
 /** Lo que dura la salida (ver `.sheet.is-leaving` en los estilos). */
 const LEAVE_MS = 480;
 
-export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin, still, tone, overlay, className }: {
+export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin, still, tone, overlay, className, back }: {
   eyebrow: string;
   title: string;
   intro?: ReactNode;
@@ -57,6 +57,8 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
   overlay?: ReactNode;
   /** Una clase más, para el estilo propio de cada hoja. */
   className?: string;
+  /** El enlace de arriba, si no es «Volver al mapa» (por ejemplo, el panel del equipo). */
+  back?: { to: string; label: string };
 }) {
   const [leaving, setLeaving] = useState(false);
   const close = () => {
@@ -70,9 +72,9 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
     document.body.classList.add('has-sheet');
     return () => document.body.classList.remove('has-sheet');
   }, []);
-  const back = (
+  const backLabel = (
     <>
-      <Arrow dir="left" /> Volver al mapa
+      <Arrow dir="left" /> {back?.label ?? 'Volver al mapa'}
     </>
   );
   // A pantalla completa: a un lado el atardecer del mapa con el título (como la llegada a la costa), al otro el
@@ -88,9 +90,9 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
     >
       <header className="sheet__hero">
         {onClose ? (
-          <button type="button" className="sheet__back" onClick={close}>{back}</button>
+          <button type="button" className="sheet__back" onClick={close}>{backLabel}</button>
         ) : (
-          <Link className="sheet__back" to="/27">{back}</Link>
+          <Link className="sheet__back" to={back?.to ?? '/27'}>{backLabel}</Link>
         )}
         <div className="sheet__heading">
           <p className="eyebrow">{eyebrow}</p>
