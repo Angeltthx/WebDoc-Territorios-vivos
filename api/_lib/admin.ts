@@ -1,6 +1,7 @@
 // El panel del equipo (/admin): la clave y la sesión.
 //
-// - La clave vive en ADMIN_PASSWORD (Vercel → Environment Variables; en local, .env.local). Nunca en el código.
+// - Se entra con usuario y clave: el usuario es ADMIN_USER (si no está, «admin») y la clave, ADMIN_PASSWORD (Vercel →
+//   Environment Variables; en local, .env.local). Nunca en el código.
 // - Al entrar, el servidor da una galleta (cookie) firmada que vence en SESION_HORAS: el navegador la manda sola, el
 //   JavaScript de la página no la puede leer (HttpOnly) y no viaja a otros sitios (SameSite=Strict).
 // - Las acciones (POST) además piden el encabezado `x-admin: 1`: un formulario de otro sitio no lo puede poner.
@@ -40,8 +41,8 @@ const cookie = (request: Request, value: string, maxAge: number) => {
   return `${COOKIE}=${value}; Path=/api/admin; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
 };
 
-/** Entrar con la clave. */
-export async function login(request: Request, clave: string) {
+/** Entrar con usuario y clave. */
+export async function login(request: Request, usuario: string, clave: string) {
   const password = process.env.ADMIN_PASSWORD ?? '';
   if (!password || !secret()) return json({ error: 'El panel todavía no tiene clave configurada.' }, 503);
   const huella = ipHash(request);
@@ -49,9 +50,11 @@ export async function login(request: Request, clave: string) {
   const [{ n }] = (await db`
     select count(*)::int as n from admin_intentos where ip_hash = ${huella} and not ok and creada > now() - interval '15 minutes'`) as { n: number }[];
   if (n >= INTENTOS) return json({ error: 'Demasiados intentos. Espera unos minutos.' }, 429);
-  const ok = same(clave, password);
+  // Las dos se comparan siempre (para no dar pistas de cuál estaba mal).
+  const userOk = same(usuario.trim().toLowerCase(), (process.env.ADMIN_USER || 'admin').toLowerCase());
+  const ok = same(clave, password) && userOk;
   await db`insert into admin_intentos (ip_hash, ok) values (${huella}, ${ok})`;
-  if (!ok) return json({ error: 'Esa no es la clave.' }, 401);
+  if (!ok) return json({ error: 'Usuario o clave incorrectos.' }, 401);
   const exp = String(Date.now() + SESION_HORAS * 3600 * 1000);
   return json({ ok: true }, 200, { 'set-cookie': cookie(request, `${exp}.${sign(exp)}`, SESION_HORAS * 3600) });
 }

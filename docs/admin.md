@@ -3,9 +3,16 @@
 ## Entrar
 
 - Dirección: `/admin` (en local, http://localhost:3000/admin). No se indexa en buscadores.
+- Usuario: `admin` (se puede cambiar con la variable `ADMIN_USER`).
 - Clave: la variable `ADMIN_PASSWORD` (Vercel → `web` → Settings → Environment Variables; en este computador también
   está en `.env.local`). Para cambiarla, se cambia ahí y se vuelve a publicar.
 - La sesión dura 12 horas. «Salir» la cierra.
+
+## Cómo se ve
+
+A pantalla completa: el menú a la izquierda (Resumen, Pedidos, Historias, Productos, con lo pendiente en dorado) y el
+trabajo a la derecha, en tablas. Al tocar una fila, su detalle se abre en un panel a la derecha con sus acciones.
+El nombre del panel y la ruta «Panel / …» llevan siempre al resumen.
 
 ## Qué tiene
 
@@ -20,7 +27,7 @@
 
 ```
 Navegador (/admin)                      Servidor (api/admin)                  Neon
-  │ POST /api/admin/sesion {clave} ───────► compara con ADMIN_PASSWORD
+  │ POST /api/admin/sesion {usuario, clave} ► compara con ADMIN_USER y ADMIN_PASSWORD
   │ ◄── galleta tv_admin (firmada) ──────── (HttpOnly, SameSite=Strict, 12 h)
   │ GET  /api/admin/resumen | historias | pedidos | productos ──► revisa la galleta ──► consulta
   │ POST (con encabezado x-admin: 1) ──────────────────────────► revisa galleta y encabezado ──► cambia

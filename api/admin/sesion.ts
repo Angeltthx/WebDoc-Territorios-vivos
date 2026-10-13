@@ -1,6 +1,6 @@
 // /api/admin/sesion
 //   GET    → ¿hay sesión? (la página la pregunta al abrir)
-//   POST   { clave } → entrar
+//   POST   { usuario, clave } → entrar
 //   DELETE → salir
 
 import { isAdmin, login, logout } from '../_lib/admin.js';
@@ -11,8 +11,9 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => ({}))) as { clave?: unknown };
-  return login(request, typeof body.clave === 'string' ? body.clave.slice(0, 200) : '');
+  const body = (await request.json().catch(() => ({}))) as { usuario?: unknown; clave?: unknown };
+  const text = (v: unknown) => (typeof v === 'string' ? v.slice(0, 200) : '');
+  return login(request, text(body.usuario), text(body.clave));
 }
 
 export function DELETE(request: Request) {

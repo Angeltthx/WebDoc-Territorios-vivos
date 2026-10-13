@@ -20,7 +20,10 @@ export async function GET(request: Request) {
   const productos = await db`select sku, nombre, precio, existencias, activo from productos order by sku`;
   const ultimos = await db`
     select referencia, creado, estado, nombre, ciudad, total from pedidos
-    where estado in ('pagado', 'empacando', 'enviado', 'entregado') order by creado desc limit 5`;
+    where estado in ('pagado', 'empacando', 'enviado', 'entregado') order by creado desc limit 8`;
+  const porRevisar = await db`
+    select id, creada, titulo, autor, municipio, lugar, jsonb_array_length(archivos)::int as archivos
+    from historias where estado = 'pendiente' order by creada desc limit 8`;
   const count = (rows: Conteo[]) => Object.fromEntries(rows.map((r) => [r.estado, r.n]));
-  return json({ historias: count(historias), pedidos: count(pedidos), ventas, productos, ultimos });
+  return json({ historias: count(historias), pedidos: count(pedidos), ventas, productos, ultimos, porRevisar });
 }

@@ -24,7 +24,7 @@ export function App() {
         {/* A donde vuelve la persona después de pagar en Wompi. */}
         <Route path="/tienda/pedido/:ref" element={sheet(<OrderPage />)} />
         <Route path="/cuenta-tu-historia" element={sheet(<StoryForm />)} />
-        <Route path="/admin" element={sheet(<Admin />)} />
+        <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
         <Route path="/:page" element={<Webdoc />} />
         <Route path="*" element={<Webdoc />} />
       </Routes>

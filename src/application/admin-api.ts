@@ -25,7 +25,7 @@ async function call<T>(path: string, init?: { method?: string; body?: unknown })
 }
 
 export const session = () => call<{ ok: boolean }>('sesion');
-export const login = (clave: string) => call<{ ok: true }>('sesion', { body: { clave } });
+export const login = (usuario: string, clave: string) => call<{ ok: true }>('sesion', { body: { usuario, clave } });
 export const logout = () => call<{ ok: true }>('sesion', { method: 'DELETE' });
 
 export type Conteo = Record<string, number>;
@@ -36,6 +36,7 @@ export interface Resumen {
   ventas: { total: number; pedidos: number; mes: number };
   productos: { sku: string; nombre: string; precio: number; existencias: number; activo: boolean }[];
   ultimos: { referencia: string; creado: string; estado: string; nombre: string; ciudad: string; total: number }[];
+  porRevisar: { id: string; creada: string; titulo: string; autor: string; municipio: string; lugar: string; archivos: number }[];
 }
 export const resumen = () => call<Resumen>('resumen');
 
