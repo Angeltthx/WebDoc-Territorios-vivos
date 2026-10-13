@@ -198,8 +198,8 @@ export const stations: Station[] = [
       panorama: {
         title: 'Entrar al manglar 360°',
         sub: 'el que ella limpió',
-        src: '/media/360/manglar/master.m3u8',
-        poster: '/media/360/manglar/poster.webp',
+        src: '/media/360/manglar-2026-10-13/master.m3u8',
+        poster: '/media/360/manglar-2026-10-13/poster.webp',
         label: 'Estación 4 · Manglar 360°',
       },
       songs: [
@@ -233,8 +233,8 @@ export const transitions: Transition[] = [
     from: 'Inicio',
     to: 'Chorí',
     symbol: 'wave',
-    // Texto de la transición del intro: pendiente (está en el Canva del cliente).
-    lines: [],
+    // Texto del Canva del cliente (13/10/2026); sigue en la transición 2 («…y otras aguas…»).
+    lines: ['El agua nos une a todos aquí, naveguemos por el río Chorí…'],
     video: 't1',
     // Se veía muy recortada (el video es más ancho que la pantalla): completa, con el fondo desenfocado (13/10/2026).
     fit: 'contain',

@@ -129,8 +129,8 @@ export default function Admin() {
     <div className="ap">
       <aside className="ap-side">
         <button type="button" className="ap-brand" onClick={() => go('resumen')} title="Ir al resumen">
-          <span className="ap-brand__mark" aria-hidden="true">TV</span>
-          <span><strong>Territorios Vivos</strong><small>Panel del equipo</small></span>
+          <span className="ap-logo"><img src="/media/logo-territorios-vivos.webp" alt="Territorios Vivos" /></span>
+          <small>Administración</small>
         </button>
         <nav className="ap-nav" aria-label="Secciones">
           {SECCIONES.map((s) => (
@@ -190,13 +190,12 @@ function LoginScreen({ loading, onIn }: { loading: boolean; onIn: () => void }) 
   return (
     <div className="ap-login">
       <div className="ap-login__brand">
-        <span className="ap-brand__mark" aria-hidden="true">TV</span>
-        <p><strong>Territorios Vivos</strong><span>Panel del equipo</span></p>
+        <span className="ap-logo ap-logo--lg"><img src="/media/logo-territorios-vivos.webp" alt="Territorios Vivos" /></span>
       </div>
       {loading ? <p className="ap-muted">Un momento…</p> : (
         <form className="ap-login__card" onSubmit={submit}>
-          <h1>Entrar al panel</h1>
-          <p className="ap-muted">Pedidos de la tienda, historias de la gente y productos.</p>
+          <h1>Iniciar sesión</h1>
+          <p className="ap-muted">Administración de pedidos, historias y productos.</p>
           <label className="ap-field">
             <span>Usuario</span>
             <input required autoComplete="username" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
@@ -207,7 +206,7 @@ function LoginScreen({ loading, onIn }: { loading: boolean; onIn: () => void }) 
           </label>
           {error && <p className="ap-error" role="alert">{error}</p>}
           <button type="submit" className="ap-btn ap-btn--primary ap-btn--block" disabled={busy || !clave || !usuario}>{busy ? 'Entrando…' : 'Entrar'}</button>
-          <Link className="ap-login__back" to="/">← Volver a la web</Link>
+          <Link className="ap-login__back" to="/">Volver a la web</Link>
         </form>
       )}
     </div>
@@ -282,19 +281,32 @@ function Confirm({ label, sure, onYes, busy, danger }: { label: string; sure: st
 
 const Loading = () => <p className="ap-muted ap-pad">Cargando…</p>;
 
-/** Barras por día (las visitas de las dos últimas semanas), con el número encima. */
+/** Un tope «redondo» para el eje (1, 2, 5, 10, 20, 50…) que quede por encima del máximo. */
+function niceMax(n: number) {
+  if (n <= 4) return 4;
+  const pow = 10 ** Math.floor(Math.log10(n));
+  return [1, 2, 2.5, 5, 10].map((f) => f * pow).find((v) => v >= n)!;
+}
+
+/** Barras por día (las visitas de las dos últimas semanas), con eje de cifras y líneas de guía. */
 function Bars({ data }: { data: { dia: string; visitas: number }[] }) {
-  const max = Math.max(1, ...data.map((d) => d.visitas));
+  const top = niceMax(Math.max(0, ...data.map((d) => d.visitas)));
+  const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => Math.round(top * f));
   const day = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
   return (
-    <div className="ap-bars" role="img" aria-label={`Visitas por día: ${data.map((d) => `${day(d.dia)} ${d.visitas}`).join(', ')}`}>
-      {data.map((d, i) => (
-        <div key={d.dia} className={`ap-bars__col${i === data.length - 1 ? ' is-today' : ''}`} title={`${day(d.dia)}: ${d.visitas}`}>
-          <span className="ap-bars__n">{d.visitas || ''}</span>
-          <span className="ap-bars__bar" style={{ height: `${(d.visitas / max) * 100}%` }} />
-          <span className="ap-bars__d">{i % 2 === data.length % 2 || i === data.length - 1 ? day(d.dia) : ''}</span>
-        </div>
-      ))}
+    <div className="ap-chart" role="img" aria-label={`Visitas por día: ${data.map((d) => `${day(d.dia)} ${d.visitas}`).join(', ')}`}>
+      <div className="ap-chart__y" aria-hidden="true">{ticks.map((t, i) => <span key={i}>{t}</span>)}</div>
+      <div className="ap-chart__plot">
+        <div className="ap-chart__grid" aria-hidden="true">{ticks.map((_, i) => <span key={i} />)}</div>
+        {data.map((d, i) => (
+          <div key={d.dia} className={`ap-chart__col${i === data.length - 1 ? ' is-today' : ''}`} title={`${day(d.dia)}: ${d.visitas} visita${d.visitas === 1 ? '' : 's'}`}>
+            <span className="ap-chart__bar" style={{ height: `${(d.visitas / top) * 100}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="ap-chart__x" aria-hidden="true">
+        {data.map((d, i) => <span key={d.dia}>{i % 2 === data.length % 2 || i === data.length - 1 ? day(d.dia) : ''}</span>)}
+      </div>
     </div>
   );
 }
@@ -359,7 +371,7 @@ function ResumenView({ run, go }: { run: Run; go: (s: Seccion, id?: string | nul
 
       <div className="ap-grid2">
         <section className="ap-card">
-          <header className="ap-card__head"><h2>Últimos pedidos</h2><button type="button" className="ap-link" onClick={() => go('pedidos')}>Ver todos →</button></header>
+          <header className="ap-card__head"><h2>Últimos pedidos</h2><button type="button" className="ap-link" onClick={() => go('pedidos')}>Ver todos</button></header>
           <Table head={['Código', 'Cliente', 'Estado', <span className="ap-num" key="t">Total</span>]} empty="Todavía no hay ventas.">
             {r.ultimos.map((o) => (
               <tr key={o.referencia} className="is-click" onClick={() => go('pedidos', o.referencia)}>
@@ -372,7 +384,7 @@ function ResumenView({ run, go }: { run: Run; go: (s: Seccion, id?: string | nul
           </Table>
         </section>
         <section className="ap-card">
-          <header className="ap-card__head"><h2>Historias por revisar</h2><button type="button" className="ap-link" onClick={() => go('historias')}>Ver todas →</button></header>
+          <header className="ap-card__head"><h2>Historias por revisar</h2><button type="button" className="ap-link" onClick={() => go('historias')}>Ver todas</button></header>
           <Table head={['Título', 'Contada por', 'Lugar']} empty="No hay historias por revisar.">
             {r.porRevisar.map((h) => (
               <tr key={h.id} className="is-click" onClick={() => go('historias', h.id)}>
@@ -432,7 +444,7 @@ function PedidosView({ run, open, onChange }: { run: Run; open: string | null; o
       <section className="ap-card ap-card--flush">
         {!data ? <Loading /> : (
           <Table head={['Código', 'Fecha', 'Cliente', 'Destino', <span className="ap-num" key="c">Cant.</span>, <span className="ap-num" key="t">Total</span>, 'Pago', 'Estado']}
-            empty={vista === 'despachar' && !buscar ? 'No hay pedidos por despachar. ¡Al día!' : 'No hay pedidos aquí.'}>
+            empty={vista === 'despachar' && !buscar ? 'No hay pedidos por despachar.' : 'No hay pedidos aquí.'}>
             {data.pedidos.map((p) => (
               <tr key={p.referencia} className={`is-click${p.referencia === sel ? ' is-sel' : ''}`} onClick={() => setSel(p.referencia)}>
                 <td className="ap-mono">{p.referencia}</td>
@@ -587,7 +599,7 @@ function HistoriasView({ run, open, onChange }: { run: Run; open: string | null;
       <section className="ap-card ap-card--flush">
         {!data ? <Loading /> : (
           <Table head={['Recibida', 'Título', 'Contada por', 'Lugar', 'Categoría', 'Archivos', 'Estado']}
-            empty={estado === 'pendiente' ? 'No hay historias por revisar. ¡Al día!' : 'No hay historias aquí.'}>
+            empty={estado === 'pendiente' ? 'No hay historias por revisar.' : 'No hay historias aquí.'}>
             {data.historias.map((h) => (
               <tr key={h.id} className={`is-click${h.id === sel ? ' is-sel' : ''}`} onClick={() => setSel(h.id)}>
                 <td>{fecha(h.creada)}</td>
@@ -713,7 +725,7 @@ function ProductosView({ run }: { run: Run }) {
           </Table>
         )}
       </section>
-      <p className="ap-muted">Apartados: en pedidos que esperan pago (vuelven a las existencias si no se pagan). El póster original toma sus fotos y textos del código (src/content/stories.ts); los productos nuevos, de aquí.</p>
+      <p className="ap-muted">Apartados: en pedidos que esperan pago (vuelven a las existencias si no se pagan). Las fotos y textos del póster original vienen de la web; los de los productos nuevos, de este panel.</p>
       {form && <ProductoForm key={form === 'nuevo' ? 'nuevo' : form.sku} p={form === 'nuevo' ? null : form} run={run} onClose={close} onSaved={() => { close(); load(); }} />}
     </div>
   );
@@ -925,7 +937,7 @@ function ProductoFila({ p, run, onSaved, onEdit }: { p: api.AdminProducto; run: 
   };
   return (
     <tr>
-      <td className="ap-strong">{p.nombre}<small className="ap-mono">{p.sku} · actualizado {fecha(p.actualizado)}</small></td>
+      <td className="ap-strong">{p.nombre}<small><span className="ap-mono">{p.sku}</span> · actualizado {fecha(p.actualizado)}</small></td>
       <td className="ap-num">
         <input className="ap-cell-input" value={precio} inputMode="numeric" aria-label="Precio" onChange={(e) => { setPrecio(e.target.value.replace(/\D/g, '')); setMsg(''); }} />
         <small>{Number(precio) ? pesos(Number(precio)) : ''}</small>

@@ -3,7 +3,8 @@
 // (30/09/2026): transición en video después del intro y galería en la estación 4;
 // videos de HISTORIA de las estaciones 1 a 3 en streaming (public/media/historias);
 // (05/10/2026): video del intro después de la portada, cierre en video y Video canción en streaming;
-// (08/10/2026): "Historia" → "Tráiler historia" y sección "Video canción" en la estación 3.
+// (08/10/2026): "Historia" → "Tráiler historia" y sección "Video canción" en la estación 3;
+// (13/10/2026): tráiler nuevo en la estación 3, los Video canción de las estaciones 3 y 4 intercambiados y video del Viche.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { Photo, StationId, VideoAsset } from '../domain/types';
@@ -123,8 +124,8 @@ export const pages: PageSpec[] = [
     id: 'nuqui-video-cancion',
     kind: 'video',
     label: 'Estación 3 · Video canción',
-    // El video que estaba en Historia pasa a Video canción (08/10/2026).
-    video: { title: 'El baile de las olas · Video canción', stream: 'estacion-3' },
+    // Por ahora, el video largo de Marea alta, marea baja (13/10/2026): el cliente aún define cuál va aquí.
+    video: { title: 'Marea alta, marea baja · Video canción', stream: 'cancion-marea' },
     tabs: nuqui('Video canción'),
   },
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },
@@ -164,14 +165,15 @@ export const pages: PageSpec[] = [
     id: 'pangui-video-cancion',
     kind: 'video',
     label: 'Estación 4 · Video canción',
-    video: { title: 'Marea alta, marea baja · Video canción', stream: 'cancion-marea' },
+    // El video musical que estaba en la estación 3 (13/10/2026).
+    video: { title: 'El baile de las olas · Video canción', stream: 'estacion-3' },
     tabs: pangui('Video canción'),
   },
   {
     id: 'pangui-viche',
     kind: 'video',
     label: 'Estación 4 · Viche',
-    video: { title: 'Viche curao, un regalo de la selva', tint: '#58509a' },
+    video: { title: 'Viche curao, un regalo de la selva', stream: 'viche' },
     tabs: pangui('Viche'),
   },
   { id: 'transicion-4', kind: 'transition', index: 5 },

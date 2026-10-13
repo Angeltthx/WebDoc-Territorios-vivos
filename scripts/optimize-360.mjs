@@ -1,4 +1,4 @@
-// Convierte el video 360 del manglar a streaming HLS en tres calidades (public/media/360/manglar).
+// Convierte el video 360 del manglar a streaming HLS en tres calidades (public/media/360/manglar-<fecha>).
 // Uso: npm run media:360  (lee ../Contenido/Manglar Video 360.mp4; tarda varios minutos)
 // - 3840×1920 (~8 Mbps, pantallas grandes), 2880×1440 (~5 Mbps, computador), 1920×960 (~2.5 Mbps, celular).
 // - Segmentos de 4 s con fotogramas clave alineados, para cambiar de calidad sin cortes.
@@ -11,7 +11,8 @@ import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 const SRC = path.resolve('..', 'Contenido', 'Manglar Video 360.mp4');
-const OUT = path.resolve('public', 'media', '360', 'manglar');
+// Carpeta con fecha: los medios se guardan en caché un año, así que cada versión nueva va en su propia carpeta.
+const OUT = path.resolve('public', 'media', '360', 'manglar-2026-10-13');
 rmSync(OUT, { recursive: true, force: true });
 
 const RENDITIONS = [
@@ -21,10 +22,11 @@ const RENDITIONS = [
 ];
 RENDITIONS.forEach((r) => mkdirSync(path.join(OUT, r.name), { recursive: true }));
 
-// El original es de rango completo (yuvj420p); se convierte a rango de TV, compatible con todos los navegadores.
+// Se lleva a rango de TV, compatible con todos los navegadores. El rango de entrada lo toma del original (el primero era
+// de rango completo, yuvj420p; el editado del 13/10/2026 ya viene en rango de TV).
 const filter =
   `[0:v]split=${RENDITIONS.length}${RENDITIONS.map((_, i) => `[s${i}]`).join('')};` +
-  RENDITIONS.map((r, i) => `[s${i}]scale=${r.w}:${r.h}:in_range=full:out_range=tv,format=yuv420p[o${i}]`).join(';');
+  RENDITIONS.map((r, i) => `[s${i}]scale=${r.w}:${r.h}:out_range=tv,format=yuv420p[o${i}]`).join(';');
 
 const args = ['-hide_banner', '-loglevel', 'warning', '-stats', '-y', '-i', SRC, '-filter_complex', filter];
 RENDITIONS.forEach((r, i) => {
