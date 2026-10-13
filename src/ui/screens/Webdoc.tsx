@@ -100,7 +100,7 @@ function cueMode(spec: PageSpec): CueMode {
 
 function voiceOf(spec: PageSpec): string | null {
   if (spec.kind === 'transition') return transitions[spec.index].voice ?? null;
-  if (spec.id === 'pangui-viche') return voices.viche;
+  if (spec.id === 'pangui-historia') return voices.panguiHistoria;
   return null;
 }
 

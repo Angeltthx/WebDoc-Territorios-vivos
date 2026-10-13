@@ -20,7 +20,7 @@ const VIDEOS = {
   // Video canción de la estación 4 (05/10/2026).
   'cancion-marea': { file: 'Marea alta, marea baja_1.mp4', poster: 8 },
   // Tráiler historia de la estación 3, con Orfelina (13/10/2026). El video que estaba ahí pasó a Video canción.
-  'nuqui-trailer': { file: 'Tráiler El baile de las olas - Orfelina.mp4', poster: 6 },
+  'nuqui-trailer': { file: 'Tráiler El baile de las olas - Orfelina.mp4', poster: 49 },
   // Viche de la estación 4 (13/10/2026).
   viche: { file: 'Tráiler Viche.mp4', poster: 10 },
 };

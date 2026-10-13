@@ -133,7 +133,6 @@ export const stations: Station[] = [
       portrait: p('6i3a3478', 'Orfelina Marmolejo abraza a una niña', { focus: '45% 30%' }),
     },
     sections: [
-      { kind: 'scrolly', label: 'Scrolly' },
       { kind: 'pensamiento', label: 'Pensamiento' },
       { kind: 'historia', label: 'Tráiler historia' },
       { kind: 'video-cancion', label: 'Video canción' },
@@ -273,8 +272,9 @@ export const transitions: Transition[] = [
   },
 ];
 
-/** Voz de Chachita antes del Viche (la del intro ya viene en su video). */
-export const voices = { viche: 'x' };
+/** Voz de Chachita en el Tráiler historia de la estación 4 (antes sonaba en el Viche, que ahora tiene su video con
+ * sonido). La del intro ya viene en su video. */
+export const voices = { panguiHistoria: 'x' };
 
 export const welcome = {
   background: p('6i3a4535', 'Un pescador rema una canoa frente a una isla del Pacífico', { focus: '50% 60%' }),

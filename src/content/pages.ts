@@ -4,7 +4,7 @@
 // videos de HISTORIA de las estaciones 1 a 3 en streaming (public/media/historias);
 // (05/10/2026): video del intro después de la portada, cierre en video y Video canción en streaming;
 // (08/10/2026): "Historia" → "Tráiler historia" y sección "Video canción" en la estación 3;
-// (13/10/2026): tráiler nuevo en la estación 3, los Video canción de las estaciones 3 y 4 intercambiados y video del Viche.
+// (13/10/2026): tráiler nuevo en la estación 3 (une el scrollytelling y el tráiler en una sola página), los Video canción de las estaciones 3 y 4 intercambiados y video del Viche.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { Photo, StationId, VideoAsset } from '../domain/types';
@@ -44,7 +44,6 @@ const atrato = (active: string): Tabs => ({
 const nuqui = (active: string): Tabs => ({
   active,
   items: [
-    { label: 'Scrolly', to: 'nuqui-scrolly' },
     { label: 'Pensamiento', to: 'nuqui-pensamiento' },
     { label: 'Tráiler historia', to: 'nuqui-historia' },
     { label: 'Video canción', to: 'nuqui-video-cancion' },
@@ -107,16 +106,10 @@ export const pages: PageSpec[] = [
 
   { id: 'nuqui-pensamiento', kind: 'quote', station: 'nuqui', label: 'Estación 3 · El baile de las olas', tabs: nuqui('Pensamiento') },
   {
-    id: 'nuqui-scrolly',
-    kind: 'video',
-    label: 'Estación 3 · Scrollytelling',
-    video: { title: 'El baile de las olas', poster: p('6i3a3560', 'Una bailarina de amarillo sonríe', { focus: '50% 30%' }) },
-  },
-  {
     id: 'nuqui-historia',
     kind: 'video',
     label: 'Estación 3 · Tráiler historia',
-    // Tráiler nuevo, con Orfelina (13/10/2026).
+    // Tráiler nuevo, con Orfelina (13/10/2026). Es también el scrollytelling: la página aparte sin video se quitó (13/10/2026).
     video: { title: 'El baile de las olas', stream: 'nuqui-trailer' },
     tabs: nuqui('Tráiler historia'),
   },
