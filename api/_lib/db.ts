@@ -124,6 +124,10 @@ export const SCHEMA = [
   `alter table productos add column if not exists caracteristicas jsonb not null default '[]'`,
   `alter table productos add column if not exists fotos jsonb not null default '[]'`,
   `alter table productos add column if not exists creado timestamptz not null default now()`,
+  // ── Visitas ── Contador propio para el resumen del panel (sin cookies ni datos personales): páginas vistas por día y
+  // personas distintas por día (una huella anónima que cambia cada día: no permite seguir a nadie). Ver api/visita.ts.
+  `create table if not exists visitas_pagina (dia date not null, ruta text not null, vistas integer not null default 0, primary key (dia, ruta))`,
+  `create table if not exists visitas_personas (dia date not null, huella text not null, movil boolean not null default false, primary key (dia, huella))`,
   // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
   `insert into productos (sku, nombre, precio, existencias)
     values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 85000, 10)

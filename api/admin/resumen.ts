@@ -24,6 +24,24 @@ export async function GET(request: Request) {
   const porRevisar = await db`
     select id, creada, titulo, autor, municipio, lugar, jsonb_array_length(archivos)::int as archivos
     from historias where estado = 'pendiente' order by creada desc limit 8`;
+  // Visitas (contador propio, en días de Colombia): personas distintas por día, sumadas; páginas vistas; las más vistas.
+  const hoy = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  const [visitas] = (await db`
+    select
+      count(*) filter (where dia = ${hoy}::date)::int as hoy,
+      count(*) filter (where dia > ${hoy}::date - 7)::int as semana,
+      count(*)::int as mes,
+      coalesce(round(100.0 * count(*) filter (where movil) / nullif(count(*), 0)), 0)::int as movil
+    from visitas_personas where dia > ${hoy}::date - 30`) as { hoy: number; semana: number; mes: number; movil: number }[];
+  const [{ vistas }] = (await db`select coalesce(sum(vistas), 0)::int as vistas from visitas_pagina where dia > ${hoy}::date - 30`) as { vistas: number }[];
+  const porDia = await db`
+    select to_char(d, 'YYYY-MM-DD') as dia, coalesce(count(p.huella), 0)::int as visitas
+    from generate_series(${hoy}::date - 13, ${hoy}::date, interval '1 day') d
+    left join visitas_personas p on p.dia = d::date
+    group by d order by d`;
+  const paginas = await db`
+    select ruta, sum(vistas)::int as vistas from visitas_pagina where dia > ${hoy}::date - 30
+    group by ruta order by vistas desc limit 10`;
   const count = (rows: Conteo[]) => Object.fromEntries(rows.map((r) => [r.estado, r.n]));
-  return json({ historias: count(historias), pedidos: count(pedidos), ventas, productos, ultimos, porRevisar });
+  return json({ historias: count(historias), pedidos: count(pedidos), ventas, productos, ultimos, porRevisar, visitas: { ...visitas, vistas, porDia, paginas } });
 }

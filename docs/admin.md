@@ -46,3 +46,17 @@ Los productos nuevos viven completos en la tabla `productos` (columnas categoria
 
 Archivos: `api/_lib/admin.ts` (clave y sesión), `api/admin/*.ts` (las rutas), `src/application/admin-api.ts` y
 `src/ui/screens/Admin.tsx` (la pantalla).
+
+## Visitas
+
+Dos cuentas a la vez, sin cookies ni datos personales (el panel no se cuenta):
+
+- **Vercel Web Analytics** (`@vercel/analytics`, se arranca en `src/main.tsx`): el detalle — de dónde llega la gente,
+  países, dispositivos, páginas. Se ve en Vercel → `web` → **Analytics** (hay que activarlo una vez ahí).
+- **Contador propio** (`/api/visita`, tablas `visitas_pagina` y `visitas_personas`): lo que sale en el Resumen del panel —
+  visitas hoy, en 7 y 30 días, el porcentaje desde el celular, las visitas por día de las dos últimas semanas y las
+  páginas más vistas. Una «visita» es una persona distinta en un día (una huella anónima que cambia cada día). Los
+  robots no cuentan. Los días van en hora de Colombia.
+
+Las páginas del recorrido cambian sin recargar: se cuentan a mano (`countPage` en `src/application/visits.ts`) y solo si
+la persona se queda al menos 1,5 s en ellas.

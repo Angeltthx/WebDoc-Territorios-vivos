@@ -9,6 +9,8 @@ import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from
 import { Link } from 'react-router-dom';
 import { CHOCO_POINTS, EMBLEM_LABEL, type Emblem } from '../../content/choco';
 import { pesos } from '../../content/stories';
+import { pages } from '../../content/pages';
+import { transitions } from '../../content/journey';
 import * as api from '../../application/admin-api';
 
 type Seccion = 'resumen' | 'pedidos' | 'historias' | 'productos';
@@ -21,6 +23,22 @@ const SECCIONES: { id: Seccion; label: string; icon: IconName }[] = [
 
 const fecha = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—';
+
+/** El nombre de una dirección de la web, para las páginas más vistas. */
+const OTRAS: Record<string, string> = {
+  '/tienda': 'Tienda', '/tienda/pedido': 'Tienda · vuelta del pago', '/cuenta-tu-historia': 'Tu historia (formulario)', '/costa-k7q4x': 'Mapa 3D (dirección directa)',
+};
+function pageName(ruta: string) {
+  if (OTRAS[ruta]) return OTRAS[ruta];
+  const n = ruta === '/' ? 1 : Number(ruta.slice(1));
+  const spec = Number.isInteger(n) ? pages[n - 1] : undefined;
+  if (!spec) return ruta;
+  const name = spec.kind === 'welcome' ? 'Portada'
+    : spec.kind === 'transition' ? transitions[spec.index]?.label ?? 'Transición'
+      : spec.kind === 'closing' ? 'Mapa 3D (cierre)'
+        : spec.label;
+  return `${n}. ${name}`;
+}
 
 const ESTADO_PEDIDO: Record<string, string> = {
   pendiente: 'Esperando pago', pagado: 'Por empacar', empacando: 'En empaque', enviado: 'En camino', entregado: 'Entregado',
@@ -264,6 +282,23 @@ function Confirm({ label, sure, onYes, busy, danger }: { label: string; sure: st
 
 const Loading = () => <p className="ap-muted ap-pad">Cargando…</p>;
 
+/** Barras por día (las visitas de las dos últimas semanas), con el número encima. */
+function Bars({ data }: { data: { dia: string; visitas: number }[] }) {
+  const max = Math.max(1, ...data.map((d) => d.visitas));
+  const day = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+  return (
+    <div className="ap-bars" role="img" aria-label={`Visitas por día: ${data.map((d) => `${day(d.dia)} ${d.visitas}`).join(', ')}`}>
+      {data.map((d, i) => (
+        <div key={d.dia} className={`ap-bars__col${i === data.length - 1 ? ' is-today' : ''}`} title={`${day(d.dia)}: ${d.visitas}`}>
+          <span className="ap-bars__n">{d.visitas || ''}</span>
+          <span className="ap-bars__bar" style={{ height: `${(d.visitas / max) * 100}%` }} />
+          <span className="ap-bars__d">{i % 2 === data.length % 2 || i === data.length - 1 ? day(d.dia) : ''}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ───────── Resumen ───────── */
 function ResumenView({ run, go }: { run: Run; go: (s: Seccion, id?: string | null) => void }) {
   const [r, setR] = useState<api.Resumen | null>(null);
@@ -278,6 +313,11 @@ function ResumenView({ run, go }: { run: Run; go: (s: Seccion, id?: string | nul
   return (
     <div className="ap-stack">
       <div className="ap-kpis">
+        <div className="ap-kpi">
+          <p className="ap-kpi__l">Visitas hoy</p>
+          <p className="ap-kpi__n">{r.visitas.hoy}</p>
+          <p className="ap-kpi__s">{r.visitas.semana} en 7 días · {r.visitas.mes} en 30 días · {r.visitas.movil} % desde el celular</p>
+        </div>
         <div className="ap-kpi">
           <p className="ap-kpi__l">Ventas · últimos 30 días</p>
           <p className="ap-kpi__n">{pesos(r.ventas.mes)}</p>
@@ -300,6 +340,21 @@ function ResumenView({ run, go }: { run: Run; go: (s: Seccion, id?: string | nul
             <p className="ap-kpi__s">{p.nombre}{!p.activo ? ' · no está a la venta' : p.existencias <= 3 ? ' · quedan pocos' : ''}</p>
           </button>
         ))}
+      </div>
+
+      <div className="ap-grid2">
+        <section className="ap-card">
+          <header className="ap-card__head"><h2>Visitas · últimos 14 días</h2><span className="ap-muted">{r.visitas.vistas} páginas vistas en 30 días</span></header>
+          <Bars data={r.visitas.porDia} />
+        </section>
+        <section className="ap-card">
+          <header className="ap-card__head"><h2>Páginas más vistas · 30 días</h2></header>
+          <Table head={['Página', <span className="ap-num" key="v">Vistas</span>]} empty="Todavía no hay visitas contadas.">
+            {r.visitas.paginas.map((p) => (
+              <tr key={p.ruta}><td>{pageName(p.ruta)}</td><td className="ap-num">{p.vistas}</td></tr>
+            ))}
+          </Table>
+        </section>
       </div>
 
       <div className="ap-grid2">
@@ -664,6 +719,16 @@ function ProductosView({ run }: { run: Run }) {
   );
 }
 
+/** Una parte del formulario de producto, en su propia caja. */
+function FormSection({ title, help, children }: { title: string; help?: string; children: ReactNode }) {
+  return (
+    <section className="ap-psec">
+      <header><h3>{title}</h3>{help && <p>{help}</p>}</header>
+      {children}
+    </section>
+  );
+}
+
 const CATEGORIAS = ['Póster', 'Postales', 'Ropa', 'Papelería', 'Hogar', 'Accesorios'];
 type FotoForm = api.FotoProducto & { progreso?: number };
 
@@ -728,85 +793,115 @@ function ProductoForm({ p, run, onClose, onSaved }: { p: api.AdminProducto | nul
     }
   };
 
+  const portada = fotos.find((f) => f.url);
   return (
-    <Drawer title={p ? 'Editar producto' : 'Nuevo producto'} sub={p ? <span className="ap-mono">{p.sku}</span> : 'Así como lo llenes, se verá en la tienda.'} onClose={onClose}>
-      <form className="ap-stack" onSubmit={submit}>
-        <h3 className="ap-h3">Lo que se ve en la tienda</h3>
-        <div className="ap-form">
-          <label className="ap-field ap-field--wide"><span>Nombre</span>
-            <input required minLength={3} maxLength={90} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Postales del recorrido" />
-          </label>
-          <label className="ap-field"><span>Categoría</span>
-            <input required list="ap-categorias" maxLength={40} value={categoria} onChange={(e) => setCategoria(e.target.value)} />
-            <datalist id="ap-categorias">{CATEGORIAS.map((c) => <option key={c} value={c} />)}</datalist>
-          </label>
-          <label className="ap-field"><span>Tamaño o presentación <em>opcional</em></span>
-            <input maxLength={40} value={tamano} onChange={(e) => setTamano(e.target.value)} placeholder="Juego de 6" />
-          </label>
-          <label className="ap-field"><span>Medidas <em>opcional</em></span>
-            <input maxLength={60} value={medidas} onChange={(e) => setMedidas(e.target.value)} placeholder="10 × 15 cm" />
-          </label>
-          <label className="ap-field ap-field--wide"><span>Frase corta <em>sale en la tarjeta de la lista</em></span>
-            <input maxLength={220} value={resumen} onChange={(e) => setResumen(e.target.value)} placeholder="Seis postales con las fotos del recorrido." />
-          </label>
-          <label className="ap-field ap-field--wide"><span>Descripción <em>sale en la ficha; deja una línea en blanco entre párrafos</em></span>
-            <textarea rows={5} maxLength={4000} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-          </label>
+    <Drawer title={p ? 'Editar producto' : 'Nuevo producto'} sub={p ? <span className="ap-mono">{p.sku}</span> : 'Llena los datos y mira arriba cómo va quedando en la tienda.'} onClose={onClose}>
+      <form className="ap-pform" onSubmit={submit}>
+        {/* Cómo va quedando: la tarjeta de la tienda. */}
+        <div className="ap-preview" aria-hidden="true">
+          <div className="ap-preview__pic">{portada ? <img src={portada.url} alt="" /> : <span>Sin foto todavía</span>}</div>
+          <div className="ap-preview__body">
+            <p className="ap-preview__kind">{categoria || 'Categoría'}{existencias ? ` · quedan ${existencias}` : ''}</p>
+            <p className="ap-preview__name">{nombre || 'Nombre del producto'}</p>
+            <p className="ap-preview__sum">{resumen || 'La frase corta aparece aquí.'}</p>
+            <p className="ap-preview__price">{Number(precio) ? pesos(Number(precio)) : '$ —'}</p>
+          </div>
+          <span className="ap-preview__tag">Vista previa</span>
         </div>
 
-        <h3 className="ap-h3">Fotos <span className="ap-muted">· la primera es la principal · hasta 8</span></h3>
-        <div className="ap-photos">
-          {fotos.map((f, i) => (
-            <figure key={f.pathname} className={i === 0 ? 'is-main' : ''}>
-              {f.url ? <img src={f.url} alt="" /> : <span className="ap-photos__ph" />}
-              {f.progreso !== undefined && f.progreso < 1 && <span className="ap-photos__bar" style={{ transform: `scaleX(${f.progreso})` }} />}
-              <figcaption>
-                {i === 0 ? <strong>Principal</strong> : <button type="button" onClick={() => move(i, -1)} title="Antes">←</button>}
-                {i < fotos.length - 1 && <button type="button" onClick={() => move(i, 1)} title="Después">→</button>}
-                <button type="button" onClick={() => setFotos((x) => x.filter((_, k) => k !== i))} title="Quitar">Quitar</button>
-              </figcaption>
-            </figure>
-          ))}
-          {fotos.length < 8 && (
-            <label className="ap-photos__add">
-              <input type="file" accept="image/*" multiple onChange={(e) => { void addFotos(e.target.files); e.target.value = ''; }} />
-              <span>+ Agregar fotos</span>
-              <small>JPG, PNG o WEBP · hasta 15 MB</small>
+        <FormSection title="Datos del producto" help="El nombre y los textos que verá el cliente.">
+          <div className="ap-form">
+            <label className="ap-field ap-field--wide"><span>Nombre</span>
+              <input required minLength={3} maxLength={90} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Postales del recorrido" />
             </label>
-          )}
-        </div>
+            <label className="ap-field"><span>Categoría</span>
+              <input required list="ap-categorias" maxLength={40} value={categoria} onChange={(e) => setCategoria(e.target.value)} />
+              <datalist id="ap-categorias">{CATEGORIAS.map((c) => <option key={c} value={c} />)}</datalist>
+            </label>
+            <label className="ap-field"><span>Presentación <em>opcional</em></span>
+              <input maxLength={40} value={tamano} onChange={(e) => setTamano(e.target.value)} placeholder="Juego de 6" />
+            </label>
+            <label className="ap-field"><span>Medidas <em>opcional</em></span>
+              <input maxLength={60} value={medidas} onChange={(e) => setMedidas(e.target.value)} placeholder="10 × 15 cm" />
+            </label>
+            <label className="ap-field ap-field--wide"><span>Frase corta <em>va en la tarjeta</em></span>
+              <input maxLength={220} value={resumen} onChange={(e) => setResumen(e.target.value)} placeholder="Seis postales con las fotos del recorrido." />
+            </label>
+            <label className="ap-field ap-field--wide"><span>Descripción <em>va en la ficha · separa los párrafos con una línea en blanco</em></span>
+              <textarea rows={5} maxLength={4000} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+            </label>
+          </div>
+        </FormSection>
 
-        <h3 className="ap-h3">Precio y existencias</h3>
-        <div className="ap-form">
-          <label className="ap-field"><span>Precio <em>en pesos</em></span>
-            <input required inputMode="numeric" value={precio} onChange={(e) => setPrecio(digits(e.target.value))} placeholder="35000" />
-            {Number(precio) > 0 && <small className="ap-muted">Se ve como {pesos(Number(precio))}</small>}
-          </label>
-          <label className="ap-field"><span>Existencias</span>
-            <input required inputMode="numeric" value={existencias} onChange={(e) => setExistencias(digits(e.target.value))} placeholder="10" />
-          </label>
-          <label className="ap-switch ap-field--center"><input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} /><span>A la venta en la tienda</span></label>
-        </div>
+        <FormSection title="Fotos" help="La primera es la portada en la tienda. Puedes subir hasta 8 y cambiarles el orden.">
+          <div className={`ap-photos${fotos.length ? '' : ' is-empty'}`}>
+            {fotos.map((f, i) => (
+              <figure key={f.pathname} className={i === 0 ? 'is-main' : ''}>
+                <div className="ap-photos__img">
+                  {f.url ? <img src={f.url} alt="" /> : <span className="ap-photos__ph" />}
+                  {i === 0 && <span className="ap-photos__badge">Portada</span>}
+                  {f.progreso !== undefined && f.progreso < 1 && <span className="ap-photos__bar"><span style={{ transform: `scaleX(${f.progreso})` }} /></span>}
+                </div>
+                <figcaption>
+                  <button type="button" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Mover antes">←</button>
+                  <button type="button" disabled={i === fotos.length - 1} onClick={() => move(i, 1)} aria-label="Mover después">→</button>
+                  <button type="button" className="is-remove" onClick={() => setFotos((x) => x.filter((_, k) => k !== i))}>Quitar</button>
+                </figcaption>
+              </figure>
+            ))}
+            {fotos.length < 8 && (
+              <label className="ap-photos__add">
+                <input type="file" accept="image/*" multiple onChange={(e) => { void addFotos(e.target.files); e.target.value = ''; }} />
+                <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.8" /><path d="M21 16l-5-5-8 8" />
+                </svg>
+                <span>{fotos.length ? 'Agregar más' : 'Elige las fotos o arrástralas aquí'}</span>
+                <small>JPG, PNG o WEBP · hasta 15 MB cada una</small>
+              </label>
+            )}
+          </div>
+        </FormSection>
 
-        <h3 className="ap-h3">Características <span className="ap-muted">· la tabla de la ficha</span></h3>
-        <div className="ap-specs">
-          {specs.map(([k, v], i) => (
-            <div key={i} className="ap-specs__row">
-              <input aria-label="Característica" placeholder="Papel" maxLength={60} value={k} onChange={(e) => setSpecs((s) => s.map((x, j): [string, string] => (j === i ? [e.target.value, x[1]] : x)))} />
-              <input aria-label="Valor" placeholder="Mate de 300 g" maxLength={200} value={v} onChange={(e) => setSpecs((s) => s.map((x, j): [string, string] => (j === i ? [x[0], e.target.value] : x)))} />
-              <button type="button" className="ap-icon-btn" aria-label="Quitar" onClick={() => setSpecs((s) => s.filter((_, j) => j !== i))}><Icon name="close" /></button>
-            </div>
-          ))}
-          {specs.length < 12 && <button type="button" className="ap-link" onClick={() => setSpecs((s) => [...s, ['', '']])}>+ Agregar característica</button>}
-        </div>
+        <FormSection title="Precio y existencias">
+          <div className="ap-form">
+            <label className="ap-field"><span>Precio <em>en pesos</em></span>
+              <span className="ap-money-input"><span aria-hidden="true">$</span>
+                <input required inputMode="numeric" value={precio} onChange={(e) => setPrecio(digits(e.target.value))} placeholder="35000" />
+              </span>
+              <small className="ap-hint">{Number(precio) > 0 ? `Se ve como ${pesos(Number(precio))}` : ' '}</small>
+            </label>
+            <label className="ap-field"><span>Existencias <em>unidades</em></span>
+              <input required inputMode="numeric" value={existencias} onChange={(e) => setExistencias(digits(e.target.value))} placeholder="10" />
+            </label>
+            <label className="ap-toggle">
+              <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
+              <span className="ap-toggle__track" aria-hidden="true" />
+              <span>{activo ? 'A la venta' : 'Oculto en la tienda'}</span>
+            </label>
+          </div>
+        </FormSection>
 
-        {error && <p className="ap-error" role="alert">{error}</p>}
-        <div className="ap-actions">
-          <button type="submit" className="ap-btn ap-btn--primary" disabled={busy || uploading || !fotos.length}>
-            {busy ? 'Guardando…' : uploading ? 'Subiendo fotos…' : p ? 'Guardar cambios' : 'Crear producto'}
-          </button>
-          <button type="button" className="ap-btn ap-btn--ghost" onClick={onClose}>Cancelar</button>
-          {!fotos.length && <span className="ap-muted">Sube al menos una foto.</span>}
+        <FormSection title="Características" help="Salen en una tabla dentro de la ficha. Opcional.">
+          <div className="ap-specs">
+            {specs.map(([k, v], i) => (
+              <div key={i} className="ap-specs__row">
+                <input aria-label="Característica" placeholder="Papel" maxLength={60} value={k} onChange={(e) => setSpecs((s) => s.map((x, j): [string, string] => (j === i ? [e.target.value, x[1]] : x)))} />
+                <input aria-label="Valor" placeholder="Mate de 300 g" maxLength={200} value={v} onChange={(e) => setSpecs((s) => s.map((x, j): [string, string] => (j === i ? [x[0], e.target.value] : x)))} />
+                <button type="button" className="ap-icon-btn" aria-label="Quitar" onClick={() => setSpecs((s) => s.filter((_, j) => j !== i))}><Icon name="close" /></button>
+              </div>
+            ))}
+            {specs.length < 12 && <button type="button" className="ap-link" onClick={() => setSpecs((s) => [...s, ['', '']])}>+ Agregar otra</button>}
+          </div>
+        </FormSection>
+
+        <div className="ap-pform__foot">
+          {error ? <p className="ap-error" role="alert">{error}</p> : !fotos.length ? <p className="ap-muted">Falta al menos una foto.</p> : <span />}
+          <div className="ap-actions">
+            <button type="button" className="ap-btn ap-btn--ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="ap-btn ap-btn--primary" disabled={busy || uploading || !fotos.length}>
+              {busy ? 'Guardando…' : uploading ? 'Subiendo fotos…' : p ? 'Guardar cambios' : 'Crear producto'}
+            </button>
+          </div>
         </div>
       </form>
     </Drawer>

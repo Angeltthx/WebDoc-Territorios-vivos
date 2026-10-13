@@ -37,6 +37,12 @@ export interface Resumen {
   productos: { sku: string; nombre: string; precio: number; existencias: number; activo: boolean }[];
   ultimos: { referencia: string; creado: string; estado: string; nombre: string; ciudad: string; total: number }[];
   porRevisar: { id: string; creada: string; titulo: string; autor: string; municipio: string; lugar: string; archivos: number }[];
+  /** Contador propio: personas distintas por día (sumadas en 7 y 30 días), páginas vistas y las más vistas (30 días). */
+  visitas: {
+    hoy: number; semana: number; mes: number; movil: number; vistas: number;
+    porDia: { dia: string; visitas: number }[];
+    paginas: { ruta: string; vistas: number }[];
+  };
 }
 export const resumen = () => call<Resumen>('resumen');
 

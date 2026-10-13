@@ -1,5 +1,6 @@
-import { Suspense, lazy, type ReactNode } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { Suspense, lazy, useEffect, type ReactNode } from 'react';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { countPage } from './application/visits';
 import { Webdoc } from './ui/screens/Webdoc';
 
 // Mapa 3D de prueba, mientras llega el modelo del diseñador. Va en una dirección difícil de adivinar (y sin indexar)
@@ -14,9 +15,20 @@ const OrderPage = lazy(() => import('./ui/screens/OrderPage'));
 const Admin = lazy(() => import('./ui/screens/Admin'));
 const sheet = (el: ReactNode) => <Suspense fallback={null}><div className="sheet-page">{el}</div></Suspense>;
 
+/** Cuenta cada dirección a la que se llega (el recorrido cuenta sus páginas por su lado: ver journey.ts). */
+function VisitTracker() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    // Las vueltas de un pedido cuentan juntas, sin el código.
+    countPage(pathname.startsWith('/tienda/pedido/') ? '/tienda/pedido' : pathname, { at: pathname });
+  }, [pathname]);
+  return null;
+}
+
 export function App() {
   return (
     <BrowserRouter>
+      <VisitTracker />
       <Routes>
         <Route path="/" element={<Webdoc />} />
         <Route path={MAP_PATH} element={<Suspense fallback={<p className="map-loading">Cargando el mapa…</p>}><MapScreen /></Suspense>} />
