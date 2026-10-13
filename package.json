@@ -15,6 +15,7 @@
     "media:transiciones": "node scripts/optimize-transitions.mjs",
     "media:historias": "node scripts/optimize-historias.mjs",
     "media:tienda": "node scripts/optimize-tienda.mjs",
+    "media:r2": "node scripts/upload-r2.mjs",
     "map:relief": "node scripts/map-relief.mjs",
     "map:region": "node scripts/map-region.mjs",
     "map:models": "node scripts/map-models.mjs",
@@ -33,6 +34,8 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1150.0",
+    "@aws-sdk/lib-storage": "^3.1150.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@types/three": "^0.186.0",

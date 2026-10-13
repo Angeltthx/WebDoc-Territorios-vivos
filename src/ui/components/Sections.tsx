@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent } from 'react';
 import type { Photo, Station, VideoAsset } from '../../domain/types';
+import { videoUrl } from '../../application/media';
 import { aspectOf, Backdrop, Img } from './Media';
 import { Arrow } from './Chrome';
 import { Portal } from './Portal';
@@ -101,7 +102,7 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
   const [time, setTime] = useState({ now: 0, total: 0 });
   const [idle, setIdle] = useState(false);
   const idleTimer = useRef(0);
-  const base = `/media/historias/${id}`;
+  const base = videoUrl(`/media/historias/${id}`);
   const src = `${base}/master.m3u8`;
 
   // Al salir de la página, el video se pausa (sin reiniciarse).

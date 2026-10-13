@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getStation, transitions, voices } from '../../content/journey';
+import { videoUrl } from '../../application/media';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
 import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted, setVoice } from '../../application/sound';
@@ -260,12 +261,12 @@ function PortadaVideo({ playing }: { playing: boolean }) {
     else v.pause();
   }, [playing]);
   return (
-    <div className="backdrop" aria-hidden="true" style={{ backgroundImage: 'url(/media/video/portada-poster.webp)' }}>
+    <div className="backdrop" aria-hidden="true" style={{ backgroundImage: `url(${videoUrl('/media/video/portada-poster.webp')})` }}>
       <video
         ref={ref}
         className="backdrop__video"
-        src={`/media/video/portada-${small ? 720 : 1080}.mp4`}
-        poster="/media/video/portada-poster.webp"
+        src={videoUrl(`/media/video/portada-${small ? 720 : 1080}.mp4`)}
+        poster={videoUrl('/media/video/portada-poster.webp')}
         autoPlay
         muted
         loop
@@ -342,13 +343,13 @@ function TransitionVideo({ id, playing, near, muted, shade, fit = 'cover' }: {
     const v = ref.current;
     if (v && playing) v.muted = muted;
   }, [muted, playing]);
-  const poster = `/media/transiciones/${id}-poster.webp?v=${TRANSITIONS_VERSION}`;
+  const poster = videoUrl(`/media/transiciones/${id}-poster.webp?v=${TRANSITIONS_VERSION}`);
   return (
     <div className={`backdrop${fit === 'contain' ? ' backdrop--contain' : ''}`} aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
       <video
         ref={ref}
         className="backdrop__video"
-        src={`/media/transiciones/${id}-${small ? 720 : 1080}.mp4?v=${TRANSITIONS_VERSION}`}
+        src={videoUrl(`/media/transiciones/${id}-${small ? 720 : 1080}.mp4?v=${TRANSITIONS_VERSION}`)}
         poster={poster}
         muted
         loop

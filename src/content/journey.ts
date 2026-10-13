@@ -3,6 +3,7 @@
 // no se inventan recetas, créditos ni guiones.
 
 import type { Photo, Station, Transition } from '../domain/types';
+import { videoUrl } from '../application/media';
 import galleries from './galleries.json';
 
 const p = (id: string, alt: string, extra: Partial<Photo> = {}): Photo => ({ id, alt, ...extra });
@@ -197,8 +198,8 @@ export const stations: Station[] = [
       panorama: {
         title: 'Entrar al manglar 360°',
         sub: 'el que ella limpió',
-        src: '/media/360/manglar-2026-10-13/master.m3u8',
-        poster: '/media/360/manglar-2026-10-13/poster.webp',
+        src: videoUrl('/media/360/manglar-2026-10-13/master.m3u8'),
+        poster: videoUrl('/media/360/manglar-2026-10-13/poster.webp'),
         label: 'Estación 4 · Manglar 360°',
       },
       songs: [
