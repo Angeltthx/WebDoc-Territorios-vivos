@@ -114,6 +114,16 @@ export const SCHEMA = [
   // ── Panel del equipo ── Intentos de entrar (para frenar a quien quiera adivinar la clave). Ver api/_lib/admin.ts.
   `create table if not exists admin_intentos (ip_hash text not null, creada timestamptz not null default now(), ok boolean not null)`,
   `create index if not exists admin_intentos_ip on admin_intentos (ip_hash, creada desc)`,
+  // Productos creados desde el panel: todo lo que muestra la tienda vive en la base (los del código, como el póster,
+  // siguen tomando sus fotos y textos de src/content/stories.ts). Las fotos van al almacén (carpeta productos/).
+  `alter table productos add column if not exists categoria text not null default ''`,
+  `alter table productos add column if not exists resumen text not null default ''`,
+  `alter table productos add column if not exists descripcion text not null default ''`,
+  `alter table productos add column if not exists tamano text not null default ''`,
+  `alter table productos add column if not exists medidas text not null default ''`,
+  `alter table productos add column if not exists caracteristicas jsonb not null default '[]'`,
+  `alter table productos add column if not exists fotos jsonb not null default '[]'`,
+  `alter table productos add column if not exists creado timestamptz not null default now()`,
   // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
   `insert into productos (sku, nombre, precio, existencias)
     values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 85000, 10)

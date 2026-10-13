@@ -1940,3 +1940,28 @@ th .ap-num { display: block; }
   .ap-steps { grid-template-columns: repeat(2, 1fr); row-gap: 12px; }
   .ap-nav__item span:not(.ap-nav__badge) { display: none; }
 }
+
+/* Formulario de producto: las fotos (la primera, la principal) y la tabla de características. */
+.ap-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.ap-photos figure { position: relative; margin: 0; display: grid; gap: 4px; }
+.ap-photos img, .ap-photos__ph { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; border: 1px solid var(--ap-line); background: var(--ap-line-2); }
+.ap-photos figure.is-main img { border: 2px solid var(--ap-accent); }
+.ap-photos__bar { position: absolute; left: 6px; right: 6px; top: calc(100% - 34px); height: 3px; border-radius: 2px; background: var(--ap-accent); transform-origin: left; transition: transform 0.2s linear; }
+.ap-photos figcaption { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; }
+.ap-photos figcaption strong { color: var(--ap-accent); font-weight: 600; }
+.ap-photos figcaption button { padding: 0; border: 0; background: none; color: var(--ap-muted); text-decoration: underline; text-underline-offset: 2px; }
+.ap-photos figcaption button:hover { color: var(--ap-text); }
+.ap-photos__add {
+  position: relative; display: grid; place-content: center; gap: 2px; aspect-ratio: 1; padding: 8px; border: 1.5px dashed #c7cec5;
+  border-radius: 8px; text-align: center; color: var(--ap-accent); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.ap-photos__add:hover { border-color: var(--ap-accent); background: #fafbf8; }
+.ap-photos__add small { color: var(--ap-muted); font-size: 11px; font-weight: 400; }
+.ap-photos__add input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ap-specs { display: grid; gap: 6px; }
+.ap-specs__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto; gap: 6px; }
+.ap-specs__row input { padding: 7px 10px; border: 1px solid var(--ap-line); border-radius: 8px; font-size: 13.5px; }
+.ap-specs__row input:focus { outline: none; border-color: var(--ap-accent); }
+.ap-specs .ap-link { justify-self: start; margin-top: 2px; }
+.ap-field--center { align-self: end; padding-bottom: 9px; }
+.ap-h3 .ap-muted { display: inline; font-weight: 400; text-transform: none; letter-spacing: 0; }

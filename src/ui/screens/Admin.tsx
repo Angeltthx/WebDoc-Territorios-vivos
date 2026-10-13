@@ -637,26 +637,183 @@ function HistoriaDetalle({ h, onAction, onClose }: { h: api.AdminHistoria; onAct
 function ProductosView({ run }: { run: Run }) {
   const [list, setList] = useState<api.AdminProducto[] | null>(null);
   const [error, setError] = useState('');
+  /** El formulario abierto: uno nuevo, o editar uno existente. */
+  const [form, setForm] = useState<api.AdminProducto | 'nuevo' | null>(null);
   const load = useCallback(() => {
     run(api.productos).then((d) => d && setList(d.productos)).catch((e) => setError(e.message));
   }, [run]);
   useEffect(load, [load]);
+  const close = useCallback(() => setForm(null), []);
   if (error) return <p className="ap-error">{error}</p>;
   return (
     <div className="ap-stack">
+      <div className="ap-toolbar">
+        <p className="ap-muted">{list ? `${list.length} ${list.length === 1 ? 'producto' : 'productos'} · ${list.filter((p) => p.activo).length} a la venta` : ''}</p>
+        <button type="button" className="ap-btn ap-btn--primary" onClick={() => setForm('nuevo')}>+ Nuevo producto</button>
+      </div>
       <section className="ap-card ap-card--flush">
         {!list ? <Loading /> : (
           <Table head={['Producto', <span className="ap-num" key="p">Precio</span>, <span className="ap-num" key="e">Existencias</span>, <span className="ap-num" key="v">Vendidos</span>, <span className="ap-num" key="a">Apartados</span>, 'A la venta', '']}>
-            {list.map((p) => <ProductoFila key={p.sku} p={p} run={run} onSaved={load} />)}
+            {list.map((p) => <ProductoFila key={p.sku} p={p} run={run} onSaved={load} onEdit={() => setForm(p)} />)}
           </Table>
         )}
       </section>
-      <p className="ap-muted">Apartados: en pedidos que esperan pago (vuelven a las existencias si no se pagan). Las fotos y los textos del producto están en el código (src/content/stories.ts).</p>
+      <p className="ap-muted">Apartados: en pedidos que esperan pago (vuelven a las existencias si no se pagan). El póster original toma sus fotos y textos del código (src/content/stories.ts); los productos nuevos, de aquí.</p>
+      {form && <ProductoForm key={form === 'nuevo' ? 'nuevo' : form.sku} p={form === 'nuevo' ? null : form} run={run} onClose={close} onSaved={() => { close(); load(); }} />}
     </div>
   );
 }
 
-function ProductoFila({ p, run, onSaved }: { p: api.AdminProducto; run: Run; onSaved: () => void }) {
+const CATEGORIAS = ['Póster', 'Postales', 'Ropa', 'Papelería', 'Hogar', 'Accesorios'];
+type FotoForm = api.FotoProducto & { progreso?: number };
+
+/** Crear (o editar) un producto: lo que se ve en la tienda, su precio y existencias, y sus fotos. */
+function ProductoForm({ p, run, onClose, onSaved }: { p: api.AdminProducto | null; run: Run; onClose: () => void; onSaved: () => void }) {
+  const [nombre, setNombre] = useState(p?.nombre ?? '');
+  const [categoria, setCategoria] = useState(p?.categoria || 'Póster');
+  const [resumen, setResumen] = useState(p?.resumen ?? '');
+  const [descripcion, setDescripcion] = useState(p?.descripcion ?? '');
+  const [tamano, setTamano] = useState(p?.tamano ?? '');
+  const [medidas, setMedidas] = useState(p?.medidas ?? '');
+  const [precio, setPrecio] = useState(p ? String(p.precio) : '');
+  const [existencias, setExistencias] = useState(p ? String(p.existencias) : '');
+  const [activo, setActivo] = useState(p?.activo ?? true);
+  const [specs, setSpecs] = useState<[string, string][]>(p?.caracteristicas?.length ? p.caracteristicas : [['Material', ''], ['Hecho en', 'Colombia']]);
+  const [fotos, setFotos] = useState<FotoForm[]>(p?.fotos ?? []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [folder] = useState(() => crypto.randomUUID());
+  const uploading = fotos.some((f) => f.progreso !== undefined && f.progreso < 1);
+  const digits = (v: string) => v.replace(/\D/g, '');
+
+  const addFotos = async (list: FileList | null) => {
+    if (!list) return;
+    setError('');
+    for (const file of [...list].slice(0, 8 - fotos.length)) {
+      if (!file.type.startsWith('image/')) continue;
+      const tmp: FotoForm = { pathname: `subiendo-${file.name}-${Date.now()}`, alt: '', url: URL.createObjectURL(file), progreso: 0 };
+      setFotos((f) => [...f, tmp]);
+      try {
+        const up = await api.subirFoto(file, folder, (pr) => setFotos((f) => f.map((x) => (x.pathname === tmp.pathname ? { ...x, progreso: pr } : x))));
+        setFotos((f) => f.map((x) => (x.pathname === tmp.pathname ? { ...up, url: tmp.url } : x)));
+      } catch (e) {
+        setFotos((f) => f.filter((x) => x.pathname !== tmp.pathname));
+        setError(e instanceof Error ? e.message : 'No se pudo subir la foto.');
+      }
+    }
+  };
+  const move = (i: number, d: number) => setFotos((f) => {
+    const n = [...f];
+    const j = i + d;
+    if (j < 0 || j >= n.length) return f;
+    [n[i], n[j]] = [n[j], n[i]];
+    return n;
+  });
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    const body = {
+      sku: p?.sku, nombre, categoria, resumen, descripcion, tamano, medidas, precio: Number(precio), existencias: Number(existencias), activo,
+      caracteristicas: specs.filter(([k, v]) => k.trim() && v.trim()),
+      fotos: fotos.filter((f) => f.progreso === undefined || f.progreso >= 1).map(({ pathname, alt }) => ({ pathname, alt: alt || nombre })),
+    };
+    try {
+      await run(() => (p ? api.editarProducto(body) : api.crearProducto(body)));
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Drawer title={p ? 'Editar producto' : 'Nuevo producto'} sub={p ? <span className="ap-mono">{p.sku}</span> : 'Así como lo llenes, se verá en la tienda.'} onClose={onClose}>
+      <form className="ap-stack" onSubmit={submit}>
+        <h3 className="ap-h3">Lo que se ve en la tienda</h3>
+        <div className="ap-form">
+          <label className="ap-field ap-field--wide"><span>Nombre</span>
+            <input required minLength={3} maxLength={90} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Postales del recorrido" />
+          </label>
+          <label className="ap-field"><span>Categoría</span>
+            <input required list="ap-categorias" maxLength={40} value={categoria} onChange={(e) => setCategoria(e.target.value)} />
+            <datalist id="ap-categorias">{CATEGORIAS.map((c) => <option key={c} value={c} />)}</datalist>
+          </label>
+          <label className="ap-field"><span>Tamaño o presentación <em>opcional</em></span>
+            <input maxLength={40} value={tamano} onChange={(e) => setTamano(e.target.value)} placeholder="Juego de 6" />
+          </label>
+          <label className="ap-field"><span>Medidas <em>opcional</em></span>
+            <input maxLength={60} value={medidas} onChange={(e) => setMedidas(e.target.value)} placeholder="10 × 15 cm" />
+          </label>
+          <label className="ap-field ap-field--wide"><span>Frase corta <em>sale en la tarjeta de la lista</em></span>
+            <input maxLength={220} value={resumen} onChange={(e) => setResumen(e.target.value)} placeholder="Seis postales con las fotos del recorrido." />
+          </label>
+          <label className="ap-field ap-field--wide"><span>Descripción <em>sale en la ficha; deja una línea en blanco entre párrafos</em></span>
+            <textarea rows={5} maxLength={4000} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          </label>
+        </div>
+
+        <h3 className="ap-h3">Fotos <span className="ap-muted">· la primera es la principal · hasta 8</span></h3>
+        <div className="ap-photos">
+          {fotos.map((f, i) => (
+            <figure key={f.pathname} className={i === 0 ? 'is-main' : ''}>
+              {f.url ? <img src={f.url} alt="" /> : <span className="ap-photos__ph" />}
+              {f.progreso !== undefined && f.progreso < 1 && <span className="ap-photos__bar" style={{ transform: `scaleX(${f.progreso})` }} />}
+              <figcaption>
+                {i === 0 ? <strong>Principal</strong> : <button type="button" onClick={() => move(i, -1)} title="Antes">←</button>}
+                {i < fotos.length - 1 && <button type="button" onClick={() => move(i, 1)} title="Después">→</button>}
+                <button type="button" onClick={() => setFotos((x) => x.filter((_, k) => k !== i))} title="Quitar">Quitar</button>
+              </figcaption>
+            </figure>
+          ))}
+          {fotos.length < 8 && (
+            <label className="ap-photos__add">
+              <input type="file" accept="image/*" multiple onChange={(e) => { void addFotos(e.target.files); e.target.value = ''; }} />
+              <span>+ Agregar fotos</span>
+              <small>JPG, PNG o WEBP · hasta 15 MB</small>
+            </label>
+          )}
+        </div>
+
+        <h3 className="ap-h3">Precio y existencias</h3>
+        <div className="ap-form">
+          <label className="ap-field"><span>Precio <em>en pesos</em></span>
+            <input required inputMode="numeric" value={precio} onChange={(e) => setPrecio(digits(e.target.value))} placeholder="35000" />
+            {Number(precio) > 0 && <small className="ap-muted">Se ve como {pesos(Number(precio))}</small>}
+          </label>
+          <label className="ap-field"><span>Existencias</span>
+            <input required inputMode="numeric" value={existencias} onChange={(e) => setExistencias(digits(e.target.value))} placeholder="10" />
+          </label>
+          <label className="ap-switch ap-field--center"><input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} /><span>A la venta en la tienda</span></label>
+        </div>
+
+        <h3 className="ap-h3">Características <span className="ap-muted">· la tabla de la ficha</span></h3>
+        <div className="ap-specs">
+          {specs.map(([k, v], i) => (
+            <div key={i} className="ap-specs__row">
+              <input aria-label="Característica" placeholder="Papel" maxLength={60} value={k} onChange={(e) => setSpecs((s) => s.map((x, j): [string, string] => (j === i ? [e.target.value, x[1]] : x)))} />
+              <input aria-label="Valor" placeholder="Mate de 300 g" maxLength={200} value={v} onChange={(e) => setSpecs((s) => s.map((x, j): [string, string] => (j === i ? [x[0], e.target.value] : x)))} />
+              <button type="button" className="ap-icon-btn" aria-label="Quitar" onClick={() => setSpecs((s) => s.filter((_, j) => j !== i))}><Icon name="close" /></button>
+            </div>
+          ))}
+          {specs.length < 12 && <button type="button" className="ap-link" onClick={() => setSpecs((s) => [...s, ['', '']])}>+ Agregar característica</button>}
+        </div>
+
+        {error && <p className="ap-error" role="alert">{error}</p>}
+        <div className="ap-actions">
+          <button type="submit" className="ap-btn ap-btn--primary" disabled={busy || uploading || !fotos.length}>
+            {busy ? 'Guardando…' : uploading ? 'Subiendo fotos…' : p ? 'Guardar cambios' : 'Crear producto'}
+          </button>
+          <button type="button" className="ap-btn ap-btn--ghost" onClick={onClose}>Cancelar</button>
+          {!fotos.length && <span className="ap-muted">Sube al menos una foto.</span>}
+        </div>
+      </form>
+    </Drawer>
+  );
+}
+
+function ProductoFila({ p, run, onSaved, onEdit }: { p: api.AdminProducto; run: Run; onSaved: () => void; onEdit: () => void }) {
   const [precio, setPrecio] = useState(String(p.precio));
   const [existencias, setExistencias] = useState(String(p.existencias));
   const [activo, setActivo] = useState(p.activo);
@@ -684,6 +841,7 @@ function ProductoFila({ p, run, onSaved }: { p: api.AdminProducto; run: Run; onS
       <td><label className="ap-switch"><input type="checkbox" checked={activo} onChange={(e) => { setActivo(e.target.checked); setMsg(''); }} /><span>{activo ? 'Sí' : 'No'}</span></label></td>
       <td>
         <button type="button" className="ap-btn ap-btn--primary ap-btn--sm" disabled={!changed} onClick={() => void save()}>Guardar</button>
+        {p.fotos.length > 0 && <button type="button" className="ap-btn ap-btn--sm ap-btn--ghost" onClick={onEdit}>Editar todo</button>}
         {msg === 'ok' && !changed && <small className="ap-ok">✓ Guardado</small>}
         {msg && msg !== 'ok' && <small className="ap-error">{msg}</small>}
       </td>

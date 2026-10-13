@@ -21,7 +21,7 @@ El nombre del panel y la ruta «Panel / …» llevan siempre al resumen.
 | Resumen | Historias por revisar, pedidos por despachar, ventas (30 días y total), existencias y las últimas ventas. Cada cifra lleva a su sección. |
 | Historias | Leer, ver y oír lo que mandó la gente. Las coordenadas vienen puestas (las que compartió la persona, o las del lugar o el municipio que escribió) y se ajustan. «Publicar en el mapa», «Corregir el texto», «Rechazar» / «Quitar del mapa» y «Borrar» (para siempre, con sus archivos). |
 | Pedidos | Por despachar · En camino · Entregados · Sin pagar · Todos, y búsqueda por código, nombre, correo o celular. Cada pedido: a dónde va, WhatsApp y correo del cliente, lo que lleva y el total. «Empezar a empacar» → «Marcar como enviado» (pide transportadora y guía) → «Marcar como entregado»; «Devolver un paso» para corregir. Nota interna. El cliente ve cada paso, con su fecha, en «Consultar mi pedido». |
-| Productos | Precio, existencias y si está a la venta. Muestra cuántos se han vendido y cuántos están apartados en pedidos sin pagar. |
+| Productos | Precio, existencias y si está a la venta, en la misma tabla, con vendidos y apartados. **«+ Nuevo producto»**: nombre, categoría, tamaño y medidas, frase corta, descripción, fotos (se suben al almacén, la primera es la principal), precio, existencias y características; sale en la tienda con el mismo diseño del póster. «Editar todo» para cambiarlo después. |
 
 ## Cómo está hecho
 
@@ -41,6 +41,8 @@ Navegador (/admin)                      Servidor (api/admin)                  Ne
   solo avanza si está pagado y de un paso en uno; «enviado» exige transportadora o guía; al devolver un paso se borra la
   fecha del paso deshecho; el precio va de $ 1.000 a $ 50.000.000.
 - Las fechas de cada paso de un pedido las anota la base sola (disparador `pedidos_fechas`).
+
+Los productos nuevos viven completos en la tabla `productos` (columnas categoria, resumen, descripcion, tamano, medidas, caracteristicas y fotos); sus fotos, en el almacén privado (carpeta `productos/`), y la tienda las muestra con enlaces firmados. El póster original sigue tomando fotos y textos del código.
 
 Archivos: `api/_lib/admin.ts` (clave y sesión), `api/admin/*.ts` (las rutas), `src/application/admin-api.ts` y
 `src/ui/screens/Admin.tsx` (la pantalla).

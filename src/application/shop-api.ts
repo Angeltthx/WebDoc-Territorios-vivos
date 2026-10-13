@@ -1,19 +1,45 @@
 // La tienda contra la API (ver api/tienda): precio y existencias, crear el pedido (devuelve el enlace al checkout de
 // Wompi) y ver cómo va un pedido al volver de pagar. La bolsa vive en este navegador (sobrevive al ir y volver de Wompi).
 
+import type { ShopItem } from '../content/stories';
+
 export interface Catalog {
   /** Por SKU: lo que manda la base de datos. */
   productos: Record<string, { precio: number; existencias: number; activo: boolean }>;
+  /** Los productos creados desde el panel (con sus textos y fotos en la base), listos para mostrarse como los del código. */
+  extras: ShopItem[];
   envio: number;
 }
+
+interface DbProduct {
+  sku: string; nombre: string; precio: number; existencias: number; activo: boolean; categoria: string; resumen: string;
+  descripcion: string; tamano: string; medidas: string; caracteristicas: [string, string][]; fotos: { pathname: string; alt: string; url?: string }[];
+}
+
+/** Un producto de la base, en la forma de los del código (un solo tamaño). */
+const toItem = (p: DbProduct): ShopItem => ({
+  id: p.sku,
+  name: p.nombre,
+  kind: p.categoria,
+  summary: p.resumen,
+  photos: p.fotos.filter((f) => f.url).map((f) => ({ src: f.url!, alt: f.alt || p.nombre })),
+  sizes: [{ id: 'unico', sku: p.sku, label: p.tamano || 'Única', detail: p.medidas, price: p.precio }],
+  description: p.descripcion.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean),
+  specs: p.caracteristicas,
+});
 
 /** Precio y existencias. Sin servidor (por ejemplo, con `vite` solo), null: la tienda muestra los precios del código. */
 export async function fetchCatalog(): Promise<Catalog | null> {
   try {
     const res = await fetch('/api/tienda/productos');
     if (!res.ok || !res.headers.get('content-type')?.includes('json')) return null;
-    const data = (await res.json()) as { productos: { sku: string; precio: number; existencias: number; activo: boolean }[]; envio: number };
-    return { envio: data.envio, productos: Object.fromEntries(data.productos.map(({ sku, ...p }) => [sku, p])) };
+    const data = (await res.json()) as { productos: DbProduct[]; envio: number };
+    return {
+      envio: data.envio,
+      productos: Object.fromEntries(data.productos.map((p) => [p.sku, { precio: p.precio, existencias: p.existencias, activo: p.activo }])),
+      // Los que traen fotos son los creados desde el panel; solo los que están a la venta.
+      extras: data.productos.filter((p) => p.fotos?.length && p.activo).map(toItem),
+    };
   } catch {
     return null;
   }

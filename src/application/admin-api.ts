@@ -93,6 +93,7 @@ export const pedidos = (vista: VistaPedidos, q = '') =>
   call<{ pedidos: AdminPedido[]; conteo: Conteo }>(`pedidos?vista=${vista}&q=${encodeURIComponent(q)}`);
 export const accionPedido = (body: Record<string, unknown>) => call<{ ok: true }>('pedidos', { body });
 
+export interface FotoProducto { pathname: string; alt: string; url?: string }
 export interface AdminProducto {
   sku: string;
   nombre: string;
@@ -100,8 +101,36 @@ export interface AdminProducto {
   existencias: number;
   activo: boolean;
   actualizado: string;
+  creado: string;
   apartados: number;
   vendidos: number;
+  categoria: string;
+  resumen: string;
+  descripcion: string;
+  tamano: string;
+  medidas: string;
+  caracteristicas: [string, string][];
+  /** Vacío en los productos del código (el póster original): sus fotos están en src/content. */
+  fotos: FotoProducto[];
 }
 export const productos = () => call<{ productos: AdminProducto[] }>('productos');
 export const guardarProducto = (body: Record<string, unknown>) => call<{ ok: true }>('productos', { body });
+export const crearProducto = (body: Record<string, unknown>) => call<{ ok: true; sku: string }>('productos', { body: { ...body, accion: 'crear' } });
+export const editarProducto = (body: Record<string, unknown>) => call<{ ok: true; sku: string }>('productos', { body: { ...body, accion: 'editar' } });
+
+/** Sube una foto de producto directo al almacén (con permiso de /api/admin/subir). `onProgress` va de 0 a 1. */
+export async function subirFoto(file: File, folder: string, onProgress: (p: number) => void): Promise<FotoProducto> {
+  const { upload } = await import('@vercel/blob/client');
+  const safe = file.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').slice(-60) || 'foto';
+  try {
+    const blob = await upload(`productos/${folder}/${safe}`, file, {
+      access: 'private',
+      handleUploadUrl: '/api/admin/subir',
+      contentType: file.type || undefined,
+      onUploadProgress: (e) => onProgress(e.percentage / 100),
+    });
+    return { pathname: blob.pathname, alt: '', url: URL.createObjectURL(file) };
+  } catch (e) {
+    throw new AdminError(e instanceof Error ? e.message : 'No se pudo subir la foto.', 0);
+  }
+}

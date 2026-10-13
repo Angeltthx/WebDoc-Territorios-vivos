@@ -23,10 +23,13 @@ const same = (a: string, b: string) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
-/** ¿La petición trae una sesión válida (y, si cambia algo, el encabezado del panel)? */
-export function isAdmin(request: Request) {
+/**
+ * ¿La petición trae una sesión válida (y, si cambia algo, el encabezado del panel)? La subida de fotos no puede poner
+ * el encabezado (la arma la librería del almacén): ahí basta la galleta, que de todos modos no viaja desde otros sitios.
+ */
+export function isAdmin(request: Request, { header = true } = {}) {
   if (!secret()) return false;
-  if (request.method !== 'GET' && request.headers.get('x-admin') !== '1') return false;
+  if (header && request.method !== 'GET' && request.headers.get('x-admin') !== '1') return false;
   const raw = request.headers.get('cookie')?.split(/;\s*/).find((c) => c.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
   if (!raw) return false;
   const [exp, mac] = raw.split('.');

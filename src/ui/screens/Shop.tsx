@@ -364,7 +364,9 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
     return next;
   });
   const priceOf = (s: Size) => catalog?.productos[s.sku]?.precio ?? s.price;
-  const lines: Line[] = SHOP_ITEMS.flatMap((item) =>
+  /** Los del código y los creados desde el panel (estos llegan con el catálogo). */
+  const items = [...SHOP_ITEMS, ...(catalog?.extras ?? [])];
+  const lines: Line[] = items.flatMap((item) =>
     item.sizes.filter((s) => bag[s.sku]).map((size) => ({ item, size, qty: bag[size.sku], price: priceOf(size) })));
   const count = lines.reduce((n, l) => n + l.qty, 0);
   const total = lines.reduce((n, l) => n + l.qty * l.price, 0);
@@ -398,7 +400,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
     >
       {view !== 'pago' && (
         <div className="shop-bar">
-          <p className="shop-bar__count">{view === 'lista' ? `${SHOP_ITEMS.length} ${SHOP_ITEMS.length === 1 ? 'producto' : 'productos'}` : ''}</p>
+          <p className="shop-bar__count">{view === 'lista' ? `${items.length} ${items.length === 1 ? 'producto' : 'productos'}` : ''}</p>
           <div className="shop-bar__actions">
             {view !== 'consulta' && (
               <button type="button" className="shop-track-btn" onClick={() => { setBagOpen(false); setView('consulta'); }}>
@@ -473,7 +475,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
         />
       ) : (
         <ul className="shop-grid">
-          {SHOP_ITEMS.map((item) => {
+          {items.map((item) => {
             const left = leftOf(item);
             return (
               <li key={item.id}>
