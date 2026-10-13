@@ -9,10 +9,11 @@ import {
   StationGuide, TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
 import { GalleryPanel, QuotePanel, RecipePanel, SilencePanel, SongsPanel, VideoPanel } from '../components/Sections';
+import { type CueMode, IdleCue } from '../components/IdleCue';
 
 /**
  * El webdoc como un recorrido vertical: cada página ocupa la pantalla y, al desplazarse,
- * la siguiente sube sobre la anterior con un borde de ola que se aplana al llegar.
+ * la siguiente sube sobre la anterior como una hoja que se desliza encima (ver «Al pasar de página» en los estilos).
  */
 export function Webdoc() {
   const scroller = useRef<HTMLDivElement>(null);
@@ -58,7 +59,7 @@ export function Webdoc() {
             <section
               key={spec.id}
               id={spec.id}
-              className={`stack-page${state}${seen.has(i) ? ' is-seen' : ''}${i === 0 ? ' stack-page--first' : ''}`}
+              className={`stack-page${state}${seen.has(i) ? ' is-seen' : ''}${i === 0 ? ' stack-page--first' : ''}${spec.kind === 'closing' ? ' stack-page--closing' : ''}`}
               style={{ zIndex: i + 1 }}
               aria-hidden={i !== active ? true : undefined}
               inert={i !== active ? true : undefined}
@@ -68,6 +69,7 @@ export function Webdoc() {
           );
         })}
       </main>
+      <IdleCue page={active} mode={cueMode(pages[active])} onNext={() => scrollToIndex(active + 1)} />
       <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} />
       <div className="dock">
         <button
@@ -85,6 +87,15 @@ export function Webdoc() {
       <StationGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </JourneyNav.Provider>
   );
+}
+
+/** Cuándo invitar a seguir en cada página: al terminar su video, después de ver su galería, o tras un rato quieta. */
+function cueMode(spec: PageSpec): CueMode {
+  if (spec.kind === 'closing') return 'off';
+  if (spec.kind === 'video' || (spec.kind === 'transition' && transitions[spec.index].video)) return 'video';
+  if (spec.kind === 'gallery') return 'gallery';
+  if (spec.kind === 'songs') return 'songs';
+  return 'timer';
 }
 
 function voiceOf(spec: PageSpec): string | null {
