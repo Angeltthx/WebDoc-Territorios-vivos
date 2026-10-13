@@ -85,14 +85,15 @@ export function OrderTracker({ code, txId, onState }: {
 
   return (
     <div className={`shop-order is-${state}`} aria-live="polite">
-      <p className="shop-order__badge">
-        <span className="shop-order__icon" aria-hidden="true">
-          {state === 'cargando' || state === 'pendiente' ? <span className="shop-order__spin" /> : paid ? '✓' : '!'}
-        </span>
-        {state === 'pendiente' && tries >= TRIES ? 'El pago sigue en proceso'
-          // Al volver de pagar, las gracias; al consultar después, en qué va.
-          : state === 'pagado' && !txId ? 'Tu pago está aprobado' : TRACK_TEXT[state].title}
-      </p>
+      {/* Sin línea de pasos (buscando, en proceso, rechazado o sin encontrar): un aviso arriba. Con ella, la línea basta. */}
+      {!paid && (
+        <p className="shop-order__badge">
+          <span className="shop-order__icon" aria-hidden="true">
+            {state === 'cargando' || state === 'pendiente' ? <span className="shop-order__spin" /> : '!'}
+          </span>
+          {state === 'pendiente' && tries >= TRIES ? 'El pago sigue en proceso' : TRACK_TEXT[state].title}
+        </p>
+      )}
       {state === 'error' && <p className="shop-order__next">{TRACK_TEXT.error.intro}</p>}
 
       {/* El camino del pedido: cada paso con su fecha; el de ahora, resaltado. */}
