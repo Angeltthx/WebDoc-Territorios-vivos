@@ -2,8 +2,8 @@
 // El archivo no pasa por esta función (sería muy pesado): aquí solo se revisa qué es, cuánto pesa y quién lo pide.
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
-import { sql } from '../_lib/db';
-import { ipHash, json } from '../_lib/util';
+import { sql } from '../_lib/db.js';
+import { ipHash, json } from '../_lib/util.js';
 
 const MAX_MB = 50;
 /** Permisos por persona (huella de IP) en una hora: una historia lleva hasta 8 archivos. */

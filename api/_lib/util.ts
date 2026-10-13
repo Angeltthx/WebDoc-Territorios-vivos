@@ -3,7 +3,7 @@
 
 import { createHash } from 'node:crypto';
 import { issueSignedToken, presignUrl } from '@vercel/blob';
-import type { Archivo } from './db';
+import type { Archivo } from './db.js';
 
 export const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers } });

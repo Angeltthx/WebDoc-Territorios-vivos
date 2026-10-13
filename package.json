@@ -14,6 +14,7 @@
     "media:360": "node scripts/optimize-360.mjs",
     "media:transiciones": "node scripts/optimize-transitions.mjs",
     "media:historias": "node scripts/optimize-historias.mjs",
+    "media:tienda": "node scripts/optimize-tienda.mjs",
     "map:relief": "node scripts/map-relief.mjs",
     "map:region": "node scripts/map-region.mjs",
     "map:models": "node scripts/map-models.mjs",
