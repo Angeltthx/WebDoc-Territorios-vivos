@@ -44,6 +44,16 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   const handle = useRef<MapSceneHandle | null>(null);
   const globe = useRef<GlobeHandle | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
+  /** La primera vez que se ve el planeta, entra desde lejos y se asienta (después, al volver de la costa, ya no). */
+  const [arriving, setArriving] = useState(false);
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (phase !== 'globe' || arrived.current) return;
+    arrived.current = true;
+    setArriving(true);
+    const t = setTimeout(() => setArriving(false), 2600);
+    return () => clearTimeout(t);
+  }, [phase]);
   const [place, setPlace] = useState<MapPlace | null>(null);
   const [spot, setSpot] = useState<ChocoPoint | null>(null);
   const [town, setTown] = useState('nuqui');
@@ -258,7 +268,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
     // En el recorrido, la costa usa las flechas del teclado (no pasan de página: ver `data-no-arrows`); en el planeta,
     // las flechas siguen moviendo el recorrido.
     <div
-      className={`map-screen is-${phase}${embedded ? ' map-screen--embedded' : ''}${engaged ? ' is-engaged' : ''}`}
+      className={`map-screen is-${phase}${embedded ? ' map-screen--embedded' : ''}${engaged ? ' is-engaged' : ''}${arriving ? ' is-arriving' : ''}`}
       data-no-arrows={(embedded && phase !== 'globe' && phase !== 'loading') || undefined}
     >
       <div ref={stage} className="map-stage" />

@@ -24,6 +24,18 @@ export function QuotePanel({ station }: { station: Station }) {
 
 const toSeconds = (t: string) => t.split(':').reduce((acc, n) => acc * 60 + Number(n), 0);
 
+/** «Presiona para…»: debajo de lo que hay que presionar (un video, el 360, una canción), a los pocos segundos de
+ * llegar a la página, con la flecha del recorrido apuntando arriba y el mismo palpitar de «Sigue bajando». */
+export function PressHint({ desk, touch }: { desk: string; touch: string }) {
+  return (
+    <p className="play-hint" aria-hidden="true">
+      <span className="play-hint__arrow"><Arrow dir="up" /></span>
+      <span className="play-hint__desk">{desk}</span>
+      <span className="play-hint__touch">{touch}</span>
+    </p>
+  );
+}
+
 /** Pestañas Tráiler historia y Video canción: el video en streaming si ya existe; si no, el estado pendiente. */
 export function VideoPanel({ video, bar, active = false }: { video: VideoAsset; bar?: string; active?: boolean }) {
   if (video.stream) return <StoryPlayer id={video.stream} title={video.title} active={active} />;
@@ -167,7 +179,7 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
     <div
       ref={box}
       className={`story${started ? ' is-started' : ''}${started && playing ? ' is-playing' : ''}${hide ? ' is-idle' : ''}`}
-      data-no-arrows
+      data-no-arrows="x"
       onPointerMove={started ? wake : undefined}
     >
       <video
@@ -194,6 +206,8 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
             <PlayGlyph />
           </button>
           <p className="video__title story__title">{title}</p>
+          {/* Si a los pocos segundos no lo ha puesto: cómo verlo. */}
+          <PressHint desk="Presiona para ver el video" touch="Toca para ver el video" />
         </div>
       )}
 
@@ -267,7 +281,7 @@ export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['galler
     <>
       <Backdrop photo={gallery.background} tint="rgba(8,16,14,.55)" blur />
       <div className="gallery reveal">
-        <div className="gallery__track" ref={track} data-no-arrows>
+        <div className="gallery__track" ref={track} data-no-arrows="x">
           {gallery.photos.map((ph, i) => (
             <button
               key={ph.id + i}
@@ -494,16 +508,22 @@ export function SongsPanel({ songs }: { songs: NonNullable<Station['songs']> }) 
     <>
       <Backdrop photo={songs.background} tint="rgba(10,24,18,.25)" />
       <div className="songs reveal">
-        <button type="button" className="glass-card glass-card--360" onClick={open360}>
-          <span className="glass-card__icon" aria-hidden="true">◉</span>
-          <strong>{songs.panorama.title}</strong>
-          <span>{songs.panorama.sub}</span>
-        </button>
-        <button type="button" className="glass-card" onClick={() => setMsg('Los cantos se reproducirán cuando se entreguen las grabaciones.')}>
-          <span className="glass-card__icon" aria-hidden="true">♪</span>
-          <strong>Chachita canta</strong>
-          <span>{songs.songs.map((s) => s.title).join(' · ')}</span>
-        </button>
+        <div className="songs__item">
+          <button type="button" className="glass-card glass-card--360" onClick={open360}>
+            <span className="glass-card__icon" aria-hidden="true">◉</span>
+            <strong>{songs.panorama.title}</strong>
+            <span>{songs.panorama.sub}</span>
+          </button>
+          <PressHint desk="Presiona para ver el video 360" touch="Toca para ver el video 360" />
+        </div>
+        <div className="songs__item">
+          <button type="button" className="glass-card glass-card--song" onClick={() => setMsg('Los cantos se reproducirán cuando se entreguen las grabaciones.')}>
+            <span className="glass-card__icon" aria-hidden="true">♪</span>
+            <strong>Chachita canta</strong>
+            <span>{songs.songs.map((s) => s.title).join(' · ')}</span>
+          </button>
+          <PressHint desk="Presiona para escuchar la canción" touch="Toca para escuchar la canción" />
+        </div>
       </div>
       {msg && <p className="notice notice--float" role="status">{msg}</p>}
       {video360 && (

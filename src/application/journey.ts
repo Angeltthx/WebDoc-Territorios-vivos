@@ -1,17 +1,33 @@
-// Recorrido por desplazamiento vertical: cada página ocupa una pantalla.
-// El desplazamiento es libre y, cuando el visitante se detiene, la página se acomoda con suavidad:
-// si solo se pasó un poco, vuelve a la página en la que estaba; si bajó (o subió) al menos
-// una cuarta parte, continúa a la siguiente. La URL refleja la página visible (/, /2 … /N).
+// Recorrido por desplazamiento vertical: cada página ocupa una pantalla, y se pasa de una en una.
+// - Rueda del mouse o trackpad: un giro (o un deslizamiento) = una página. El resto del gesto (la inercia del
+//   trackpad) no cuenta, para no saltarse varias.
+// - Celular: como los videos de Instagram. Pasa si el dedo recorre lo suficiente (SWIPE_DISTANCE) o si el gesto es
+//   rápido y decidido (SWIPE_VELOCITY); si no, vuelve a su sitio. La inercia del navegador no decide.
+// - Teclado: flechas, Av Pág / Re Pág y espacio, una página por pulsación.
+// Lo que se desplaza por su cuenta (galerías, paneles con su propio scroll, el mapa 3D) se respeta.
+// La URL refleja la página visible (/, /2 … /N).
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { pageIndex, pages } from '../content/pages';
 
 export const TOTAL_PAGES = pages.length;
 
-/** Fracción de pantalla que hay que recorrer para pasar a la página siguiente. */
+/** Si el desplazamiento quedó a medias (barra de desplazamiento, algo raro), fracción que hay que pasar para seguir. */
 const ADVANCE_THRESHOLD = 0.25;
 /** Tiempo sin movimiento que se considera "el visitante se detuvo" (si no hay evento scrollend). */
 const IDLE_MS = 140;
+/** Celular: fracción de la pantalla que hay que arrastrar el dedo para pasar de página. */
+const SWIPE_DISTANCE = 0.2;
+/** Celular: un gesto así de rápido (px/ms) pasa con menos recorrido… */
+const SWIPE_VELOCITY = 0.55;
+/** …pero al menos esta fracción (un toque no es un gesto). */
+const SWIPE_FLICK_MIN = 0.07;
+/** Rueda o trackpad: lo que hay que girar (px) para pasar de página (un giro de la rueda basta). */
+const WHEEL_STEP = 30;
+/** Tras pasar de página con la rueda, el gesto sigue contando como el mismo hasta una pausa así de larga (ms)… */
+const WHEEL_QUIET_MS = 200;
+/** …y nunca antes de esto (lo que tarda en llegar la página). */
+const WHEEL_LOCK_MS = 650;
 
 /** Navegadores sin evento scrollend (p. ej. Safari antiguo) usan un temporizador. */
 const HAS_SCROLLEND = typeof window !== 'undefined' && 'onscrollend' in window;
@@ -25,6 +41,9 @@ function indexFromPath(pathname: string): number {
 
 const clamp = (i: number) => Math.max(0, Math.min(TOTAL_PAGES - 1, i));
 
+/** Un campo donde se escribe: ahí las teclas son del campo. */
+const editable = (t: Element | null) => !!t?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+
 export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
   const [active, setActive] = useState(() => indexFromPath(window.location.pathname));
   const activeRef = useRef(active);
@@ -36,8 +55,14 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     if (!el) return;
     const target = clamp(i);
     anchor.current = target;
+    const top = target * el.clientHeight;
+    // Ya está ahí: no hay desplazamiento (ni su scrollend), así que no se espera ninguno.
+    if (Math.abs(el.scrollTop - top) <= 1) {
+      settling.current = false;
+      return;
+    }
     settling.current = smooth;
-    el.scrollTo({ top: target * el.clientHeight, behavior: smooth ? 'smooth' : 'auto' });
+    el.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
   }, [scroller]);
 
   const scrollToPage = useCallback((id: string) => {
@@ -60,6 +85,29 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     let realign = 0;
     const resizing = () => performance.now() < resizingUntil;
 
+    /** Algo dentro de la página se desplaza por su cuenta en esa dirección (un panel con scroll): se le deja. */
+    const scrollsInside = (target: EventTarget | null, dy: number) => {
+      for (let n = target instanceof Element ? target : null; n && n !== el; n = n.parentElement) {
+        const oy = getComputedStyle(n).overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight + 1) {
+          if (dy > 0 ? n.scrollTop + n.clientHeight < n.scrollHeight - 1 : n.scrollTop > 0) return true;
+        }
+      }
+      return false;
+    };
+
+    /** Encima de la página hay una hoja o un diálogo (la tienda, el formulario, el 360): lo suyo es suyo. */
+    const inOverlay = (target: EventTarget | null) =>
+      target instanceof Element && !!target.closest('[aria-modal="true"], dialog, .sheet');
+    /** Algo usa el dedo para sí mismo (el mapa 3D, el 360): lo dice con touch-action (sin desplazamiento vertical). */
+    const ownsTouch = (target: EventTarget | null) => {
+      for (let n = target instanceof Element ? target : null; n && n !== el; n = n.parentElement) {
+        const ta = getComputedStyle(n).touchAction;
+        if (ta !== 'auto' && ta !== 'manipulation' && !ta.includes('pan-y')) return true;
+      }
+      return false;
+    };
+
     const settle = () => {
       if (resizing()) return;
       if (settling.current) {
@@ -73,9 +121,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       if (Math.abs(delta) >= 1) target = Math.round(pos);
       else if (delta >= ADVANCE_THRESHOLD) target = anchor.current + 1;
       else if (delta <= -ADVANCE_THRESHOLD) target = anchor.current - 1;
-      target = clamp(target);
-      if (Math.abs(el.scrollTop - target * el.clientHeight) > 1) scrollToIndex(target);
-      else anchor.current = target;
+      scrollToIndex(target);
     };
 
     const onScroll = () => {
@@ -92,17 +138,109 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       }
     };
 
-    // Teclado: una página por pulsación, sin interferir con campos, menús ni galerías.
+    // ── Rueda y trackpad: un giro, una página ──
+    let wheelSum = 0;
+    let lastWheel = 0;
+    let wheelLocked = false;
+    let wheelLockUntil = 0;
+    const onWheel = (e: WheelEvent) => {
+      // El mapa 3D (o lo que sea) ya usó la rueda; el zoom del navegador (Ctrl); los gestos de lado.
+      if (e.defaultPrevented || e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      if (inOverlay(e.target) || scrollsInside(e.target, e.deltaY)) return;
+      e.preventDefault();
+      const now = performance.now();
+      const gap = now - lastWheel;
+      lastWheel = now;
+      // Lo que queda del gesto que ya pasó de página (la inercia del trackpad) no cuenta.
+      if (wheelLocked) {
+        if (now < wheelLockUntil || gap < WHEEL_QUIET_MS) return;
+        wheelLocked = false;
+      }
+      if (gap > WHEEL_QUIET_MS) wheelSum = 0;
+      wheelSum += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * el.clientHeight : e.deltaY;
+      if (Math.abs(wheelSum) < WHEEL_STEP) return;
+      const target = clamp(anchor.current + Math.sign(wheelSum));
+      wheelSum = 0;
+      if (target === anchor.current) return;
+      scrollToIndex(target);
+      wheelLocked = true;
+      wheelLockUntil = now + WHEEL_LOCK_MS;
+    };
+
+    // ── Celular: arrastrar lo suficiente, o un gesto rápido ──
+    let touch: { x0: number; y0: number; t0: number; y: number; t: number; v: number; target: EventTarget | null } | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        touch = null;
+        return;
+      }
+      if (inOverlay(e.target) || ownsTouch(e.target)) {
+        touch = null;
+        return;
+      }
+      const p = e.touches[0];
+      const now = performance.now();
+      touch = { x0: p.clientX, y0: p.clientY, t0: now, y: p.clientY, t: now, v: 0, target: e.target };
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!touch || e.touches.length !== 1) return;
+      const p = e.touches[0];
+      const now = performance.now();
+      const dt = Math.max(1, now - touch.t);
+      // Velocidad de los últimos movimientos (suavizada): la del final es la que cuenta para un gesto rápido.
+      touch.v = 0.7 * ((touch.y - p.clientY) / dt) + 0.3 * touch.v;
+      touch.y = p.clientY;
+      touch.t = now;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const t = touch;
+      touch = null;
+      if (!t || e.touches.length) return;
+      const p = e.changedTouches[0];
+      const dy = t.y0 - p.clientY; // positivo: el dedo subió (siguiente página)
+      const dx = t.x0 - p.clientX;
+      if (Math.abs(dy) < 8 || Math.abs(dx) > Math.abs(dy)) return; // un toque, o un gesto de lado (galerías)
+      if (scrollsInside(t.target, dy)) return;
+      // La velocidad del final del gesto (si el dedo se quedó quieto antes de soltar, no hay gesto rápido) o, en un
+      // gesto corto, la del gesto entero (en uno muy rápido el navegador casi no alcanza a avisar los movimientos).
+      const now = performance.now();
+      const recent = now - t.t > 80 ? 0 : t.v;
+      const whole = now - t.t0 < 300 ? dy / Math.max(16, now - t.t0) : 0;
+      const v = Math.abs(recent) >= Math.abs(whole) ? recent : whole;
+      const h = el.clientHeight;
+      const far = Math.abs(dy) >= SWIPE_DISTANCE * h;
+      const flick = Math.abs(v) >= SWIPE_VELOCITY && Math.sign(v) === Math.sign(dy) && Math.abs(dy) >= SWIPE_FLICK_MIN * h;
+      const target = clamp(anchor.current + (far || flick ? Math.sign(dy) : 0));
+      // Se frena la inercia del navegador (no decide ella) y se va a la página elegida.
+      settling.current = true;
+      el.style.overflowY = 'hidden';
+      requestAnimationFrame(() => {
+        el.style.overflowY = '';
+        scrollToIndex(target);
+      });
+    };
+
+    // ── Teclado: una página por pulsación ──
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest('input, textarea, select, [data-no-arrows]') || document.querySelector('dialog[open]')) return;
-      // Una página que usa las flechas para sí misma (el mapa 3D del cierre).
-      if (el.querySelector('.is-active [data-no-arrows]')) return;
-      const current = anchor.current;
-      if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); scrollToIndex(current + 1); }
-      else if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); scrollToIndex(current - 1); }
-      else if (e.key === 'Home') { e.preventDefault(); scrollToIndex(0); }
-      else if (e.key === 'End') { e.preventDefault(); scrollToIndex(TOTAL_PAGES - 1); }
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      const t = e.target instanceof Element ? e.target : null;
+      // En un campo, las teclas son del campo; un diálogo abierto (el 360) las usa; y lo que usa todas las flechas
+      // para sí mismo (el mapa 3D). Las galerías solo usan las de lado (data-no-arrows="x").
+      if (editable(t) || document.querySelector('dialog[open]')) return;
+      if (t?.closest('[data-no-arrows]:not([data-no-arrows="x"])') || el.querySelector('.is-active [data-no-arrows]:not([data-no-arrows="x"])')) return;
+      // El espacio sobre un botón o un enlace lo activa: no pasa de página.
+      if (e.key === ' ' && t?.closest('button, a, [role="button"]')) return;
+      const step = ['ArrowDown', 'PageDown', ' '].includes(e.key) ? 1 : ['ArrowUp', 'PageUp'].includes(e.key) ? -1 : 0;
+      const to = step ? anchor.current + step : e.key === 'Home' ? 0 : e.key === 'End' ? TOTAL_PAGES - 1 : null;
+      if (to === null) return;
+      e.preventDefault();
+      // Mantener la tecla apretada no salta páginas de seguido.
+      if (e.repeat) return;
+      // Si antes se hizo clic en un texto, se suelta: que la flecha no ande por las letras.
+      window.getSelection()?.removeAllRanges();
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused !== document.body && el.contains(focused)) focused.blur();
+      scrollToIndex(to);
     };
 
     // Si cambia el tamaño de la pantalla, se mantiene la misma página alineada arriba: al instante y otra vez cuando
@@ -127,6 +265,14 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
 
     el.addEventListener('scroll', onScroll, { passive: true });
     el.addEventListener('scrollend', settle);
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd);
+    const onTouchCancel = () => {
+      touch = null;
+    };
+    el.addEventListener('touchcancel', onTouchCancel);
     window.addEventListener('keydown', onKey);
     return () => {
       resize.disconnect();
@@ -134,6 +280,11 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       window.clearTimeout(realign);
       el.removeEventListener('scroll', onScroll);
       el.removeEventListener('scrollend', settle);
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchCancel);
       window.removeEventListener('keydown', onKey);
       window.clearTimeout(idle);
     };

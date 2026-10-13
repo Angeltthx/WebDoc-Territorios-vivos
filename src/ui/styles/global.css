@@ -332,7 +332,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 
 /* ───────── Recorrido vertical ─────────
    Cada página es "sticky": al desplazarse, la siguiente sube y cubre a la anterior.
-   El acomodo al detenerse lo hace application/journey.ts (sin scroll snap del navegador,
+   Cuándo se pasa de página (rueda, dedo, teclado) lo decide application/journey.ts (sin scroll snap del navegador,
    que saltaba de página con cualquier movimiento pequeño). */
 .scroller {
   position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden;
@@ -345,63 +345,145 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 /* Las animaciones de entrada esperan a que la página llegue a la pantalla. */
 .stack-page:not(.is-seen) .screen *, .stack-page:not(.is-seen) .screen *::before, .stack-page:not(.is-seen) .screen *::after { animation-play-state: paused !important; }
 
-/* ───────── Ola al desplazarse ─────────
-   La página que sube trae un borde de dos olas que se mueven a distinto ritmo, una línea de
-   espuma y un velo de agua que se disuelve mientras "emerge". Todo está ligado al scroll:
-   al llegar arriba el borde queda recto y el velo desaparece. Sin soporte, entra con borde recto. */
-@property --wave-h { syntax: '<length>'; inherits: true; initial-value: 0px; }
+/* ───────── Al pasar de página: la marea ─────────
+   La página nueva no sube como una hoja: emerge en el lugar de la anterior, como si saliera del agua. Mientras llega se
+   ve a través del agua (desenfocada, teñida del verde azul del mar y un poco más grande) y una franja de luz la cruza de
+   abajo hacia arriba, como una ola que pasa (con el sonido de ola del cambio de página); al asentarse queda nítida.
+   Todo ligado al desplazamiento: en el celular, cuanto más se arrastra, más emerge. Sin soporte, sube como antes. */
 @property --veil { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --swell { syntax: '<percentage>'; inherits: true; initial-value: 120%; }
 
 @supports (animation-timeline: view()) {
   .stack-page:not(.stack-page--first) {
     view-timeline: --page block;
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath d='M0,58 C60,24 140,24 200,58 C260,92 340,92 400,58 L400,100 L0,100 Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.45' d='M0,40 C70,6 130,6 200,40 C270,74 330,74 400,40 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath d='M0,58 C60,24 140,24 200,58 C260,92 340,92 400,58 L400,100 L0,100 Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath fill-opacity='.45' d='M0,40 C70,6 130,6 200,40 C270,74 330,74 400,40 L400,100 L0,100 Z'/%3E%3C/svg%3E"), linear-gradient(#000, #000);
-    -webkit-mask-repeat: repeat-x, repeat-x, no-repeat; mask-repeat: repeat-x, repeat-x, no-repeat;
-    -webkit-mask-size: 36vw var(--wave-h), 58vw var(--wave-h), 100% 100%;
-    mask-size: 36vw var(--wave-h), 58vw var(--wave-h), 100% 100%;
-    -webkit-mask-position: 0 0, 0 0, 0 var(--wave-h); mask-position: 0 0, 0 0, 0 var(--wave-h);
-    animation: tide linear both;
-    animation-timeline: --page;
-    animation-range: entry 0% entry 100%;
+    animation: tide-in linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
   }
-  /* El vaivén continuo solo corre en las páginas que pueden estar en movimiento (actual y siguiente),
-     para no recalcular máscaras de pantalla completa en todo el recorrido. */
-  .stack-page.is-active:not(.stack-page--first), .stack-page.is-next {
-    animation: tide linear both, drift 9s linear infinite;
-    animation-timeline: --page, auto;
-    animation-range: entry 0% entry 100%, normal;
-  }
-
-  /* Espuma sobre el borde de la ola */
-  .stack-page:not(.stack-page--first)::before {
-    content: ''; position: absolute; z-index: 30; left: 0; right: 0; top: 0; pointer-events: none;
-    height: var(--wave-h); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 100' preserveAspectRatio='none'%3E%3Cpath d='M0,58 C60,24 140,24 200,58 C260,92 340,92 400,58' fill='none' stroke='white' stroke-opacity='.75' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0,64 C60,30 140,30 200,64 C260,98 340,98 400,64' fill='none' stroke='white' stroke-opacity='.3' stroke-width='6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") repeat-x 0 0 / 36vw 100%;
-    opacity: calc(var(--veil) * 1.4);
-  }
-  .stack-page.is-active:not(.stack-page--first)::before, .stack-page.is-next::before { animation: foam-drift 9s linear infinite; }
-
-  /* Velo de agua: la página llega teñida y un poco más abajo, y se aclara al asentarse */
+  /* El agua: un velo verde azul que se aclara al salir… */
   .stack-page:not(.stack-page--first)::after {
     content: ''; position: absolute; z-index: 29; inset: 0; pointer-events: none;
-    background: linear-gradient(180deg, rgba(160, 225, 235, 0.55) 0%, rgba(40, 120, 140, 0.35) 30%, rgba(10, 60, 70, 0.25) 100%);
+    background: linear-gradient(180deg, rgba(120, 200, 215, 0.38), rgba(30, 105, 120, 0.42) 55%, rgba(10, 55, 66, 0.5));
     opacity: var(--veil);
   }
+  /* …y la ola: una franja de luz suave que la cruza de abajo hacia arriba. */
+  .stack-page:not(.stack-page--first)::before {
+    content: ''; position: absolute; z-index: 30; left: -10%; right: -10%; height: 70%; top: var(--swell); pointer-events: none;
+    background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(220, 245, 250, 0.32), rgba(160, 225, 235, 0.12) 45%, transparent 72%);
+    mix-blend-mode: screen; opacity: calc(var(--veil) * 1.6);
+  }
   .stack-page:not(.stack-page--first) > .screen {
-    animation: surface linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
+    animation: tide-surface linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
   }
 }
-@keyframes tide {
-  from { --wave-h: 20vh; --veil: 0.9; }
-  60% { --wave-h: 11vh; --veil: 0.45; }
-  to { --wave-h: 0px; --veil: 0; }
+/* La página se queda quieta en la pantalla (sube con el scroll y se compensa) mientras aparece. */
+@keyframes tide-in {
+  from { transform: translateY(-100%); opacity: 0; --veil: 1; --swell: 110%; }
+  45% { opacity: 0.85; --veil: 0.55; }
+  70% { opacity: 1; }
+  85% { --veil: 0; }
+  to { transform: none; opacity: 1; --veil: 0; --swell: -80%; }
 }
-@keyframes drift {
-  from { -webkit-mask-position: 0 0, 0 0, 0 var(--wave-h); mask-position: 0 0, 0 0, 0 var(--wave-h); }
-  to { -webkit-mask-position: 72vw 0, -58vw 0, 0 var(--wave-h); mask-position: 72vw 0, -58vw 0, 0 var(--wave-h); }
+@keyframes tide-surface {
+  from { transform: scale(1.06); filter: blur(10px) saturate(1.15); }
+  60% { filter: blur(2px) saturate(1.04); }
+  to { transform: none; filter: none; }
 }
-@keyframes foam-drift { to { background-position: 72vw 0; } }
-@keyframes surface { from { transform: translateY(7vh) scale(1.04); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  /* Sin movimiento: queda el fundido desde el agua (el velo), sin la ola ni el acercamiento. */
+  .stack-page:not(.stack-page--first)::before { content: none; }
+  .stack-page:not(.stack-page--first) > .screen { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stack-page:not(.stack-page--first) > .screen { animation: none; }
+}
+
+/* ───────── Invitación a seguir (ver IdleCue) ─────────
+   Abajo, en el borde de la pantalla (en las páginas con pestañas, justo encima de ellas, donde está el «Sigue
+   bajando»), con la letra del webdoc y la flecha del recorrido: la flecha se mece hacia abajo y palpita con un
+   resplandor tenue detrás; el texto respira. Entra fundiéndose y nunca tapa nada (es pequeña y casi transparente). */
+.cue {
+  position: fixed; z-index: 50; left: 50%; bottom: var(--cue-bottom, max(10px, env(safe-area-inset-bottom)));
+  display: grid; justify-items: center; gap: 2px; padding: 4px 12px; min-height: 44px; border: 0; background: none; color: #fff; cursor: pointer;
+  opacity: 0; translate: -50% 8px; pointer-events: none;
+  transition: opacity 0.9s var(--ease), translate 1s var(--ease);
+}
+.cue.is-shown { opacity: 0.92; translate: -50% 0; pointer-events: auto; }
+.cue.is-shown:hover { opacity: 1; }
+.cue__label {
+  font: 600 10.5px var(--sans); letter-spacing: 0.26em; text-transform: uppercase; white-space: nowrap;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6); transition: color 0.3s;
+}
+.cue.is-shown .cue__label { animation: cue-breathe 2.8s ease-in-out infinite; }
+.cue:hover .cue__label { color: var(--gold); }
+.cue__label--touch { display: none; }
+.cue__arrow { position: relative; display: grid; place-items: center; width: 30px; height: 30px; }
+.cue__arrow svg { position: relative; width: 20px; height: 20px; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
+.cue.is-shown .cue__arrow svg { animation: cue-sway 1.4s ease-in-out infinite; }
+/* El palpitar: un resplandor redondo detrás de la flecha que crece y se apaga, muy suave. */
+.cue__arrow::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 68%); opacity: 0;
+}
+.cue.is-shown .cue__arrow::before { animation: cue-pulse 2.8s ease-out infinite; }
+@keyframes cue-sway { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(4px); } }
+@keyframes cue-pulse { 0% { transform: scale(0.5); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1.7); opacity: 0; } }
+@keyframes cue-breathe { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@media (hover: none) and (pointer: coarse) {
+  .cue__label--desk { display: none; }
+  .cue__label--touch { display: block; }
+}
+/* El «Sigue bajando» de cada página ya no se muestra por su cuenta (salía de una, incluso sin haber visto el video o
+   la galería): la invitación toma su lugar cuando toca. Queda en su sitio, invisible, para saber dónde va. */
+.stack-page .scroll-hint { visibility: hidden; animation: none; }
+/* Igual con «Comenzar el viaje» de la portada: la invitación (animada) lo dice a los pocos segundos, en su lugar. */
+.stack-page .start-btn { visibility: hidden; animation: none; }
+
+/* «Presiona para ver el video»: debajo del botón de un video que no se ha puesto, a los pocos segundos de llegar, con
+   la flecha del recorrido apuntando al botón y el mismo palpitar tenue de la invitación. */
+.play-hint {
+  display: grid; justify-items: center; gap: 2px; margin: 18px 0 0; opacity: 0; pointer-events: none;
+  font: 600 10.5px var(--sans); letter-spacing: 0.26em; text-transform: uppercase; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
+}
+.play-hint svg { position: relative; width: 18px; height: 18px; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
+/* La flecha palpita como la de «Sigue bajando»: un resplandor tenue que nace detrás y se apaga. */
+.play-hint__arrow { position: relative; display: grid; place-items: center; width: 30px; height: 30px; }
+.play-hint__arrow::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 68%); opacity: 0;
+}
+.stack-page.is-active .play-hint { animation: play-hint-in 1s var(--ease) 3s both; }
+.stack-page.is-active .play-hint svg { animation: play-hint-sway 1.4s ease-in-out 4s infinite; }
+.stack-page.is-active .play-hint__arrow::before { animation: cue-pulse 2.8s ease-out 4s infinite; }
+/* Las dos casillas de la página de los cantos (el 360 y la canción), cada una con su aviso debajo. */
+.songs__item { display: grid; justify-items: center; }
+.stack-page.is-active .play-hint > span { animation: cue-breathe 2.8s ease-in-out 4s infinite; }
+.play-hint__touch { display: none; }
+@keyframes play-hint-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 0.92; transform: none; } }
+@keyframes play-hint-sway { 0%, 100% { transform: translateY(2px); } 50% { transform: translateY(-4px); } }
+@media (hover: none) and (pointer: coarse) {
+  .play-hint__desk { display: none; }
+  .play-hint__touch { display: block; }
+}
+
+/* ───────── Del recorrido al planeta (la última página) ─────────
+   En vez de subir como una hoja, el planeta aparece en el lugar de la página 26: mientras se desplaza se queda quieto en
+   la pantalla (ligado al scroll) y, al llegar, se funde encima en un segundo y medio con un acercamiento suave (por
+   tiempo, no por scroll: el desplazamiento dura muy poco para que se alcance a ver). Al subir, se desvanece. */
+.stack-page.stack-page--closing { opacity: 0; transition: opacity 0.6s ease; }
+.stack-page.stack-page--closing.is-active { opacity: 1; transition: opacity 1.5s ease; }
+.stack-page.stack-page--closing > .screen { transform: scale(1.1); transition: transform 0.6s ease; }
+.stack-page.stack-page--closing.is-active > .screen { transform: none; transition: transform 2.2s var(--ease); }
+@supports (animation-timeline: view()) {
+  .stack-page.stack-page--closing {
+    box-shadow: none; background: transparent;
+    animation: closing-hold linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
+  }
+  .stack-page.stack-page--closing::after, .stack-page.stack-page--closing::before { content: none; }
+  .stack-page.stack-page--closing > .screen { animation: none; }
+}
+@keyframes closing-hold { from { transform: translateY(-100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .stack-page.stack-page--closing > .screen, .stack-page.stack-page--closing.is-active > .screen { transform: none; transition: none; }
+}
 
 /* ───────── Experiencia 360 ───────── */
 .glass-card--360 { position: relative; }
@@ -544,6 +626,25 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+/* …pero los fundidos se quedan (no son movimiento): sin ellos, el planeta y la invitación aparecían de golpe. */
+@media (prefers-reduced-motion: reduce) {
+  .stack-page.stack-page--closing { transition-duration: 0.6s !important; }
+  .stack-page.stack-page--closing.is-active { transition-duration: 1.5s !important; }
+  .cue { transition-property: opacity !important; transition-duration: 0.9s !important; }
+  .map-loading, .globe-stage { transition-duration: 0.9s !important; }
+  .map-screen.is-arriving .globe-stage > * { animation-duration: 1.6s !important; }
+  .stack-page.is-active .play-hint { animation: play-hint-in 1s ease 3s both !important; animation-duration: 1s !important; }
+  .stack-page.is-active .play-hint svg { animation: none !important; }
+  .stack-page.is-active .play-hint__arrow::before {
+    animation: cue-glow 2.8s ease-in-out 4s infinite !important; animation-duration: 2.8s !important; animation-iteration-count: infinite !important;
+  }
+  .stack-page.is-active .play-hint > span { animation-duration: 2.8s !important; animation-iteration-count: infinite !important; }
+  /* La flecha no se mece: solo palpita su resplandor y respira el texto, sin moverse. */
+  .cue.is-shown .cue__arrow svg { animation: none !important; }
+  .cue.is-shown .cue__arrow::before, .cue.is-shown .cue__label { animation-duration: 2.8s !important; animation-iteration-count: infinite !important; }
+  .cue.is-shown .cue__arrow::before { animation-name: cue-glow !important; }
+}
+@keyframes cue-glow { 0%, 100% { opacity: 0; transform: scale(1.1); } 50% { opacity: 0.9; transform: scale(1.1); } }
 
 /* ───────── Mapa 3D de prueba (/mapa) ─────────
    Todo con el lenguaje del afiche: tintas planas, sin vidrio ni desenfoque. Pueblos en píldora crema con borde
@@ -707,6 +808,13 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .globe-stage.is-diving { cursor: default; }
 .map-screen.is-landing .globe-stage, .map-screen.is-map .globe-stage, .map-screen.is-leaving .globe-stage { opacity: 0; visibility: hidden; pointer-events: none; }
 .map-screen.is-loading .globe-stage { opacity: 0; }
+/* La primera vez: el planeta llega desde lejos (más pequeño y tenue) y se asienta despacio; el título sube después. */
+.map-screen.is-arriving .globe-stage > * { animation: globe-arrive 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.map-screen.is-arriving .globe-title { transition-delay: 0.9s; }
+@keyframes globe-arrive { from { opacity: 0; transform: scale(0.82); } 40% { opacity: 1; } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .map-screen.is-arriving .globe-stage > * { animation-name: fade; animation-duration: 1s; }
+}
 .globe-labels { position: absolute; inset: 0; pointer-events: none; }
 /* Los rótulos de la costa aparecen cuando el planeta ya se fue. */
 .map-labels { transition: opacity 0.8s ease 0.6s; }
