@@ -111,6 +111,23 @@ export const SCHEMA = [
     end $$`,
   `drop trigger if exists pedidos_fechas on pedidos`,
   `create trigger pedidos_fechas before update of estado on pedidos for each row execute function pedidos_fechas()`,
+  // ── Panel del equipo ── Intentos de entrar (para frenar a quien quiera adivinar la clave). Ver api/_lib/admin.ts.
+  `create table if not exists admin_intentos (ip_hash text not null, creada timestamptz not null default now(), ok boolean not null)`,
+  `create index if not exists admin_intentos_ip on admin_intentos (ip_hash, creada desc)`,
+  // Productos creados desde el panel: todo lo que muestra la tienda vive en la base (los del código, como el póster,
+  // siguen tomando sus fotos y textos de src/content/stories.ts). Las fotos van al almacén (carpeta productos/).
+  `alter table productos add column if not exists categoria text not null default ''`,
+  `alter table productos add column if not exists resumen text not null default ''`,
+  `alter table productos add column if not exists descripcion text not null default ''`,
+  `alter table productos add column if not exists tamano text not null default ''`,
+  `alter table productos add column if not exists medidas text not null default ''`,
+  `alter table productos add column if not exists caracteristicas jsonb not null default '[]'`,
+  `alter table productos add column if not exists fotos jsonb not null default '[]'`,
+  `alter table productos add column if not exists creado timestamptz not null default now()`,
+  // ── Visitas ── Contador propio para el resumen del panel (sin cookies ni datos personales): páginas vistas por día y
+  // personas distintas por día (una huella anónima que cambia cada día: no permite seguir a nadie). Ver api/visita.ts.
+  `create table if not exists visitas_pagina (dia date not null, ruta text not null, vistas integer not null default 0, primary key (dia, ruta))`,
+  `create table if not exists visitas_personas (dia date not null, huella text not null, movil boolean not null default false, primary key (dia, huella))`,
   // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
   `insert into productos (sku, nombre, precio, existencias)
     values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 85000, 10)

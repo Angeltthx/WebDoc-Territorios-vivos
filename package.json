@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
+    "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.8.1",
     "hls.js": "^1.7.3",
     "react": "^19.1.0",

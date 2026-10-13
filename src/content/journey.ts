@@ -133,7 +133,6 @@ export const stations: Station[] = [
       portrait: p('6i3a3478', 'Orfelina Marmolejo abraza a una niña', { focus: '45% 30%' }),
     },
     sections: [
-      { kind: 'scrolly', label: 'Scrolly' },
       { kind: 'pensamiento', label: 'Pensamiento' },
       { kind: 'historia', label: 'Tráiler historia' },
       { kind: 'video-cancion', label: 'Video canción' },
@@ -198,8 +197,8 @@ export const stations: Station[] = [
       panorama: {
         title: 'Entrar al manglar 360°',
         sub: 'el que ella limpió',
-        src: '/media/360/manglar/master.m3u8',
-        poster: '/media/360/manglar/poster.webp',
+        src: '/media/360/manglar-2026-10-13/master.m3u8',
+        poster: '/media/360/manglar-2026-10-13/poster.webp',
         label: 'Estación 4 · Manglar 360°',
       },
       songs: [
@@ -215,9 +214,8 @@ export const stations: Station[] = [
   },
 ];
 
-// Transiciones con los videos del cliente (Contenido/Transiciones). Desde el 05/10/2026 cada video trae
-// la voz de Chachita integrada y sincronizada, por eso ya no se superpone `voice` (salvo en la
-// transición 2, que no se actualizó); tampoco se agregan olas.
+// Transiciones con los videos del cliente (Contenido/Transiciones). Cada video trae la voz de Chachita integrada y
+// sincronizada (la transición 2 desde el 13/10/2026), por eso ya no se superpone `voice`; tampoco se agregan olas.
 // `video: 'tN'` → public/media/transiciones/tN-{1080,720}.mp4 (también 'intro' y 'cierre').
 export const transitions: Transition[] = [
   {
@@ -234,9 +232,11 @@ export const transitions: Transition[] = [
     from: 'Inicio',
     to: 'Chorí',
     symbol: 'wave',
-    // Texto de la transición del intro: pendiente (está en el Canva del cliente).
-    lines: [],
+    // Texto del Canva del cliente (13/10/2026); sigue en la transición 2 («…y otras aguas…»).
+    lines: ['El agua nos une a todos aquí, naveguemos por el río Chorí…'],
     video: 't1',
+    // Se veía muy recortada (el video es más ancho que la pantalla): completa, con el fondo desenfocado (13/10/2026).
+    fit: 'contain',
   },
   {
     number: 2,
@@ -245,8 +245,6 @@ export const transitions: Transition[] = [
     symbol: 'wave',
     lines: ['…y otras aguas imponentes bajan por el río grande, el Atrato'],
     video: 't2',
-    // El video de la transición 2 llegó sin cambios el 05/10/2026 (sin voz integrada): se conserva la voz aparte.
-    voice: 'y',
   },
   {
     number: 3,
@@ -274,8 +272,9 @@ export const transitions: Transition[] = [
   },
 ];
 
-/** Voz de Chachita antes del Viche (la del intro ya viene en su video). */
-export const voices = { viche: 'x' };
+/** Voz de Chachita en el Tráiler historia de la estación 4 (antes sonaba en el Viche, que ahora tiene su video con
+ * sonido). La del intro ya viene en su video. */
+export const voices = { panguiHistoria: 'x' };
 
 export const welcome = {
   background: p('6i3a4535', 'Un pescador rema una canoa frente a una isla del Pacífico', { focus: '50% 60%' }),

@@ -79,6 +79,8 @@ export interface Transition {
   tint?: string;
   /** Video de fondo (id en public/media/transiciones) con su propio sonido. */
   video?: string;
+  /** Cómo llena la pantalla: recortado para cubrirla (por defecto) o completo, con el fondo desenfocado. */
+  fit?: 'cover' | 'contain';
   /** Voz de Chachita (id en public/media/audio/chachita). */
   voice?: string;
 }

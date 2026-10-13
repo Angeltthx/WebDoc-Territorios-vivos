@@ -100,7 +100,7 @@ function cueMode(spec: PageSpec): CueMode {
 
 function voiceOf(spec: PageSpec): string | null {
   if (spec.kind === 'transition') return transitions[spec.index].voice ?? null;
-  if (spec.id === 'pangui-viche') return voices.viche;
+  if (spec.id === 'pangui-historia') return voices.panguiHistoria;
   return null;
 }
 
@@ -183,7 +183,7 @@ function PageView({ spec, next, playing, near, muted, openGuide }: {
       const onPhoto = !!(t.background || t.video);
       return (
         <div className="screen screen--transition" style={{ background: t.color }} aria-label={t.label ?? `Transición ${t.number}: de ${t.from} a ${t.to}`}>
-          {t.video && <TransitionVideo id={t.video} playing={playing} near={near} muted={muted} shade={t.lines.length > 0} />}
+          {t.video && <TransitionVideo id={t.video} playing={playing} near={near} muted={muted} shade={t.lines.length > 0} fit={t.fit} />}
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
           <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
@@ -196,6 +196,7 @@ function PageView({ spec, next, playing, near, muted, openGuide }: {
             ))}
             {t.hint && <p className="transition__hint">{t.hint}</p>}
           </div>
+          {t.number > 0 && <RouteMap index={spec.index} />}
           {!onPhoto && (
             <ol className="t-dots" aria-hidden="true">
               {transitions.map((_, i) => <li key={i} className={i === spec.index ? 'is-active' : ''} />)}
@@ -278,14 +279,49 @@ function PortadaVideo({ playing }: { playing: boolean }) {
 
 /** Versión de los videos de transición: los archivos conservan su nombre y /media se guarda en caché
  *  un año, así que al recibir videos nuevos se cambia este valor para que el navegador los vuelva a pedir. */
-const TRANSITIONS_VERSION = '2026-10-05';
+const TRANSITIONS_VERSION = '2026-10-13';
+
+/**
+ * El mapa del recorrido en cada transición, para que la gente sepa dónde va: una línea fina con las paradas
+ * (Inicio, Chorí, Atrato, Nuquí, Panguí, Mar). Lo ya andado se ve entero, el tramo de esta transición se recorre con un
+ * punto que avanza, y lo que falta queda punteado.
+ */
+function RouteMap({ index }: { index: number }) {
+  const route = transitions.filter((t) => t.number > 0);
+  const stops = [route[0].from, ...route.map((t) => t.to)];
+  const at = route.indexOf(transitions[index]);
+  const gap = 46;
+  const x = (i: number) => 8 + i * gap;
+  const y = (i: number) => (i % 2 ? 22 : 12);
+  const w = x(stops.length - 1) + 8;
+  return (
+    <figure className="route" aria-label={`Vas de ${stops[at]} a ${stops[at + 1]}`}>
+      <svg width={w} height={34} viewBox={`0 0 ${w} 34`} aria-hidden="true">
+        {stops.slice(1).map((_, i) => {
+          const d = `M ${x(i)} ${y(i)} C ${x(i) + gap / 2} ${y(i)}, ${x(i + 1) - gap / 2} ${y(i + 1)}, ${x(i + 1)} ${y(i + 1)}`;
+          return <path key={i} d={d} pathLength={1} className={i < at ? 'is-done' : i === at ? 'is-now' : ''} />;
+        })}
+        {stops.map((_, i) => (
+          <circle key={i} cx={x(i)} cy={y(i)} r={i === at + 1 ? 3.6 : 2.4} className={i <= at ? 'is-done' : i === at + 1 ? 'is-next' : ''} />
+        ))}
+      </svg>
+      <figcaption>
+        {stops[at]} <span aria-hidden="true">→</span> <strong>{stops[at + 1]}</strong>
+      </figcaption>
+    </figure>
+  );
+}
 
 /**
  * Video de una transición, con su propio sonido. Empieza desde el inicio cada vez que se llega
  * a la transición y se pausa al salir. Si el navegador no permite sonido todavía (sin gesto del
  * visitante), se reproduce en silencio. Solo se descarga cuando la transición está cerca.
  */
-function TransitionVideo({ id, playing, near, muted, shade }: { id: string; playing: boolean; near: boolean; muted: boolean; shade: boolean }) {
+function TransitionVideo({ id, playing, near, muted, shade, fit = 'cover' }: {
+  id: string; playing: boolean; near: boolean; muted: boolean; shade: boolean;
+  /** `contain`: el video completo, sin recortar, con su imagen de espera desenfocada llenando los bordes. */
+  fit?: 'cover' | 'contain';
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
   useEffect(() => {
@@ -308,7 +344,7 @@ function TransitionVideo({ id, playing, near, muted, shade }: { id: string; play
   }, [muted, playing]);
   const poster = `/media/transiciones/${id}-poster.webp?v=${TRANSITIONS_VERSION}`;
   return (
-    <div className="backdrop" aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
+    <div className={`backdrop${fit === 'contain' ? ' backdrop--contain' : ''}`} aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
       <video
         ref={ref}
         className="backdrop__video"

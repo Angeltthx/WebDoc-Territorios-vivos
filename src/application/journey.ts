@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { pageIndex, pages } from '../content/pages';
+import { countPage } from './visits';
 
 export const TOTAL_PAGES = pages.length;
 
@@ -131,6 +132,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
         activeRef.current = i;
         setActive(i);
         window.history.replaceState(null, '', pathFor(i));
+        countPage(pathFor(i), { vercel: true });
       }
       if (!HAS_SCROLLEND) {
         window.clearTimeout(idle);
