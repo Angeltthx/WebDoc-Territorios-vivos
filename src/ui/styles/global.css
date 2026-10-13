@@ -50,6 +50,12 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .backdrop__tint { position: absolute; inset: 0; }
 /* Video de fondo (portada y transiciones): ocupa la pantalla sin pasarse de ella. */
 .backdrop__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Video completo (sin recortar): los bordes se llenan con su imagen de espera desenfocada y oscurecida. */
+/* Video completo sin recortar solo en pantallas anchas; en celular (vertical) sigue llenando la pantalla. */
+@media (min-aspect-ratio: 1/1) {
+  .backdrop--contain::before { content: ''; position: absolute; inset: -40px; background: inherit; background-size: cover; background-position: center; filter: blur(28px) brightness(0.65); transform: scale(1.08); }
+  .backdrop--contain .backdrop__video { object-fit: contain; }
+}
 @keyframes kenburns { from { transform: scale(1.08); } to { transform: scale(1); } }
 
 .topbar {
@@ -296,6 +302,28 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .t-dots { position: absolute; bottom: 22px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; list-style: none; margin: 0; padding: 0; }
 .t-dots li { width: 10px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.55); }
 .t-dots li.is-active { width: 22px; background: #fff; }
+/* Mapa del recorrido en las transiciones: abajo a la derecha, pequeño. En celular, arriba bajo la barra. */
+.route {
+  position: absolute; z-index: 4; right: 22px; bottom: max(22px, env(safe-area-inset-bottom)); margin: 0; display: grid; justify-items: end; gap: 4px;
+  font-size: 11.5px; letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.85); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45)); animation: fade 1s ease 0.6s both;
+}
+.route strong { font-weight: 600; color: #fff; }
+.route path { fill: none; stroke: rgba(255, 255, 255, 0.4); stroke-width: 1.2; stroke-dasharray: 0.04 0.05; }
+.route path.is-done { stroke: rgba(255, 255, 255, 0.8); stroke-dasharray: none; }
+.route path.is-now { stroke: var(--gold); stroke-width: 1.6; stroke-dasharray: 1; stroke-dashoffset: 1; animation: river-draw 3s var(--ease) 0.8s forwards; }
+.route circle { fill: rgba(255, 255, 255, 0.45); }
+.route circle.is-done { fill: #fff; }
+.route circle.is-next { fill: var(--gold); animation: route-pulse 1.8s ease-in-out 3.5s infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes route-pulse { 50% { transform: scale(1.5); } }
+@media (prefers-reduced-motion: reduce) {
+  .route { animation: fade 1s ease 0.6s both !important; }
+  .route path.is-now { animation: none; stroke-dashoffset: 0; }
+  .route circle.is-next { animation: none; }
+}
+@media (max-width: 640px) {
+  .route { top: 64px; bottom: auto; right: 14px; }
+}
 .rain { position: absolute; inset: 0; z-index: -1; opacity: 0.3; pointer-events: none;
   background-image: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 255, 255, 0.35) 22px 23px, transparent 23px 60px);
   background-size: 200px 200px; animation: rain 1.4s linear infinite; }
@@ -562,7 +590,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .menu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .menu li { animation: rise 0.6s var(--ease) both; }
 .menu li button, .menu__soon {
-  display: inline-flex; align-items: baseline; gap: 12px; border: 0; background: none; padding: 6px 0; text-align: left;
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 0; border: 0; background: none; padding: 6px 0; text-align: left;
   font: 700 clamp(24px, min(3.6vw, 5.2vh), 46px)/1.12 var(--serif); color: #fff;
 }
 .menu li button:hover { color: var(--gold); font-style: italic; }
@@ -583,6 +611,30 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 }
 .dock__sound[aria-pressed='false'] { opacity: 0.6; }
 .menu__social { margin-top: 12px; }
+
+/* El menú como un río: una línea fina que serpentea hacia abajo y pasa por el punto de cada opción; las opciones se
+   corren siguiendo sus vueltas. Al abrir, el río se traza de arriba hacia abajo y las opciones aparecen una tras otra. */
+.menu__flow { position: relative; padding-left: 8px; }
+.menu__river { position: absolute; left: 0; top: -40px; overflow: visible; pointer-events: none; }
+.menu__river path {
+  fill: none; stroke: rgba(255, 255, 255, 0.38); stroke-width: 1.2; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: river-draw 1.4s cubic-bezier(0.45, 0, 0.2, 1) 0.1s forwards;
+}
+@keyframes river-draw { to { stroke-dashoffset: 0; } }
+.menu .menu__flow ul { position: relative; gap: 2px; }
+.menu .menu__flow li { position: relative; display: flex; align-items: center; gap: 18px; padding-left: var(--bend, 20px); }
+.menu__node {
+  position: relative; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--forest);
+  box-shadow: 0 0 0 1.2px rgba(255, 255, 255, 0.55); transition: background 0.25s, box-shadow 0.25s, transform 0.25s var(--ease);
+}
+.menu li:hover .menu__node, .menu li:focus-within .menu__node { background: var(--gold); box-shadow: 0 0 0 1.2px var(--gold), 0 0 0 6px rgba(232, 187, 82, 0.18); transform: scale(1.15); }
+.menu li:has(.menu__soon) .menu__node { box-shadow: 0 0 0 1.2px rgba(255, 255, 255, 0.25); }
+@media (prefers-reduced-motion: reduce) {
+  .menu__river path { animation: none; stroke-dashoffset: 0; }
+}
+@media (max-width: 640px) {
+  .menu .menu__flow li { gap: 14px; }
+}
 
 /* ───────── Móvil ───────── */
 @media (max-width: 900px) {

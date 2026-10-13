@@ -115,8 +115,8 @@ export const pages: PageSpec[] = [
     id: 'nuqui-historia',
     kind: 'video',
     label: 'Estación 3 · Tráiler historia',
-    // Tráiler nuevo pendiente de integrar (enlace de Drive del cliente, 08/10/2026).
-    video: { title: 'El baile de las olas', poster: p('6i3a3497-mejorado-nr', 'El grupo de danza reunido', { focus: '50% 40%' }) },
+    // Tráiler nuevo, con Orfelina (13/10/2026).
+    video: { title: 'El baile de las olas', stream: 'nuqui-trailer' },
     tabs: nuqui('Tráiler historia'),
   },
   {

@@ -215,9 +215,8 @@ export const stations: Station[] = [
   },
 ];
 
-// Transiciones con los videos del cliente (Contenido/Transiciones). Desde el 05/10/2026 cada video trae
-// la voz de Chachita integrada y sincronizada, por eso ya no se superpone `voice` (salvo en la
-// transición 2, que no se actualizó); tampoco se agregan olas.
+// Transiciones con los videos del cliente (Contenido/Transiciones). Cada video trae la voz de Chachita integrada y
+// sincronizada (la transición 2 desde el 13/10/2026), por eso ya no se superpone `voice`; tampoco se agregan olas.
 // `video: 'tN'` → public/media/transiciones/tN-{1080,720}.mp4 (también 'intro' y 'cierre').
 export const transitions: Transition[] = [
   {
@@ -237,6 +236,8 @@ export const transitions: Transition[] = [
     // Texto de la transición del intro: pendiente (está en el Canva del cliente).
     lines: [],
     video: 't1',
+    // Se veía muy recortada (el video es más ancho que la pantalla): completa, con el fondo desenfocado (13/10/2026).
+    fit: 'contain',
   },
   {
     number: 2,
@@ -245,8 +246,6 @@ export const transitions: Transition[] = [
     symbol: 'wave',
     lines: ['…y otras aguas imponentes bajan por el río grande, el Atrato'],
     video: 't2',
-    // El video de la transición 2 llegó sin cambios el 05/10/2026 (sin voz integrada): se conserva la voz aparte.
-    voice: 'y',
   },
   {
     number: 3,
