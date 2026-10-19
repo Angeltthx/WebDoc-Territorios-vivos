@@ -10,6 +10,7 @@ import {
 } from '../components/Chrome';
 import { GalleryPanel, QuotePanel, RecipePanel, SilencePanel, SongsPanel, VideoPanel } from '../components/Sections';
 import { ScrollCue } from '../components/ScrollCue';
+import { StationLocator } from '../components/StationLocator';
 
 /**
  * El webdoc como un recorrido vertical: cada página ocupa la pantalla y, al desplazarse,
@@ -135,6 +136,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
       return (
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><QuotePanel station={getStation(spec.station)!} /></div>
+          <StationLocator station={getStation(spec.station)!} />
           <TopBar label={spec.label} right={<GuideButton onOpen={openGuide} />} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>
@@ -203,6 +205,8 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
       return (
         <div className="screen" aria-label={`${spec.label}: ${spec.title}`}>
           <div className="screen__content"><SilencePanel tide={spec.tide} title={spec.title} hint={spec.hint} photo={spec.photo} /></div>
+          {/* La primera escena de la estación 4 es su apertura: ahí va su mapa, como en la cita de las demás. */}
+          {spec.tide === 'alta' && <StationLocator station={getStation('pangui')!} />}
           <TopBar label={spec.label} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>

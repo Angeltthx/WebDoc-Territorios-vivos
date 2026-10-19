@@ -19,6 +19,7 @@
     "map:region": "node scripts/map-region.mjs",
     "map:models": "node scripts/map-models.mjs",
     "map:world": "node scripts/map-world.mjs",
+    "map:locator": "node scripts/map-locator.mjs",
     "db:setup": "node scripts/db-setup.mjs",
     "dev:api": "vercel dev --listen 3000"
   },

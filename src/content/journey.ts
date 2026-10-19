@@ -57,6 +57,7 @@ export const stations: Station[] = [
     name: 'El latido',
     place: 'Chorí',
     accent: '#7fb77e',
+    where: { lat: 5.8405, lon: -77.2303 }, // el río Chorí, en Nuquí (OpenStreetMap)
     illustration: 'bosque-circulo',
     background: p('dji-0181-2', 'Comunidad embera entre la selva, vista desde el aire'),
     quote: {
@@ -96,6 +97,7 @@ export const stations: Station[] = [
     name: 'Gente del Río',
     place: 'Atrato',
     accent: '#8fb6d9',
+    where: { lat: 5.6913, lon: -76.6531 }, // Quibdó, sobre el Atrato
     illustration: 'rana-con-circulo',
     background: p('dji-0504', 'Quibdó y el río Atrato desde el aire'),
     quote: {
@@ -125,6 +127,7 @@ export const stations: Station[] = [
     name: 'El baile de las olas',
     place: 'Nuquí',
     accent: '#e8bb52',
+    where: { lat: 5.7125, lon: -77.2708 },
     illustration: 'pava-circulo',
     background: p('6i3a4535', 'Un pescador rema una canoa frente a una isla'),
     quote: {
@@ -162,6 +165,7 @@ export const stations: Station[] = [
     name: 'Marea alta, marea baja',
     place: 'Panguí',
     accent: '#9d93dc',
+    where: { lat: 5.6631, lon: -77.3091 },
     illustration: 'manglar-con-circulo',
     background: p('6i3a4281', 'Una mujer toca las ramas del manglar'),
     quote: {
