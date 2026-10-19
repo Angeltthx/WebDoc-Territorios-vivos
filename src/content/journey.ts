@@ -93,7 +93,7 @@ export const stations: Station[] = [
   {
     id: 'atrato',
     number: 2,
-    name: 'Gente del río',
+    name: 'Gente del Río',
     place: 'Atrato',
     accent: '#8fb6d9',
     illustration: 'rana-con-circulo',
@@ -109,7 +109,7 @@ export const stations: Station[] = [
       { kind: 'galeria', label: 'Galería' },
     ],
     video: {
-      title: 'Gente del río',
+      title: 'Gente del Río',
       duration: '11:20',
       poster: p('dji-0498', 'El río Atrato bajo un cielo abierto'),
     },
@@ -159,7 +159,7 @@ export const stations: Station[] = [
   {
     id: 'pangui',
     number: 4,
-    name: 'El silencio',
+    name: 'Marea alta, marea baja',
     place: 'Panguí',
     accent: '#9d93dc',
     illustration: 'manglar-con-circulo',
@@ -173,9 +173,9 @@ export const stations: Station[] = [
       { kind: 'silencio', label: 'Silencio' },
       { kind: 'historia', label: 'Tráiler historia' },
       { kind: 'galeria', label: 'Galería' },
-      { kind: 'cantos', label: '360 · Cantos' },
+      { kind: 'cantos', label: 'Manglar - Cantos' },
       { kind: 'video-cancion', label: 'Video canción' },
-      { kind: 'viche', label: 'Viche' },
+      { kind: 'viche', label: 'Un regalo de la selva' },
     ],
     silence: {
       title: 'Marea alta, marea baja',
@@ -216,19 +216,12 @@ export const stations: Station[] = [
 
 // Transiciones con los videos del cliente (Contenido/Transiciones). Cada video trae la voz de Chachita integrada y
 // sincronizada (la transición 2 desde el 13/10/2026), por eso ya no se superpone `voice`; tampoco se agregan olas.
-// `video: 'tN'` → public/media/transiciones/tN-{1080,720}.mp4 (también 'intro' y 'cierre').
+// `video: 'tN'` → public/media/transiciones/tN-{1080,720}.mp4 (también 'cierre'). El video del intro ya no es una
+// transición: es el fondo de la portada (19/10/2026). `label` es el nombre de la parada en el menú del cliente.
 export const transitions: Transition[] = [
   {
-    number: 0,
-    label: 'Intro · Chachita te recibe',
-    from: 'Portada',
-    to: 'Panguí',
-    symbol: 'wave',
-    lines: [],
-    video: 'intro',
-  },
-  {
     number: 1,
+    label: 'Río Chorí',
     from: 'Inicio',
     to: 'Chorí',
     symbol: 'wave',
@@ -240,6 +233,7 @@ export const transitions: Transition[] = [
   },
   {
     number: 2,
+    label: 'Río Atrato',
     from: 'Chorí',
     to: 'Atrato',
     symbol: 'wave',
@@ -248,6 +242,7 @@ export const transitions: Transition[] = [
   },
   {
     number: 3,
+    label: 'Nuquí',
     from: 'Atrato',
     to: 'Nuquí',
     symbol: 'rain',
@@ -256,6 +251,7 @@ export const transitions: Transition[] = [
   },
   {
     number: 4,
+    label: 'Panguí',
     from: 'Nuquí',
     to: 'Panguí',
     symbol: 'meet',
@@ -264,6 +260,7 @@ export const transitions: Transition[] = [
   },
   {
     number: 5,
+    label: 'Volver a las raíces',
     from: 'Panguí',
     to: 'Mar',
     symbol: 'sea',
@@ -273,7 +270,7 @@ export const transitions: Transition[] = [
 ];
 
 /** Voz de Chachita en el Tráiler historia de la estación 4 (antes sonaba en el Viche, que ahora tiene su video con
- * sonido). La del intro ya viene en su video. */
+ * sonido). La de la bienvenida ya viene en el video de la portada. */
 export const voices = { panguiHistoria: 'x' };
 
 export const welcome = {

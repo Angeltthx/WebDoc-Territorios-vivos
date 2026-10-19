@@ -9,7 +9,7 @@ import {
   StationGuide, TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
 import { GalleryPanel, QuotePanel, RecipePanel, SilencePanel, SongsPanel, VideoPanel } from '../components/Sections';
-import { type CueMode, IdleCue } from '../components/IdleCue';
+import { ScrollCue } from '../components/ScrollCue';
 
 /**
  * El webdoc como un recorrido vertical: cada página ocupa la pantalla y, al desplazarse,
@@ -48,7 +48,7 @@ export function Webdoc() {
     setMutedState(!muted);
   };
 
-  const nav = useMemo(() => ({ scrollToPage, scrollToIndex }), [scrollToPage, scrollToIndex]);
+  const nav = useMemo(() => ({ scrollToPage, scrollToIndex, inJourney: true }), [scrollToPage, scrollToIndex]);
 
   return (
     <JourneyNav.Provider value={nav}>
@@ -64,13 +64,21 @@ export function Webdoc() {
               aria-hidden={i !== active ? true : undefined}
               inert={i !== active ? true : undefined}
             >
-              <PageView spec={spec} next={pages[i + 1]?.id} playing={i === active} near={Math.abs(i - active) <= 1} muted={muted} openGuide={() => setGuideOpen(true)} />
+              <PageView
+                spec={spec}
+                next={pages[i + 1]?.id}
+                playing={i === active}
+                near={Math.abs(i - active) <= 1}
+                muted={muted}
+                unmute={() => muted && toggleSound()}
+                openGuide={() => setGuideOpen(true)}
+              />
             </section>
           );
         })}
       </main>
-      <IdleCue page={active} mode={cueMode(pages[active])} onNext={() => scrollToIndex(active + 1)} />
-      <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} />
+      <ScrollCue page={active} off={pages[active].kind === 'closing'} onNext={() => scrollToIndex(active + 1)} />
+      <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} current={pages[active].id} />
       <div className="dock">
         <button
           type="button"
@@ -89,22 +97,13 @@ export function Webdoc() {
   );
 }
 
-/** Cuándo invitar a seguir en cada página: al terminar su video, después de ver su galería, o tras un rato quieta. */
-function cueMode(spec: PageSpec): CueMode {
-  if (spec.kind === 'closing') return 'off';
-  if (spec.kind === 'video' || (spec.kind === 'transition' && transitions[spec.index].video)) return 'video';
-  if (spec.kind === 'gallery') return 'gallery';
-  if (spec.kind === 'songs') return 'songs';
-  return 'timer';
-}
-
 function voiceOf(spec: PageSpec): string | null {
   if (spec.kind === 'transition') return transitions[spec.index].voice ?? null;
   if (spec.id === 'pangui-historia') return voices.panguiHistoria;
   return null;
 }
 
-function PageView({ spec, next, playing, near, muted, openGuide }: {
+function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
   spec: PageSpec;
   /** Página siguiente del recorrido (para la invitación a seguir bajando). */
   next?: string;
@@ -112,23 +111,17 @@ function PageView({ spec, next, playing, near, muted, openGuide }: {
   /** Página visible o vecina: sus videos se precargan. */
   near: boolean;
   muted: boolean;
+  /** Activa el sonido del webdoc (si estaba silenciado): la persona pidió escuchar. */
+  unmute: () => void;
   openGuide: () => void;
 }) {
-  const { scrollToIndex } = useJourneyNav();
+  const { scrollToIndex, scrollToPage } = useJourneyNav();
   switch (spec.kind) {
     case 'welcome':
       return (
         <div className="screen screen--welcome" aria-labelledby="wt">
-          <PortadaVideo playing={playing} />
-          <TopBar plain label="Portada" right={<GuideButton onOpen={openGuide}>Ver mapa interactivo</GuideButton>} />
-          <div className="welcome">
-            <h1 id="wt" className="wordmark">
-              <span className="wordmark__top">Territorios</span>
-              <span className="wordmark__bottom">Vivos</span>
-              <span className="wordmark__sub">Relatos del Pacífico</span>
-            </h1>
-            <p className="welcome__voice">Chachita te recibe en voz</p>
-          </div>
+          <Welcome playing={playing} muted={muted} unmute={unmute} />
+          <TopBar plain label="Bienvenida" right={<GuideButton onOpen={() => scrollToPage('cierre')}>Ver mapa interactivo</GuideButton>} />
           <div className="welcome__start">
             <button type="button" className="start-btn" onClick={() => scrollToIndex(1)}>
               Comenzar el viaje
@@ -225,7 +218,8 @@ function PageView({ spec, next, playing, near, muted, openGuide }: {
       );
 
     case 'closing':
-      return <ClosingMap playing={playing} near={near} onBack={() => scrollToIndex(pages.length - 2)} />;
+      // «Volver al recorrido» lleva a la bienvenida (pedido del cliente, 19/10/2026).
+      return <ClosingMap playing={playing} near={near} onBack={() => scrollToIndex(0)} />;
   }
 }
 
@@ -246,34 +240,110 @@ function StationFoot({ tabs, next, children }: { tabs: Tabs; next?: string; chil
   );
 }
 
+type Listen = 'idle' | 'listening' | 'heard';
+
 /**
- * Video de fondo de la portada (Panguí), silenciado para permitir la reproducción automática.
- * Se pausa cuando la portada queda cubierta, y al volver continúa desde el mismo punto (no se reinicia).
+ * La bienvenida: el logo sobre el video del intro, que trae la voz de Chachita (19/10/2026: antes eran dos páginas, la
+ * portada y el intro, con la misma toma). El navegador no deja que un video suene sin un gesto de la persona, así que
+ * arranca en silencio y en bucle, y un botón claro bajo el logo invita a escucharla: al tocarlo empieza desde el
+ * principio, con sonido. Al terminar sigue en bucle, en silencio, y el botón ofrece escucharla otra vez.
  */
-function PortadaVideo({ playing }: { playing: boolean }) {
+function Welcome({ playing, muted, unmute }: { playing: boolean; muted: boolean; unmute: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
   const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
+  const [listen, setListen] = useState<Listen>('idle');
+  // De fondo: en silencio y en bucle.
+  const quiet = (v: HTMLVideoElement) => {
+    v.muted = true;
+    v.loop = true;
+  };
+  // Al salir de la página se pausa (y si estaba hablando, se calla); al volver sigue de fondo.
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
-    if (playing) void v.play().catch(() => {});
-    else v.pause();
+    if (playing) {
+      void v.play().catch(() => {});
+      return;
+    }
+    v.pause();
+    if (!v.loop) {
+      quiet(v);
+      setListen((l) => (l === 'listening' ? 'idle' : l));
+    }
   }, [playing]);
+  // El botón de sonido del webdoc también la calla (o la deja sonar otra vez).
+  useEffect(() => {
+    const v = ref.current;
+    if (v && listen === 'listening') v.muted = muted;
+  }, [muted, listen]);
+  const toggle = () => {
+    const v = ref.current;
+    if (!v) return;
+    if (listen === 'listening') {
+      quiet(v);
+      setListen('idle');
+      return;
+    }
+    unmute();
+    v.loop = false;
+    v.muted = false;
+    v.currentTime = 0;
+    void v.play().catch(() => {});
+    setListen('listening');
+  };
+  const onEnded = () => {
+    const v = ref.current;
+    if (!v) return;
+    quiet(v);
+    void v.play().catch(() => {});
+    setListen('heard');
+  };
+  const poster = `/media/transiciones/intro-poster.webp?v=${TRANSITIONS_VERSION}`;
   return (
-    <div className="backdrop" aria-hidden="true" style={{ backgroundImage: 'url(/media/video/portada-poster.webp)' }}>
-      <video
-        ref={ref}
-        className="backdrop__video"
-        src={`/media/video/portada-${small ? 720 : 1080}.mp4`}
-        poster="/media/video/portada-poster.webp"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-      />
-      <div className="backdrop__tint" style={{ background: 'radial-gradient(ellipse at center, rgba(6,18,14,.08), rgba(6,18,14,.42))' }} />
-    </div>
+    <>
+      <div className="backdrop" aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
+        <video
+          ref={ref}
+          className="backdrop__video"
+          src={`/media/transiciones/intro-${small ? 720 : 1080}.mp4?v=${TRANSITIONS_VERSION}`}
+          poster={poster}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          onEnded={onEnded}
+        />
+        <div className="backdrop__tint" style={{ background: 'radial-gradient(ellipse at center, rgba(6,18,14,.08), rgba(6,18,14,.42))' }} />
+      </div>
+      <div className="welcome">
+        <h1 id="wt" className="wordmark">
+          <span className="wordmark__top">Territorios</span>
+          <span className="wordmark__bottom">Vivos</span>
+          <span className="wordmark__sub">Relatos del Pacífico</span>
+        </h1>
+        <button type="button" className={`listen listen--${listen}`} onClick={toggle} aria-pressed={listen === 'listening'}>
+          <span className="listen__icon" aria-hidden="true">
+            {listen === 'listening' ? <span className="listen__bars"><i /><i /><i /><i /></span> : <SoundOn />}
+          </span>
+          <span className="listen__text">
+            <strong>
+              {listen === 'listening' ? 'Chachita te da la bienvenida' : listen === 'heard' ? 'Escuchar otra vez la bienvenida' : 'Escucha la bienvenida de Chachita'}
+            </strong>
+            <small>
+              {listen === 'listening' ? (
+                'Toca para pausar'
+              ) : (
+                <>
+                  <span className="listen__desk">Haz clic para activar el sonido</span>
+                  <span className="listen__touch">Toca para activar el sonido</span>
+                </>
+              )}
+            </small>
+          </span>
+        </button>
+      </div>
+    </>
   );
 }
 

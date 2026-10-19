@@ -4,7 +4,8 @@
 // videos de HISTORIA de las estaciones 1 a 3 en streaming (public/media/historias);
 // (05/10/2026): video del intro después de la portada, cierre en video y Video canción en streaming;
 // (08/10/2026): "Historia" → "Tráiler historia" y sección "Video canción" en la estación 3;
-// (13/10/2026): tráiler nuevo en la estación 3 (une el scrollytelling y el tráiler en una sola página), los Video canción de las estaciones 3 y 4 intercambiados y video del Viche.
+// (13/10/2026): tráiler nuevo en la estación 3 (une el scrollytelling y el tráiler en una sola página), los Video canción de las estaciones 3 y 4 intercambiados y video del Viche;
+// (19/10/2026): la portada y el intro son una sola página, y los nombres de la estación 4 son los del menú del cliente.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { Photo, StationId, VideoAsset } from '../domain/types';
@@ -57,9 +58,9 @@ const pangui = (active: string): Tabs => ({
     { label: 'Marea baja', to: 'pangui-marea-baja' },
     { label: 'Tráiler historia', to: 'pangui-historia' },
     { label: 'Galería', to: 'pangui-galeria' },
-    { label: '360 · Cantos', to: 'pangui-cantos' },
+    { label: 'Manglar - Cantos', to: 'pangui-cantos' },
     { label: 'Video canción', to: 'pangui-video-cancion' },
-    { label: 'Viche', to: 'pangui-viche', warm: true },
+    { label: 'Un regalo de la selva', to: 'pangui-viche', warm: true },
   ],
 });
 
@@ -78,8 +79,7 @@ export type PageSpec = PageBody & { id: string };
 
 export const pages: PageSpec[] = [
   { id: 'inicio', kind: 'welcome' },
-  { id: 'intro', kind: 'transition', index: 0 },
-  { id: 'transicion-inicio', kind: 'transition', index: 1 },
+  { id: 'transicion-inicio', kind: 'transition', index: 0 },
 
   { id: 'chori-pensamiento', kind: 'quote', station: 'chori', label: 'Estación 1 · El latido', tabs: chori('Pensamiento') },
   {
@@ -91,18 +91,18 @@ export const pages: PageSpec[] = [
   },
   { id: 'chori-galeria', kind: 'gallery', station: 'chori', label: 'Estación 1 · Galería', tabs: chori('Galería') },
   { id: 'chori-receta', kind: 'recipe', label: 'Estación 1 · Receta', tabs: chori('Receta') },
-  { id: 'transicion-1', kind: 'transition', index: 2 },
+  { id: 'transicion-1', kind: 'transition', index: 1 },
 
-  { id: 'atrato-pensamiento', kind: 'quote', station: 'atrato', label: 'Estación 2 · Gente del río', tabs: atrato('Pensamiento') },
+  { id: 'atrato-pensamiento', kind: 'quote', station: 'atrato', label: 'Estación 2 · Gente del Río', tabs: atrato('Pensamiento') },
   {
     id: 'atrato-historia',
     kind: 'video',
     label: 'Estación 2 · Tráiler historia',
-    video: { title: 'Gente del río', stream: 'estacion-2' },
+    video: { title: 'Gente del Río', stream: 'estacion-2' },
     tabs: atrato('Tráiler historia'),
   },
   { id: 'atrato-galeria', kind: 'gallery', station: 'atrato', label: 'Estación 2 · Galería', tabs: atrato('Galería') },
-  { id: 'transicion-2', kind: 'transition', index: 3 },
+  { id: 'transicion-2', kind: 'transition', index: 2 },
 
   { id: 'nuqui-pensamiento', kind: 'quote', station: 'nuqui', label: 'Estación 3 · El baile de las olas', tabs: nuqui('Pensamiento') },
   {
@@ -122,14 +122,14 @@ export const pages: PageSpec[] = [
     tabs: nuqui('Video canción'),
   },
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },
-  { id: 'transicion-3', kind: 'transition', index: 4 },
+  { id: 'transicion-3', kind: 'transition', index: 3 },
 
   // El silencio se divide en dos escenas, cada una con su propio sonido de marea.
   {
     id: 'pangui-marea-alta',
     kind: 'silence',
     tide: 'alta',
-    label: 'Estación 4 · El silencio',
+    label: 'Estación 4 · Marea alta, marea baja',
     title: 'Marea alta',
     hint: 'sin voz · solo la marea que sube',
     photo: p('6i3a4281', 'Una mujer toca las ramas del manglar', { focus: '55% 30%' }),
@@ -139,7 +139,7 @@ export const pages: PageSpec[] = [
     id: 'pangui-marea-baja',
     kind: 'silence',
     tide: 'baja',
-    label: 'Estación 4 · El silencio',
+    label: 'Estación 4 · Marea alta, marea baja',
     title: 'marea baja',
     hint: 'sin voz · solo la marea que baja',
     photo: p('6i3a5069', 'El manglar reflejado en el agua, con garzas', { focus: '50% 60%' }),
@@ -153,7 +153,7 @@ export const pages: PageSpec[] = [
     tabs: pangui('Tráiler historia'),
   },
   { id: 'pangui-galeria', kind: 'gallery', station: 'pangui', label: 'Estación 4 · Galería', tabs: pangui('Galería') },
-  { id: 'pangui-cantos', kind: 'songs', label: 'Estación 4 · 360 · Cantos', tabs: pangui('360 · Cantos') },
+  { id: 'pangui-cantos', kind: 'songs', label: 'Estación 4 · Manglar - Cantos', tabs: pangui('Manglar - Cantos') },
   {
     id: 'pangui-video-cancion',
     kind: 'video',
@@ -165,11 +165,11 @@ export const pages: PageSpec[] = [
   {
     id: 'pangui-viche',
     kind: 'video',
-    label: 'Estación 4 · Viche',
+    label: 'Estación 4 · Un regalo de la selva',
     video: { title: 'Viche curao, un regalo de la selva', stream: 'viche' },
-    tabs: pangui('Viche'),
+    tabs: pangui('Un regalo de la selva'),
   },
-  { id: 'transicion-4', kind: 'transition', index: 5 },
+  { id: 'transicion-4', kind: 'transition', index: 4 },
 
   { id: 'cierre', kind: 'closing' },
 ];

@@ -1,20 +1,62 @@
-// Menú principal y redes sociales (ajustes del cliente, 29/09/2026).
-// `to` lleva a una página del recorrido; sin `to` la opción se muestra como "próximamente".
+// Menú principal y redes sociales.
+// El menú es la lista del cliente (19/10/2026): cada parada del recorrido y, dentro de cada estación, sus secciones.
+// `to` lleva a una página del recorrido; `href`, a una dirección propia (la tienda, «Tu historia»).
 
 export interface MenuItem {
   label: string;
   to?: string;
+  href?: string;
+  /** Secciones de una estación: se despliegan debajo de ella. */
+  children?: MenuItem[];
 }
 
 export const menu: MenuItem[] = [
-  { label: 'Nuestra historia', to: 'inicio' },
-  { label: 'Equipo' },
-  { label: 'Making of' },
-  { label: 'Blog' },
-  { label: 'Llévate Nuquí' },
-  { label: 'El Viche', to: 'pangui-viche' },
-  { label: 'Vive y Reserva' },
-  { label: 'Cuéntanos tu historia' },
+  { label: 'Bienvenida', to: 'inicio' },
+  { label: 'Río Chorí', to: 'transicion-inicio' },
+  {
+    label: 'Estación 1 · El latido',
+    to: 'chori-pensamiento',
+    children: [
+      { label: 'Tráiler historia', to: 'chori-historia' },
+      { label: 'Galería', to: 'chori-galeria' },
+      { label: 'Receta', to: 'chori-receta' },
+    ],
+  },
+  { label: 'Río Atrato', to: 'transicion-1' },
+  {
+    label: 'Estación 2 · Gente del Río',
+    to: 'atrato-pensamiento',
+    children: [
+      { label: 'Tráiler historia', to: 'atrato-historia' },
+      { label: 'Galería', to: 'atrato-galeria' },
+    ],
+  },
+  { label: 'Nuquí', to: 'transicion-2' },
+  {
+    label: 'Estación 3 · El baile de las olas',
+    to: 'nuqui-pensamiento',
+    children: [
+      { label: 'Tráiler historia', to: 'nuqui-historia' },
+      { label: 'Video canción', to: 'nuqui-video-cancion' },
+      { label: 'Galería', to: 'nuqui-galeria' },
+    ],
+  },
+  { label: 'Panguí', to: 'transicion-3' },
+  {
+    label: 'Estación 4 · Marea alta, marea baja',
+    to: 'pangui-marea-alta',
+    children: [
+      { label: 'Tráiler historia', to: 'pangui-historia' },
+      { label: 'Galería', to: 'pangui-galeria' },
+      { label: 'Manglar - Cantos', to: 'pangui-cantos' },
+      { label: 'Video canción', to: 'pangui-video-cancion' },
+      { label: 'Un regalo de la selva', to: 'pangui-viche' },
+    ],
+  },
+  { label: 'Volver a las raíces', to: 'transicion-4' },
+  { label: 'Mapa interactivo', to: 'cierre' },
+  { label: 'Tu historia', href: '/cuenta-tu-historia' },
+  { label: 'Tienda', href: '/tienda' },
 ];
 
 export type SocialNetwork = 'youtube' | 'instagram' | 'tiktok';

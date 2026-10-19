@@ -133,7 +133,45 @@ h1, h2, p, blockquote, figure { margin: 0; }
 /* ───────── 1 · Portada ───────── */
 .screen--welcome { display: grid; place-items: center; }
 .welcome { text-align: center; animation: rise 1.4s var(--ease) 0.2s both; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.35); }
-.welcome__voice { margin-top: 44px; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; }
+/* «Escucha la bienvenida de Chachita»: bajo el logo, bien visible (el navegador no deja que la voz suene sola y la
+   gente sin contexto se la saltaba). Un círculo con el parlante que palpita, y el texto al lado. */
+.listen {
+  margin: 40px auto 0; display: inline-flex; align-items: center; gap: 14px; padding: 10px 22px 10px 10px; min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 999px; background: rgba(6, 18, 14, 0.42); backdrop-filter: blur(8px);
+  color: #fff; text-align: left; text-shadow: none; transition: background 0.25s, border-color 0.25s;
+  animation: fade 1s ease 1s both;
+}
+.listen:hover { background: rgba(6, 18, 14, 0.62); border-color: var(--gold); }
+.listen__icon { position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--gold); color: var(--forest); }
+.listen__icon svg { width: 20px; height: 20px; }
+/* Mientras no se ha escuchado, un anillo crece desde el círculo y se apaga: llama sin estorbar. */
+.listen--idle .listen__icon::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--gold);
+  animation: listen-ring 2.2s ease-out 2s infinite; opacity: 0;
+}
+@keyframes listen-ring { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.7); opacity: 0; } }
+.listen__text { display: grid; gap: 1px; }
+.listen__text strong { font: 600 15px/1.25 var(--sans); }
+.listen__text small { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8; }
+.listen__touch { display: none; }
+/* Hablando: cuatro barras que suben y bajan. */
+.listen__bars { display: flex; align-items: center; gap: 3px; height: 18px; }
+.listen__bars i { display: block; width: 3px; height: 100%; border-radius: 2px; background: currentColor; animation: listen-bar 0.9s ease-in-out infinite; }
+.listen__bars i:nth-child(2) { animation-delay: -0.3s; }
+.listen__bars i:nth-child(3) { animation-delay: -0.6s; }
+.listen__bars i:nth-child(4) { animation-delay: -0.45s; }
+@keyframes listen-bar { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+@media (hover: none) and (pointer: coarse) {
+  .listen__desk { display: none; }
+  .listen__touch { display: inline; }
+}
+/* En el celular, sin tocar los botones de sonido y redes de la derecha. */
+@media (max-width: 640px) {
+  .listen { margin-top: 28px; max-width: calc(100vw - 112px); gap: 10px; padding: 8px 16px 8px 8px; }
+  .listen__icon { width: 38px; height: 38px; }
+  .listen__text strong { font-size: 14px; }
+  .listen__text small { font-size: 10px; letter-spacing: 0.1em; }
+}
 .welcome__start { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 0; right: 0; display: grid; justify-items: center; animation: fade 1s ease 1.2s both; }
 .start-btn {
   display: grid; justify-items: center; gap: 2px; border: 0; background: none; padding: 10px 18px; min-height: 44px;
@@ -424,7 +462,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   .stack-page:not(.stack-page--first) > .screen { animation: none; }
 }
 
-/* ───────── Invitación a seguir (ver IdleCue) ─────────
+/* ───────── Señal de seguir bajando (ver ScrollCue) ─────────
    Abajo, en el borde de la pantalla (en las páginas con pestañas, justo encima de ellas, donde está el «Sigue
    bajando»), con la letra del webdoc y la flecha del recorrido: la flecha se mece hacia abajo y palpita con un
    resplandor tenue detrás; el texto respira. Entra fundiéndose y nunca tapa nada (es pequeña y casi transparente). */
@@ -577,25 +615,50 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .menu-btn:hover span:nth-child(2) { transform: translateX(3px); }
 .topbar { padding-right: 70px; }
 
+/* Panel que se despliega desde la derecha: la página sigue a la vista detrás, oscurecida. */
 .menu {
-  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
-  background: rgba(8, 26, 22, 0.94); backdrop-filter: blur(14px); color: #fff; overflow: auto;
+  width: min(400px, 100vw); height: 100dvh; max-width: none; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0;
+  background: rgba(8, 26, 22, 0.96); backdrop-filter: blur(14px); color: #fff; overflow: auto; overscroll-behavior: contain;
+  box-shadow: -18px 0 50px rgba(0, 0, 0, 0.35);
 }
-.menu[open] { animation: fade 0.35s ease both; }
-.menu::backdrop { background: transparent; }
-.menu__close { position: fixed; top: max(14px, env(safe-area-inset-top)); right: 14px; }
-.menu__nav { min-height: 100%; display: grid; align-content: center; gap: 28px; padding: 80px clamp(24px, 8vw, 120px); }
-.menu__brand { font: 700 14px var(--serif); letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8; }
+.menu[open] { animation: menu-in 0.4s var(--ease) both; }
+@keyframes menu-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.menu::backdrop { background: rgba(4, 12, 10, 0.45); }
+.menu__panel { min-height: 100%; display: flex; flex-direction: column; gap: 20px; padding: max(14px, env(safe-area-inset-top)) 22px max(22px, env(safe-area-inset-bottom)); }
+.menu__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.menu__brand { font: 700 14px var(--serif); letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.85; }
 .menu__brand em { font-style: italic; }
-.menu ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.menu li { animation: rise 0.6s var(--ease) both; }
-.menu li button, .menu__soon {
-  display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 0; border: 0; background: none; padding: 6px 0; text-align: left;
-  font: 700 clamp(24px, min(3.6vw, 5.2vh), 46px)/1.12 var(--serif); color: #fff;
+/* El recorrido como un río: una línea fina hacia abajo con un punto en cada parada (más grande en las estaciones). */
+.menu__list { position: relative; list-style: none; margin: 0; padding: 0 0 0 22px; display: grid; gap: 0; }
+.menu__list::before { content: ''; position: absolute; left: 4px; top: 14px; bottom: 14px; width: 1px; background: rgba(255, 255, 255, 0.28); }
+.menu__item { position: relative; }
+.menu__item::before {
+  content: ''; position: absolute; left: -22px; top: 15px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--forest); box-shadow: 0 0 0 1.2px rgba(255, 255, 255, 0.55); transition: background 0.25s, box-shadow 0.25s;
 }
-.menu li button:hover { color: var(--gold); font-style: italic; }
-.menu__soon { color: rgba(255, 255, 255, 0.45); cursor: default; }
-.menu__soon small { font: 500 11px var(--sans); letter-spacing: 0.14em; text-transform: uppercase; }
+.menu__item--station::before { left: -24px; top: 13px; width: 13px; height: 13px; }
+.menu__item.is-here::before { background: var(--gold); box-shadow: 0 0 0 1.2px var(--gold), 0 0 0 5px rgba(232, 187, 82, 0.2); }
+.menu__row { display: flex; align-items: center; gap: 6px; }
+.menu__link {
+  flex: 1; min-height: 40px; padding: 6px 0; border: 0; background: none; text-align: left; color: rgba(255, 255, 255, 0.82);
+  font: 500 15px/1.3 var(--sans); transition: color 0.2s;
+}
+.menu__item--station > .menu__row .menu__link { font: 700 17px/1.25 var(--serif); color: #fff; }
+.menu__link:hover { color: var(--gold); }
+.menu__link[aria-current='page'] { color: var(--gold); }
+.menu__toggle {
+  flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: #fff;
+  transition: background 0.2s;
+}
+.menu__toggle:hover { background: rgba(255, 255, 255, 0.1); }
+.menu__toggle svg { transition: transform 0.3s var(--ease); }
+.menu__toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
+/* Secciones de la estación: aparecen debajo al desplegarla. */
+.menu__sub { list-style: none; margin: 0; padding: 0 0 6px 14px; display: none; }
+.menu__sub.is-open { display: grid; animation: rise 0.35s var(--ease) both; }
+.menu__sub .menu__link { min-height: 36px; font-size: 14px; border-left: 1px solid rgba(255, 255, 255, 0.18); padding-left: 14px; }
+.menu__sub .menu__link[aria-current='page'] { border-left-color: var(--gold); }
+.menu__social { margin-top: auto; padding-top: 12px; }
 
 .social { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
 .social a, .social span {
@@ -610,31 +673,6 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
   border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.28); backdrop-filter: blur(8px);
 }
 .dock__sound[aria-pressed='false'] { opacity: 0.6; }
-.menu__social { margin-top: 12px; }
-
-/* El menú como un río: una línea fina que serpentea hacia abajo y pasa por el punto de cada opción; las opciones se
-   corren siguiendo sus vueltas. Al abrir, el río se traza de arriba hacia abajo y las opciones aparecen una tras otra. */
-.menu__flow { position: relative; padding-left: 8px; }
-.menu__river { position: absolute; left: 0; top: -40px; overflow: visible; pointer-events: none; }
-.menu__river path {
-  fill: none; stroke: rgba(255, 255, 255, 0.38); stroke-width: 1.2; stroke-linecap: round;
-  stroke-dasharray: 1; stroke-dashoffset: 1; animation: river-draw 1.4s cubic-bezier(0.45, 0, 0.2, 1) 0.1s forwards;
-}
-@keyframes river-draw { to { stroke-dashoffset: 0; } }
-.menu .menu__flow ul { position: relative; gap: 2px; }
-.menu .menu__flow li { position: relative; display: flex; align-items: center; gap: 18px; padding-left: var(--bend, 20px); }
-.menu__node {
-  position: relative; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--forest);
-  box-shadow: 0 0 0 1.2px rgba(255, 255, 255, 0.55); transition: background 0.25s, box-shadow 0.25s, transform 0.25s var(--ease);
-}
-.menu li:hover .menu__node, .menu li:focus-within .menu__node { background: var(--gold); box-shadow: 0 0 0 1.2px var(--gold), 0 0 0 6px rgba(232, 187, 82, 0.18); transform: scale(1.15); }
-.menu li:has(.menu__soon) .menu__node { box-shadow: 0 0 0 1.2px rgba(255, 255, 255, 0.25); }
-@media (prefers-reduced-motion: reduce) {
-  .menu__river path { animation: none; stroke-dashoffset: 0; }
-}
-@media (max-width: 640px) {
-  .menu .menu__flow li { gap: 14px; }
-}
 
 /* ───────── Móvil ───────── */
 @media (max-width: 900px) {
@@ -669,7 +707,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
-  .welcome__voice { margin-top: 16px; }
+  .listen { margin-top: 16px; }
   .gallery { padding: 50px 0 100px; }
   .gallery__card { height: 44vh; }
 }

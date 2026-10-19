@@ -3,7 +3,7 @@
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Arrow } from './Chrome';
+import { Arrow, pagePath } from './Chrome';
 
 /** Íconos de línea de la costa (mismo trazo que las flechas del recorrido). */
 export function LineIcon({ name, size = 20 }: { name: 'help' | 'story' | 'shop'; size?: number }) {
@@ -92,7 +92,7 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
         {onClose ? (
           <button type="button" className="sheet__back" onClick={close}>{backLabel}</button>
         ) : (
-          <Link className="sheet__back" to={back?.to ?? '/27'}>{backLabel}</Link>
+          <Link className="sheet__back" to={back?.to ?? pagePath('cierre')}>{backLabel}</Link>
         )}
         <div className="sheet__heading">
           <p className="eyebrow">{eyebrow}</p>
