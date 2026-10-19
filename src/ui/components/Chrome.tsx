@@ -1,14 +1,17 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { pathFor } from '../../application/journey';
 import { stations } from '../../content/journey';
-import type { Tabs } from '../../content/pages';
-import { menu, social, type SocialNetwork } from '../../content/site';
+import { pageIndex, type Tabs } from '../../content/pages';
+import { menu, social, type MenuItem, type SocialNetwork } from '../../content/site';
 import type { Transition } from '../../domain/types';
 import { Illustration } from './Media';
 
-/** Navegación del recorrido disponible para cualquier componente. */
-export const JourneyNav = createContext<{ scrollToPage: (id: string) => void; scrollToIndex: (i: number) => void }>({
+/** Navegación del recorrido disponible para cualquier componente. Fuera del recorrido, `inJourney` es falso. */
+export const JourneyNav = createContext<{ scrollToPage: (id: string) => void; scrollToIndex: (i: number) => void; inJourney: boolean }>({
   scrollToPage: () => {},
   scrollToIndex: () => {},
+  inJourney: false,
 });
 export const useJourneyNav = () => useContext(JourneyNav);
 
@@ -19,6 +22,9 @@ export const STATION_PAGE: Record<string, string> = {
   nuqui: 'nuqui-pensamiento',
   pangui: 'pangui-marea-alta',
 };
+
+/** Dirección de una página del recorrido, para llegar a ella desde fuera. */
+export const pagePath = (id: string) => pathFor(pageIndex(id));
 
 export function Chip({ children }: { children: ReactNode }) {
   return <span className="chip">{children}</span>;
@@ -146,83 +152,86 @@ export function StationGuide({ open, onClose }: { open: boolean; onClose: () => 
   );
 }
 
-/** Menú principal: botón fijo arriba a la derecha y panel a pantalla completa. */
-/** Cuánto se corre cada opción del menú (y su punto en el río): una curva suave, como las vueltas de un río. */
-const bend = (i: number) => Math.round(22 + 22 * Math.sin(i * 0.95));
+/** La estación de una página, por el comienzo de su id (`chori-galeria` → `chori`). */
+const stationOf = (page: string) => page.split('-')[0];
 
 /**
- * El río del menú: una línea fina que serpentea hacia abajo y pasa por el punto de cada opción. Se dibuja con las
- * posiciones reales de los puntos (las opciones cambian de alto según la pantalla) y se traza al abrir el menú.
+ * Menú principal: botón fijo arriba a la derecha y un panel que se despliega desde ese lado, sin tapar toda la página
+ * (pedido del cliente, 19/10/2026). Tiene todas las paradas del recorrido, en orden, como un río con un punto en cada
+ * una; las estaciones se abren para mostrar sus secciones. La página que se está viendo queda marcada y su estación,
+ * abierta. Fuera del recorrido (la tienda, «Tu historia») lleva a la dirección de cada página.
  */
-function River({ list }: { list: RefObject<HTMLUListElement | null> }) {
-  const [d, setD] = useState('');
-  const [box, setBox] = useState({ w: 0, h: 0 });
-  useLayoutEffect(() => {
-    const ul = list.current;
-    if (!ul) return;
-    const draw = () => {
-      const r = ul.getBoundingClientRect();
-      const pts = [...ul.querySelectorAll<HTMLElement>('.menu__node')].map((n) => {
-        const b = n.getBoundingClientRect();
-        return { x: b.left + b.width / 2 - r.left, y: b.top + b.height / 2 - r.top };
-      });
-      if (!pts.length) return;
-      // Entra por arriba y sale por abajo, más allá de la primera y la última opción.
-      const all = [{ x: pts[0].x - 10, y: -40 }, ...pts, { x: pts[pts.length - 1].x + 12, y: r.height + 40 }];
-      // Curva suave que pasa por todos los puntos (Catmull-Rom convertida a Bézier).
-      let path = `M ${all[0].x} ${all[0].y}`;
-      for (let i = 0; i < all.length - 1; i++) {
-        const p0 = all[i - 1] ?? all[i];
-        const p1 = all[i];
-        const p2 = all[i + 1];
-        const p3 = all[i + 2] ?? p2;
-        path += ` C ${p1.x + (p2.x - p0.x) / 6} ${p1.y + (p2.y - p0.y) / 6}, ${p2.x - (p3.x - p1.x) / 6} ${p2.y - (p3.y - p1.y) / 6}, ${p2.x} ${p2.y}`;
-      }
-      setD(path);
-      setBox({ w: r.width, h: r.height });
-    };
-    draw();
-    const ro = new ResizeObserver(draw);
-    ro.observe(ul);
-    return () => ro.disconnect();
-  }, [list]);
-  return (
-    <svg className="menu__river" width={box.w} height={box.h + 80} viewBox={`0 -40 ${box.w || 1} ${(box.h || 1) + 80}`} aria-hidden="true">
-      <path d={d} pathLength={1} />
-    </svg>
-  );
-}
-
-export function SiteMenu({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
+export function SiteMenu({ open, onOpen, onClose, current }: {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  /** Id de la página que se está viendo. */
+  current?: string;
+}) {
   const ref = useDialog(open);
-  const list = useRef<HTMLUListElement>(null);
-  const { scrollToPage } = useJourneyNav();
+  const { scrollToPage, inJourney } = useJourneyNav();
+  const navigate = useNavigate();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const here = (item: MenuItem) => !!item.to && !!current && (item.to === current || (!!item.children && stationOf(item.to) === stationOf(current)));
+  // Al abrir, la estación donde se está queda desplegada.
+  useEffect(() => {
+    if (open) setExpanded(menu.find((item) => item.children && here(item))?.label ?? null);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const go = (item: MenuItem) => {
+    onClose();
+    if (item.href) navigate(item.href);
+    else if (item.to && inJourney) scrollToPage(item.to);
+    else if (item.to) navigate(pagePath(item.to));
+  };
   return (
     <>
       <button type="button" className="menu-btn" onClick={onOpen} aria-label="Abrir menú" aria-haspopup="dialog">
         <span /><span /><span />
       </button>
-      <dialog ref={ref} className="menu" onClose={onClose} aria-label="Menú">
-        <button type="button" className="icon-btn menu__close" onClick={onClose} aria-label="Cerrar menú">✕</button>
-        <nav className="menu__nav">
-          <p className="menu__brand">Territorios <em>Vivos</em></p>
-          <div className="menu__flow">
-            {open && <River list={list} />}
-            <ul ref={list}>
-              {menu.map((item, i) => (
-                <li key={item.label} style={{ animationDelay: `${0.25 + 0.07 * i}s`, ['--bend' as string]: `${bend(i)}px` }}>
-                  <span className="menu__node" aria-hidden="true" />
-                  {item.to ? (
-                    <button type="button" onClick={() => { onClose(); scrollToPage(item.to!); }}>{item.label}</button>
-                  ) : (
-                    <span className="menu__soon" aria-disabled="true">
-                      {item.label} <small>Próximamente</small>
-                    </span>
+      <dialog ref={ref} className="menu" onClose={onClose} onClick={(e) => e.target === ref.current && onClose()} aria-label="Menú">
+        <nav className="menu__panel">
+          <div className="menu__head">
+            <p className="menu__brand">Territorios <em>Vivos</em></p>
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar menú">✕</button>
+          </div>
+          <ol className="menu__list">
+            {menu.map((item) => {
+              const isOpen = expanded === item.label;
+              const subId = `menu-${item.to}`;
+              return (
+                <li key={item.label} className={`menu__item${item.children ? ' menu__item--station' : ''}${here(item) ? ' is-here' : ''}`}>
+                  <div className="menu__row">
+                    <button type="button" className="menu__link" aria-current={item.to === current ? 'page' : undefined} onClick={() => go(item)}>
+                      {item.label}
+                    </button>
+                    {item.children && (
+                      <button
+                        type="button"
+                        className="menu__toggle"
+                        aria-expanded={isOpen}
+                        aria-controls={subId}
+                        aria-label={`${isOpen ? 'Ocultar' : 'Ver'} secciones de ${item.label}`}
+                        onClick={() => setExpanded(isOpen ? null : item.label)}
+                      >
+                        <Arrow dir="down" />
+                      </button>
+                    )}
+                  </div>
+                  {item.children && (
+                    <ul id={subId} className={`menu__sub${isOpen ? ' is-open' : ''}`} inert={!isOpen ? true : undefined}>
+                      {item.children.map((sub) => (
+                        <li key={sub.label}>
+                          <button type="button" className="menu__link" aria-current={sub.to === current ? 'page' : undefined} onClick={() => go(sub)}>
+                            {sub.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </li>
-              ))}
-            </ul>
-          </div>
+              );
+            })}
+          </ol>
           <SocialLinks className="menu__social" />
         </nav>
       </dialog>

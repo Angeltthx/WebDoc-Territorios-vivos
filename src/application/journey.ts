@@ -33,7 +33,7 @@ const WHEEL_LOCK_MS = 650;
 /** Navegadores sin evento scrollend (p. ej. Safari antiguo) usan un temporizador. */
 const HAS_SCROLLEND = typeof window !== 'undefined' && 'onscrollend' in window;
 
-const pathFor = (index: number) => (index <= 0 ? '/' : `/${index + 1}`);
+export const pathFor = (index: number) => (index <= 0 ? '/' : `/${index + 1}`);
 
 function indexFromPath(pathname: string): number {
   const n = Number(pathname.replace(/^\//, '') || '1');
@@ -66,9 +66,10 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     el.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
   }, [scroller]);
 
+  // A una página lejana (desde el menú) se llega de una, sin pasar por todas las de en medio (y sus videos).
   const scrollToPage = useCallback((id: string) => {
     const i = pageIndex(id);
-    if (i >= 0) scrollToIndex(i);
+    if (i >= 0) scrollToIndex(i, Math.abs(i - activeRef.current) <= 1);
   }, [scrollToIndex]);
 
   // Posición inicial según la URL (enlace directo a una página).
