@@ -47,6 +47,8 @@ export interface Station {
   name: string;
   place: string;
   accent: string;
+  /** Dónde queda, para el mapa de ubicación de la estación. */
+  where: { lat: number; lon: number };
   illustration: string;
   background: Photo;
   quote: { text: string; author: string; portrait: Photo };

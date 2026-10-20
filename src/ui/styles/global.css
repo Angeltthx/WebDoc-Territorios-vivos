@@ -2147,3 +2147,40 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .ap-chart__plot, .ap-chart__x { gap: 3px; }
   .ap-chart__x span:nth-child(even) { visibility: hidden; }
 }
+
+/* ───────── Mapa de ubicación de la estación (ver StationLocator) ─────────
+   Línea blanca sobre fondo transparente, a la derecha de la cita (en el celular, arriba a la izquierda). Nuquí y el
+   Chocó en Colombia, resaltados en dorado; la estación de la página, con un punto que palpita y su nombre. */
+.locator {
+  position: absolute; z-index: 4; right: clamp(70px, 7vw, 120px); top: 50%; translate: 0 -50%;
+  height: min(68vh, 620px); aspect-ratio: 208 / 497; pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(4, 12, 10, 0.75)) drop-shadow(0 1px 10px rgba(4, 12, 10, 0.45)); animation: fade 1.2s ease 0.8s both;
+}
+.locator svg { width: 100%; height: 100%; overflow: visible; }
+.locator path { fill: none; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.locator__choco { stroke: #fff; stroke-width: 1.6; }
+.locator__municipios { stroke: rgba(255, 255, 255, 0.35); stroke-width: 0.6; }
+.locator .locator__nuqui { fill: rgba(232, 187, 82, 0.55); stroke: var(--gold); stroke-width: 1; }
+.locator__box { fill: rgba(6, 18, 14, 0.35); stroke: rgba(255, 255, 255, 0.6); stroke-width: 0.6; vector-effect: non-scaling-stroke; }
+.locator__colombia { stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.5; }
+.locator .locator__inset-choco { fill: var(--gold); stroke: var(--gold); stroke-width: 0.6; }
+/* Los textos llevan un borde oscuro para leerse sobre cualquier foto. */
+.locator text { fill: #fff; font-family: var(--sans); paint-order: stroke; stroke: rgba(4, 12, 10, 0.7); stroke-width: 3px; stroke-linejoin: round; }
+.locator__name { font: italic 600 16px var(--serif); letter-spacing: 0.08em; opacity: 0.9; }
+.locator__small { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.85; }
+.locator__label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; }
+.locator__label tspan + tspan { font-weight: 400; font-style: italic; }
+.locator__other { fill: rgba(255, 255, 255, 0.85); stroke: rgba(6, 18, 14, 0.6); stroke-width: 0.8; }
+.locator__dot { fill: var(--gold); stroke: #fff; stroke-width: 1.4; }
+.locator__pulse { fill: none; stroke: var(--gold); stroke-width: 1.2; transform-box: fill-box; transform-origin: center; animation: locator-pulse 2.4s ease-out infinite; }
+@keyframes locator-pulse { from { transform: scale(0.8); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
+@media (max-width: 900px) {
+  .locator { right: 56px; height: min(52vh, 460px); }
+}
+@media (max-width: 640px) {
+  .locator { right: auto; left: 12px; top: 64px; translate: none; height: min(34vh, 300px); }
+  /* Más chico en pantalla: las letras crecen para seguir leyéndose. */
+  .locator__name { font-size: 24px; }
+  .locator__small { font-size: 12px; }
+  .locator__label { font-size: 17px; }
+}
