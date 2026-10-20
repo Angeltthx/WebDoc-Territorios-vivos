@@ -231,9 +231,9 @@ export const transitions: Transition[] = [
     symbol: 'wave',
     // Texto del Canva del cliente (13/10/2026); sigue en la transición 2 («…y otras aguas…»).
     lines: ['El agua nos une a todos aquí, naveguemos por el río Chorí…'],
+    // Llena la pantalla como las demás (19/10/2026): completa, con franjas de fondo desenfocado a los lados, se veía
+    // cortada.
     video: 't1',
-    // Se veía muy recortada (el video es más ancho que la pantalla): completa, con el fondo desenfocado (13/10/2026).
-    fit: 'contain',
   },
   {
     number: 2,
