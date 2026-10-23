@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Territorios Vivos · Relatos del Pacífico. Muy pronto." />
+    <meta name="theme-color" content="#0f231c" />
+    <meta property="og:title" content="Territorios Vivos · Relatos del Pacífico" />
+    <meta property="og:description" content="Muy pronto." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400&family=IBM+Plex+Serif:ital,wght@0,700;1,700&display=swap" rel="stylesheet" />
+    <title>Territorios Vivos · Próximamente</title>
+    <style>
+      :root { --forest: #0f231c; --gold: #e8bb52; }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        display: grid; place-items: center; padding: 24px 16px;
+        background: radial-gradient(120% 90% at 50% 110%, #1d4a3a 0%, var(--forest) 62%);
+        color: #fff; font: 16px/1.55 'IBM Plex Sans', system-ui, sans-serif; text-align: center;
+        -webkit-font-smoothing: antialiased; overflow: hidden;
+      }
+      main { display: flex; flex-direction: column; align-items: center; gap: 28px; animation: in 1.6s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+      h1 { margin: 0; display: flex; flex-direction: column; align-items: center; line-height: 0.92; font-family: 'IBM Plex Serif', Georgia, serif; font-weight: 700; }
+      .top { font-size: clamp(38px, 9vw, 92px); letter-spacing: 0.02em; text-transform: uppercase; }
+      .bottom { font-size: clamp(44px, 10.5vw, 112px); font-style: italic; letter-spacing: 0.04em; text-transform: uppercase; }
+      .sub { margin-top: 0.9em; font: 400 clamp(12px, 1.6vw, 18px) 'IBM Plex Sans', sans-serif; letter-spacing: 0.32em; text-transform: uppercase; }
+      svg { width: 72px; height: auto; }
+      svg path { animation: wave 4s ease-in-out infinite; }
+      svg path + path { animation-delay: -2s; }
+      p { margin: 0; font-size: clamp(13px, 1.4vw, 16px); letter-spacing: 0.32em; text-transform: uppercase; color: var(--gold); }
+      @keyframes in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+      @keyframes wave { 50% { transform: translateX(-6px); } }
+      @media (prefers-reduced-motion: reduce) { main, svg path { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>
+        <span class="top">Territorios</span>
+        <span class="bottom">Vivos</span>
+        <span class="sub">Relatos del Pacífico</span>
+      </h1>
+      <svg viewBox="8 22 50 26" aria-hidden="true"><path d="M12 30c5-6 9-6 14 0s9 6 14 0 9-6 14 0" fill="none" stroke="#e8bb52" stroke-width="3" stroke-linecap="round"/><path d="M12 42c5-6 9-6 14 0s9 6 14 0 9-6 14 0" fill="none" stroke="#e8bb52" stroke-width="3" stroke-linecap="round" opacity="0.6"/></svg>
+      <p>Muy pronto</p>
+    </main>
+  </body>
+</html>

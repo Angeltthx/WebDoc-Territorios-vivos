@@ -21,6 +21,11 @@ npm run build   # verificación de tipos + build de producción en dist/
 Despliegue: Vercel (configuración en `vercel.json`). `vercel` crea un despliegue de vista
 previa y `vercel --prod` publica a producción.
 
+**Antes del lanzamiento** el recorrido solo se ve en el subdominio privado que nombra `vercel.json`;
+cualquier otro dominio muestra `public/proximamente.html` (la API sigue abierta en todos). Por eso
+el build renombra `dist/index.html` a `app.html`. Para lanzar: el `rewrite` sin condición va a
+`/app.html` y se quita el `noindex` de `index.html`.
+
 **Los medios no se versionan.** Fotos, ilustraciones, logos y videos no están en el repositorio:
 `public/media/` se genera localmente con los dos comandos anteriores a partir de la carpeta
 `Contenido/` (entregada aparte, al lado de este proyecto). Para publicar, el despliegue se hace
