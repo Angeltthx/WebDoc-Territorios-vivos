@@ -8,6 +8,11 @@
       "source": "/app.html",
       "destination": "/",
       "permanent": false
+    },
+    {
+      "source": "/video",
+      "destination": "https://youtu.be/Glh_bb9vrDM",
+      "permanent": false
     }
   ],
   "rewrites": [
