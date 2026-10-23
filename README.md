@@ -23,7 +23,8 @@ Despliegue: Vercel (configuración en `vercel.json`). `vercel` crea un despliegu
 previa y `vercel --prod` publica a producción.
 
 **Antes del lanzamiento** el recorrido solo se ve en el subdominio privado que nombra `vercel.json`;
-cualquier otro dominio muestra `public/proximamente.html` (la API sigue abierta en todos). Por eso
+cualquier otro dominio muestra `public/proximamente.html` (la API sigue abierta en todos), salvo `/guia`, que
+abre en todos con la misma clave (a esa dirección lleva el QR de la guía). Por eso
 el build renombra `dist/index.html` a `app.html`. Para lanzar: el `rewrite` sin condición va a
 `/app.html` y se quita el `noindex` de `index.html`.
 
