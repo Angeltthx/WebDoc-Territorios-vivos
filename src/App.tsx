@@ -13,6 +13,8 @@ const StoryForm = lazy(() => import('./ui/screens/StoryForm'));
 const OrderPage = lazy(() => import('./ui/screens/OrderPage'));
 // El panel del equipo (con su clave; no se indexa).
 const Admin = lazy(() => import('./ui/screens/Admin'));
+// La guía pedagógica (a esta dirección lleva su QR).
+const Guide = lazy(() => import('./ui/screens/Guide'));
 const sheet = (el: ReactNode) => <Suspense fallback={null}><div className="sheet-page">{el}</div></Suspense>;
 
 /** Cuenta cada dirección a la que se llega (el recorrido cuenta sus páginas por su lado: ver journey.ts). */
@@ -36,6 +38,7 @@ export function App() {
         {/* A donde vuelve la persona después de pagar en Wompi. */}
         <Route path="/tienda/pedido/:ref" element={sheet(<OrderPage />)} />
         <Route path="/cuenta-tu-historia" element={sheet(<StoryForm />)} />
+        <Route path="/guia" element={<Suspense fallback={null}><Guide /></Suspense>} />
         <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
         <Route path="/:page" element={<Webdoc />} />
         <Route path="*" element={<Webdoc />} />
