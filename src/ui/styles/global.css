@@ -179,6 +179,9 @@ h1, h2, p, blockquote, figure { margin: 0; }
 }
 .start-btn svg { animation: bob 1.8s ease-in-out infinite; }
 .start-btn:hover { color: var(--gold); }
+.credit { margin: 6px 0 0; font-size: 11px; letter-spacing: 0.14em; color: rgba(255, 255, 255, 0.78); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5); }
+.credit a { color: #fff; font-weight: 500; text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.4); }
+.credit a:hover { color: var(--gold); border-color: var(--gold); }
 
 /* ───────── Cita ───────── */
 .quote { position: absolute; left: clamp(20px, 5vw, 80px); top: 50%; transform: translateY(-50%); max-width: min(600px, 52vw); text-shadow: 0 2px 20px rgba(0, 0, 0, 0.4); }
@@ -218,6 +221,22 @@ h1, h2, p, blockquote, figure { margin: 0; }
 @keyframes controls-in { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .story.is-playing .story__controls, .story:fullscreen .story__controls { bottom: max(18px, env(safe-area-inset-bottom)); }
 .story.is-idle { cursor: none; }
+/* Tráiler historia: el video en un recuadro sobre el fondo de la galería, con el aviso del estreno debajo. */
+.trailer { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: clamp(14px, 2.4vh, 24px); padding: 76px 20px 150px; }
+.trailer__frame {
+  position: relative; isolation: isolate; overflow: hidden; width: min(880px, 100%, calc((100vh - 330px) * 16 / 9)); aspect-ratio: 16 / 9;
+  border-radius: 10px; background: #000; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+}
+.trailer__frame:fullscreen { border-radius: 0; }
+.trailer__frame .story__title { font-size: 14px; }
+.trailer__frame .play-hint { display: none; }
+.trailer__frame .story .story__controls { width: calc(100% - 24px); bottom: 12px; }
+.trailer__note { margin: 0; max-width: 680px; text-align: center; font-size: clamp(13px, 1.25vw, 15.5px); line-height: 1.6; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
+@media (max-width: 640px) {
+  .trailer { padding: 70px 16px 140px; }
+  .trailer__frame { width: 100%; }
+  .trailer__note { padding: 0 44px; font-size: 12.5px; line-height: 1.5; } /* libre de los botones laterales */
+}
 .story.is-idle .story__controls { opacity: 0; pointer-events: none; }
 .screen .topbar, .screen .page-foot { transition: opacity 0.45s ease, transform 0.55s var(--ease); }
 .screen:has(.story.is-playing) .page-foot { opacity: 0; transform: translateY(100%); pointer-events: none; }
@@ -313,12 +332,6 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .recipe__steps img { width: 100%; height: 100%; object-fit: cover; }
 .recipe__pending { background: #000; }
 
-/* ───────── Silencio ───────── */
-.silence { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 18px; text-align: center; padding: 0 20px; }
-.silence__title { font: italic 400 clamp(30px, 4.2vw, 56px)/1.15 var(--sans); animation: slowfade 4s ease 0.6s both; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.3); }
-.silence__hint { font-size: 14px; letter-spacing: 0.06em; animation: slowfade 2s ease 3.6s both; }
-@keyframes slowfade { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: none; } }
-
 /* ───────── 360 · Cantos ───────── */
 .songs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: clamp(16px, 11vw, 170px); padding: 0 80px 20px; }
 .glass-card {
@@ -353,6 +366,7 @@ body:has(.stack-page.is-active .story.is-idle) .menu-btn { opacity: 0; pointer-e
 .route circle { fill: rgba(255, 255, 255, 0.45); }
 .route circle.is-done { fill: #fff; }
 .route circle.is-next { fill: var(--gold); animation: route-pulse 1.8s ease-in-out 3.5s infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes river-draw { to { stroke-dashoffset: 0; } }
 @keyframes route-pulse { 50% { transform: scale(1.5); } }
 @media (prefers-reduced-motion: reduce) {
   .route { animation: fade 1s ease 0.6s both !important; }

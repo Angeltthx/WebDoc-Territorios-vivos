@@ -42,6 +42,23 @@ export function VideoPanel({ video, bar, active = false }: { video: VideoAsset; 
   return <PendingVideo video={video} bar={bar} />;
 }
 
+/** Aviso bajo los tráileres (pedido del cliente, 20/10/2026). */
+const TRAILER_NOTE =
+  'Muy pronto podrás disfrutar de la historia completa en cines, eventos especiales y televisión. Síguenos en nuestras redes sociales para conocer las próximas fechas, horarios y lugares de proyección. ¡Mantente conectado para no perderte ningún detalle!';
+
+/** Tráiler historia: el video en un recuadro (no a pantalla completa) sobre el fondo de la galería de la estación. */
+export function TrailerPanel({ video, background, active = false }: { video: VideoAsset; background: Photo; active?: boolean }) {
+  return (
+    <>
+      <Backdrop photo={background} tint="rgba(8,16,14,.55)" blur />
+      <div className="trailer reveal">
+        <div className="trailer__frame"><VideoPanel video={video} active={active} /></div>
+        <p className="trailer__note">{TRAILER_NOTE}</p>
+      </div>
+    </>
+  );
+}
+
 /** Reproductor pendiente: portada y botón, hasta que se entregue el archivo final. */
 function PendingVideo({ video, bar }: { video: VideoAsset; bar?: string }) {
   const [asked, setAsked] = useState(false);
@@ -471,18 +488,6 @@ export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']>
 }
 
 /** Escena de silencio (marea alta / marea baja): sin voz, el título aparece despacio. */
-export function SilencePanel({ tide, title, hint, photo }: { tide: 'alta' | 'baja'; title: string; hint: string; photo: Photo }) {
-  return (
-    <>
-      <Backdrop photo={photo} tint={tide === 'alta' ? 'rgba(20,110,80,.5)' : 'rgba(30,90,110,.42)'} />
-      <div className={`silence silence--${tide}`}>
-        <h2 className="silence__title">{title}</h2>
-        <p className="silence__hint"><span aria-hidden="true">≋</span> {hint}</p>
-      </div>
-    </>
-  );
-}
-
 export function SongsPanel({ songs }: { songs: NonNullable<Station['songs']> }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [video360, setVideo360] = useState<HTMLVideoElement | null>(null);

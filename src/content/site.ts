@@ -44,7 +44,7 @@ export const menu: MenuItem[] = [
   { label: 'Panguí', to: 'transicion-3' },
   {
     label: 'Estación 4 · Marea alta, marea baja',
-    to: 'pangui-marea-alta',
+    to: 'pangui-pensamiento',
     children: [
       { label: 'Tráiler historia', to: 'pangui-historia' },
       { label: 'Galería', to: 'pangui-galeria' },

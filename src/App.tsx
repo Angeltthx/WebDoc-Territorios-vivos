@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { BASE } from './application/base';
 import { countPage } from './application/visits';
 import { Webdoc } from './ui/screens/Webdoc';
 
@@ -29,7 +30,7 @@ function VisitTracker() {
 
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={BASE || undefined}>
       <VisitTracker />
       <Routes>
         <Route path="/" element={<Webdoc />} />

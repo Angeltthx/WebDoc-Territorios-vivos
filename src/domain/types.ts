@@ -8,7 +8,6 @@ export type SectionKind =
   | 'galeria'
   | 'receta'
   | 'scrolly'
-  | 'silencio'
   | 'cantos'
   | 'video-cancion'
   | 'viche';
@@ -57,7 +56,6 @@ export interface Station {
   gallery?: { intro: string; background: Photo; photos: Photo[] };
   recipe?: { eyebrow: string; title: string; hero: Photo; steps: Photo[] };
   scrolly?: { scenes: { photo: Photo; text: string }[] };
-  silence?: { title: string; hint: string; photo: Photo };
   songs?: {
     background: Photo;
     /** Experiencia 360: lista HLS y imagen equirrectangular de espera. */

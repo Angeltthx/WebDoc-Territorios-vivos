@@ -6,6 +6,7 @@
 // si la persona se queda en ella al menos STAY_MS (las que se pasan de largo, no).
 
 import { inject, pageview } from '@vercel/analytics';
+import { appPath } from './base';
 
 const STAY_MS = 1500;
 const skip = (path: string) => path.startsWith('/admin');
@@ -34,7 +35,7 @@ export function countPage(path: string, { vercel = false, at = path } = {}) {
   if (skip(path)) return;
   window.clearTimeout(timer);
   timer = window.setTimeout(() => {
-    if (location.pathname !== at) return;
+    if (appPath(location.pathname) !== at) return;
     if (vercel) pageview({ path });
     countOwn(path);
   }, STAY_MS);

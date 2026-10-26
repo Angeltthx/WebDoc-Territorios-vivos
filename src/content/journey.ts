@@ -168,24 +168,20 @@ export const stations: Station[] = [
     where: { lat: 5.6631, lon: -77.3091 },
     illustration: 'manglar-con-circulo',
     background: p('6i3a4281', 'Una mujer toca las ramas del manglar'),
+    // Pensamiento en lugar de las escenas Marea alta y Marea baja, con la misma imagen (pedido del cliente, 20/10/2026).
     quote: {
-      text: 'Marea alta, marea baja',
+      text: 'Aquí tenemos los elementos de la vida: el agua dulce, el agua salada, todo un tema de tradición, de cultura',
       author: 'Panguí',
-      portrait: p('6i3a4281', 'Una mujer toca las ramas del manglar'),
+      portrait: p('6i3a4281', 'Una mujer toca las ramas del manglar', { focus: '55% 30%' }),
     },
     sections: [
-      { kind: 'silencio', label: 'Silencio' },
+      { kind: 'pensamiento', label: 'Pensamiento' },
       { kind: 'historia', label: 'Tráiler historia' },
       { kind: 'galeria', label: 'Galería' },
       { kind: 'cantos', label: 'Manglar - Cantos' },
       { kind: 'video-cancion', label: 'Video canción' },
       { kind: 'viche', label: 'Un regalo de la selva' },
     ],
-    silence: {
-      title: 'Marea alta, marea baja',
-      hint: 'el sonido baja · solo la marea',
-      photo: p('6i3a4281', 'Una mujer toca las ramas del manglar', { focus: '55% 30%' }),
-    },
     video: {
       title: 'Marea alta, marea baja',
       duration: '12:30',
@@ -272,10 +268,6 @@ export const transitions: Transition[] = [
     video: 'cierre',
   },
 ];
-
-/** Voz de Chachita en el Tráiler historia de la estación 4 (antes sonaba en el Viche, que ahora tiene su video con
- * sonido). La de la bienvenida ya viene en el video de la portada. */
-export const voices = { panguiHistoria: 'x' };
 
 export const welcome = {
   background: p('6i3a4535', 'Un pescador rema una canoa frente a una isla del Pacífico', { focus: '50% 60%' }),

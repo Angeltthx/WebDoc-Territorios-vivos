@@ -20,7 +20,7 @@ export const STATION_PAGE: Record<string, string> = {
   chori: 'chori-pensamiento',
   atrato: 'atrato-pensamiento',
   nuqui: 'nuqui-pensamiento',
-  pangui: 'pangui-marea-alta',
+  pangui: 'pangui-pensamiento',
 };
 
 /** Dirección de una página del recorrido, para llegar a ella desde fuera. */
