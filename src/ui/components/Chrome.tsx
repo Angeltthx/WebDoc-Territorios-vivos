@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pathFor } from '../../application/journey';
 import { stations } from '../../content/journey';
@@ -59,11 +59,41 @@ export function ChachitaTag({ plain }: { plain?: boolean }) {
   );
 }
 
+/**
+ * Una fila de pestañas que no cabe (en celular, la estación 4 tiene seis): la activa se trae a la vista y la fila dice
+ * hacia qué lado hay más (`data-more`, que pone una sombra en ese borde).
+ */
+export function useTabsInView(nav: RefObject<HTMLElement | null>, active: string) {
+  useEffect(() => {
+    const el = nav.current;
+    if (!el) return;
+    const mark = () => {
+      const left = el.scrollLeft > 2;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+      el.dataset.more = left && right ? 'both' : left ? 'left' : right ? 'right' : '';
+    };
+    const on = el.querySelector<HTMLElement>('[aria-current="page"]');
+    if (on && el.scrollWidth > el.clientWidth) {
+      const a = el.getBoundingClientRect(), b = on.getBoundingClientRect();
+      el.scrollLeft += b.left + b.width / 2 - (a.left + a.width / 2);
+    }
+    mark();
+    el.addEventListener('scroll', mark, { passive: true });
+    window.addEventListener('resize', mark);
+    return () => {
+      el.removeEventListener('scroll', mark);
+      window.removeEventListener('resize', mark);
+    };
+  }, [nav, active]);
+}
+
 /** Pestañas de la estación. Cada una desplaza el recorrido hasta su página. */
 export function PageTabs({ tabs }: { tabs: Tabs }) {
   const { scrollToPage } = useJourneyNav();
+  const nav = useRef<HTMLElement>(null);
+  useTabsInView(nav, tabs.active);
   return (
-    <nav className="tabs" aria-label="Secciones de la estación">
+    <nav className="tabs" aria-label="Secciones de la estación" ref={nav}>
       {tabs.items.map((t) => {
         const active = t.label === tabs.active;
         const cls = `tab${active ? ' is-active' : ''}${t.warm ? ' tab--warm' : ''}`;

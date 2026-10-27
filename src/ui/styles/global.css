@@ -249,7 +249,7 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 @media (max-width: 640px) {
   .trailer { padding: 70px 16px 140px; }
   .trailer__frame { width: 100%; }
-  .trailer__note { padding: 0 44px; font-size: 12.5px; line-height: 1.5; } /* libre de los botones laterales */
+  .trailer__note { padding: 0 4px; font-size: 14px; line-height: 1.55; }
 }
 .story.is-idle .story__controls { opacity: 0; pointer-events: none; }
 .screen .topbar, .screen .page-foot { transition: opacity 0.45s ease, transform 0.55s var(--ease); }
@@ -493,7 +493,9 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   overscroll-behavior: none; background: var(--forest); scrollbar-width: none;
 }
 .scroller::-webkit-scrollbar { display: none; }
-.stack-page { position: sticky; top: 0; height: 100dvh; min-height: 480px; overflow: hidden; background: var(--forest); }
+/* Exactamente el alto de la pantalla (sin mínimo): el recorrido ubica cada página por ese alto, y con el celular
+   acostado un mínimo más alto que la pantalla corría todas las páginas. */
+.stack-page { position: sticky; top: 0; height: 100dvh; overflow: hidden; background: var(--forest); }
 .stack-page.is-covered { visibility: hidden; }
 
 /* Las animaciones de entrada esperan a que la página llegue a la pantalla. */
@@ -775,23 +777,21 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .recipe__steps { padding-right: 56px; }
   .recipe__step { width: min(300px, 74vw); }
   .recipe__prev, .recipe__next { display: none; }
-  .recipe__body { font-size: 13px; line-height: 1.5; }
+  .recipe__body { font-size: 14.5px; line-height: 1.55; }
 }
 
 @media (max-width: 640px) {
-  .dock { left: auto; right: 10px; bottom: auto; top: 50%; transform: translateY(-50%); }
-  .dock .social a, .dock .social span, .dock__sound { width: 34px; height: 34px; }
-  .chip { font-size: 10px; letter-spacing: 0.12em; max-width: 60vw; }
-  .ghost-link { font-size: 11px; letter-spacing: 0.1em; }
+  .chip { font-size: 11px; letter-spacing: 0.12em; max-width: 60vw; }
+  .ghost-link { font-size: 12px; letter-spacing: 0.1em; }
   .page-foot { padding: 0 12px max(10px, env(safe-area-inset-bottom)); }
-  /* Celular: en vertical contra el borde derecho, entre los botones de redes y las pestañas (sin tapar nada). */
+  /* Celular: en vertical contra el borde derecho, encima de «Desliza para seguir» y de las pestañas. */
   .credit-mark {
-    right: 3px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 62px); writing-mode: vertical-rl; transform: rotate(180deg);
-    font-size: 8.5px; letter-spacing: 0.14em;
+    right: 3px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 120px); writing-mode: vertical-rl; transform: rotate(180deg);
+    font-size: 9px; letter-spacing: 0.14em;
   }
-  body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 62px); }
+  body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 120px); }
   .tabs { justify-content: flex-start; }
-  .tab { font-size: 11px; }
+  .tab { font-size: 12px; }
   .quote { left: 20px; right: 20px; top: auto; bottom: 130px; transform: none; max-width: none; }
   .quote.reveal { animation-name: rise; }
   .video__bar { left: 20px; right: 20px; bottom: 120px; }
@@ -2397,4 +2397,82 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .chapter-team__thanks { grid-template-columns: 1fr 1fr; }
   .chapter-take img { width: 84px; height: 116px; }
   .chapter .dock { display: none; }
+}
+
+/* ───────── Celular (28/10/2026) ─────────
+   La misma interfaz, compuesta para una pantalla de 360–430 px (criterios de la skill de diseño): nada fijo encima
+   del contenido, letra legible, toques de al menos 44 px y nada que se salga por los lados. */
+@media (max-width: 640px) {
+  /* Arriba a la derecha solo quedan el sonido y el menú; las redes están dentro del menú. Lo que iba a la derecha de
+     la barra («Mapa · guía», «Chachita», «Ver mapa interactivo») también está en el menú. */
+  .dock { left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; }
+  .dock .social { display: none; }
+  .dock__sound { width: 44px; height: 44px; }
+  .stack-page .topbar { padding-right: 120px; }
+  .stack-page .topbar__right { display: none; }
+  .stack-page .chip { max-width: 100%; }
+  /* La pestaña activa a la vista y una sombra en el borde por donde hay más. */
+  .tabs[data-more='right'] { mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+  .tabs[data-more='left'] { mask-image: linear-gradient(90deg, transparent, #000 36px); }
+  .tabs[data-more='both'] { mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+  /* Galería: cada foto con su proporción, sin franjas vacías arriba y abajo. */
+  .gallery__card { height: auto; width: min(84vw, calc(46vh * var(--ar, 1.5))); max-width: none; }
+  .page-foot__note { display: none; }
+  /* Textos de lectura. */
+  .transition__quote, .transition__line { font-size: 21px; line-height: 1.4; }
+  .chapter p { font-size: 15px; line-height: 1.6; }
+  .chapter-team__people span { font-size: 12.5px; }
+  .chapter-blog__meta, .chapter-soon, .chapter-take__note { font-size: 12.5px !important; }
+  .chapter-blog aside em { font-size: 12px; }
+  .chapter--video .chapter__body { align-content: center; }
+  .globe-title__gate { font-size: 11px; line-height: 1.5; }
+  .play-hint__touch { font-size: 11.5px; }
+  .listen__text small { font-size: 11px; }
+  .gallery__tag { font-size: 12px; }
+  /* Toques de al menos 44 px. */
+  .songs__yt, .reader__back, .sheet__back, .story-how { display: inline-flex; align-items: center; min-height: 44px; }
+  .songs__yt { margin-top: 2px; }
+  .tutorial__dots { gap: 4px; }
+  .tutorial__dots button { height: 44px; background: linear-gradient(var(--line), var(--line)) center / 100% 3px no-repeat; border-radius: 0; }
+  .tutorial__dots button.is-on { background-image: linear-gradient(var(--ink), var(--ink)); }
+  .credit-mark a { padding: 8px 4px; margin: -8px -4px; }
+  .tutorial__skip { min-height: 44px; min-width: 44px; }
+  .tutorial__dots button { width: 34px; background-size: 22px 3px; }
+  .tutorial__dots button.is-on { width: 48px; background-size: 40px 3px; }
+  /* La receta empieza bajo la barra (en pantallas bajas, centrada, el título quedaba debajo de ella). */
+  .recipe { align-content: start; padding-top: 72px; }
+  /* El mapa de ubicación de la estación, más chico: en los retratos tapaba parte de la cara. */
+  .locator { height: min(28vh, 240px); }
+  .route__stop text { font-size: 10px; }
+}
+/* Tablet: el mapa del recorrido sube bajo la barra (abajo chocaba con «Desliza para seguir») y en El proyecto y Visita
+   Nuquí las redes quedan en el menú (tapaban la primera pestaña). */
+@media (max-width: 900px) {
+  .route { top: 60px; bottom: auto; right: 8px; }
+  .chapter .dock { display: none; }
+}
+/* Celular acostado: poca altura. Lo fijo se aprieta arriba (sonido y menú, como en vertical) para dejarle la pantalla
+   a la página; «Desliza para seguir» se quita (chocaba con las pestañas) y la receta vuelve a dos columnas. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .dock { left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; }
+  .dock .social, .chapter .dock { display: none; }
+  .dock__sound { width: 44px; height: 44px; }
+  .stack-page .topbar { padding-right: 120px; }
+  .stack-page .topbar__right { display: none; }
+  .cue, .scroll-hint, .page-foot__note { display: none; }
+  .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 48px); right: 16px; }
+  .route { top: 52px; bottom: auto; }
+  .trailer { padding-top: 60px; padding-bottom: 70px; }
+  .trailer__frame { width: min(880px, 100%, calc((100vh - 140px) * 16 / 9)); }
+  .trailer__note { display: none; }
+  .recipe { grid-template-columns: minmax(200px, 30vw) minmax(0, 1fr); align-content: center; gap: 20px; padding: 58px 0 64px 24px; }
+  .recipe__intro { font-size: 13px; line-height: 1.5; }
+  .recipe__step { width: 250px; padding: 8px; }
+  .recipe__photos { aspect-ratio: 16 / 8; }
+  .recipe__body { font-size: 12.5px; line-height: 1.5; max-height: 9em; overflow-y: auto; }
+  .recipe__prev, .recipe__next { display: none; }
+  .gallery { padding: 56px 0 70px; }
+  .gallery__card { height: min(52vh, 420px); }
+  .quote { bottom: 70px; top: auto; transform: none; }
+  .songs__yt { display: inline-flex; align-items: center; min-height: 44px; }
 }

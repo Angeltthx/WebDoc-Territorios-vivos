@@ -2,11 +2,11 @@
 // su dirección (/el-proyecto/equipo…); se pasa de una a otra sin sumar pasos al «atrás» del navegador, así
 // «Volver al recorrido» regresa a la página del recorrido desde donde se llegó.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { chapterByPath, type ChapterAction, type ChapterBody, type ChapterTab } from '../../content/chapters';
 import { Backdrop, Img } from '../components/Media';
-import { CreditMark, pagePath, SiteMenu, SocialLinks } from '../components/Chrome';
+import { CreditMark, pagePath, SiteMenu, SocialLinks, useTabsInView } from '../components/Chrome';
 import { VideoPanel } from '../components/Sections';
 
 export default function ChapterScreen({ path }: { path: string }) {
@@ -17,6 +17,8 @@ export default function ChapterScreen({ path }: { path: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState(false);
   const tab = chapter.tabs.find((t) => t.slug === slug) ?? chapter.tabs[0];
+  const tabsNav = useRef<HTMLElement>(null);
+  useTabsInView(tabsNav, tab.slug);
 
   useEffect(() => {
     document.title = `Territorios Vivos · ${chapter.label} · ${tab.label}`;
@@ -50,7 +52,7 @@ export default function ChapterScreen({ path }: { path: string }) {
       <main key={tab.slug} className="chapter__body reveal">
         <Body body={tab.body} act={act} />
       </main>
-      <nav className="chapter__tabs tabs" aria-label={`Secciones de ${chapter.label}`}>
+      <nav className="chapter__tabs tabs" aria-label={`Secciones de ${chapter.label}`} ref={tabsNav}>
         {chapter.tabs.map((t: ChapterTab, i) => (
           <Link
             key={t.slug}
