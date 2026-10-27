@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getStation, transitions } from '../../content/journey';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
@@ -42,10 +42,14 @@ export function Webdoc() {
 
   useEffect(() => () => setVoice(null), []);
 
-  const toggleSound = () => {
+  const toggleSound = useCallback(() => {
     setMuted(!muted);
     setMutedState(!muted);
-  };
+  }, [muted]);
+  // Estables: al pasar de página solo se vuelven a dibujar las páginas que cambian (la que llega, la que se va y sus
+  // vecinas), no las 24.
+  const unmute = useCallback(() => muted && toggleSound(), [muted, toggleSound]);
+  const openGuide = useCallback(() => setGuideOpen(true), []);
 
   const nav = useMemo(() => ({ scrollToPage, scrollToIndex, inJourney: true }), [scrollToPage, scrollToIndex]);
 
@@ -63,14 +67,14 @@ export function Webdoc() {
               aria-hidden={i !== active ? true : undefined}
               inert={i !== active ? true : undefined}
             >
-              <PageView
+              <StackPage
                 spec={spec}
                 next={pages[i + 1]?.id}
                 playing={i === active}
                 near={Math.abs(i - active) <= 1}
                 muted={muted}
-                unmute={() => muted && toggleSound()}
-                openGuide={() => setGuideOpen(true)}
+                unmute={unmute}
+                openGuide={openGuide}
               />
             </section>
           );
@@ -101,6 +105,8 @@ function voiceOf(spec: PageSpec): string | null {
   // El Tráiler historia de la estación 4 ya no lleva voz: la que sonaba ahí era la del Viche (20/10/2026).
   return spec.kind === 'transition' ? transitions[spec.index].voice ?? null : null;
 }
+
+const StackPage = memo(PageView);
 
 function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
   spec: PageSpec;

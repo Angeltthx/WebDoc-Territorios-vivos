@@ -400,13 +400,19 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .t-dots li { width: 10px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.55); }
 .t-dots li.is-active { width: 22px; background: #fff; }
 /* Mapa del recorrido en las transiciones: abajo a la derecha, pequeño. En celular, arriba bajo la barra.
-   Un río con las paradas: por lo andado el agua corre sin parar; el tramo nuevo se llena con una gota al frente y la
-   parada a la que se llega se ilumina y hace ondas (28/10/2026). Tiempos: el agua baja de 0,8 s a 3,8 s. */
+   Un río con las paradas: por lo andado el agua corre; el tramo nuevo se llena con una gota al frente y la parada a la
+   que se llega se ilumina y hace ondas (28/10/2026). Tiempos: el agua baja de 0,8 s a 3,8 s.
+   No se queda (29/10/2026): aparece medio transparente, cuenta a dónde se va y a los 6 s se desvanece. */
 .route {
   --water: #9fe3f2;
   position: absolute; z-index: 4; right: 16px; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 22px); margin: 0;
-  padding: 8px 10px 4px; border-radius: 14px; background: radial-gradient(ellipse at center, rgba(6, 18, 14, 0.42), rgba(6, 18, 14, 0) 72%);
-  animation: fade 1s ease 0.4s both;
+  padding: 8px 10px 4px; border-radius: 14px; background: radial-gradient(ellipse at center, rgba(6, 18, 14, 0.26), rgba(6, 18, 14, 0) 72%);
+  pointer-events: none; animation: route-glimpse 7.2s ease both;
+}
+@keyframes route-glimpse {
+  0%, 5% { opacity: 0; visibility: visible; }
+  14%, 80% { opacity: 0.82; }
+  100% { opacity: 0; visibility: hidden; }
 }
 .route svg { display: block; overflow: visible; max-width: calc(100vw - 32px); height: auto; }
 .route path { fill: none; stroke-linecap: round; }
@@ -435,20 +441,18 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 @keyframes stop-arrive { 0% { transform: scale(1); } 45% { transform: scale(1.7); fill: #fff; } 100% { transform: scale(1); fill: var(--water); } }
 @keyframes name-arrive { to { fill: #fff; font-weight: 700; } }
 /* Ondas, como una gota que cae en el agua: empiezan al llegar y siguen, despacio. */
-.route__ripple { fill: none; stroke: var(--water); stroke-width: 1; opacity: 0; transform-box: fill-box; transform-origin: center; animation: ripple 2.8s ease-out 3.7s infinite; }
-.route__ripple--late { animation-delay: 5.1s; }
+.route__ripple { fill: none; stroke: var(--water); stroke-width: 1; opacity: 0; transform-box: fill-box; transform-origin: center; animation: ripple 2.4s ease-out 3.7s both; }
+.route__ripple--late { animation-delay: 4.5s; }
 @keyframes ripple { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(3.6); opacity: 0; } }
 /* Con movimiento reducido (p. ej. «Efectos de animación» apagados en Windows) el agua igual llega, una vez: es lo que
    cuenta a dónde se va. No sigue la corriente ni se repiten las ondas. Le gana a la regla general que acorta todo. */
 @media (prefers-reduced-motion: reduce) {
+  .route { animation-duration: 7.2s !important; }
   .route .route__seg.is-now .route__water, .route .route__drop { animation-duration: 3s !important; }
   .route .route__stop.is-next circle, .route .route__stop.is-next text { animation-duration: 0.7s !important; }
-  .route .route__ripple { animation-duration: 2.8s !important; }
+  .route .route__ripple { animation-duration: 2.4s !important; }
   .route .route__ripple--late { display: none; }
   .route .route__flow { animation: none !important; opacity: 0; }
-}
-@media (max-width: 640px) {
-  .route { top: 60px; bottom: auto; right: 8px; }
 }
 .rain { position: absolute; inset: 0; z-index: -1; opacity: 0.3; pointer-events: none;
   background-image: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 255, 255, 0.35) 22px 23px, transparent 23px 60px);
@@ -498,8 +502,15 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .stack-page { position: sticky; top: 0; height: 100dvh; overflow: hidden; background: var(--forest); }
 .stack-page.is-covered { visibility: hidden; }
 
-/* Las animaciones de entrada esperan a que la página llegue a la pantalla. */
-.stack-page:not(.is-seen) .screen *, .stack-page:not(.is-seen) .screen *::before, .stack-page:not(.is-seen) .screen *::after { animation-play-state: paused !important; }
+/* Las animaciones de entrada esperan a que la página llegue a la pantalla, y las de las páginas que no se están viendo
+   (lo que se repite sin parar: el agua del mapa, los pulsos) se detienen hasta volver a ellas. */
+.stack-page:not(.is-active) .screen *, .stack-page:not(.is-active) .screen *::before, .stack-page:not(.is-active) .screen *::after { animation-play-state: paused !important; }
+@media (hover: none) and (pointer: coarse) {
+  .chip, .listen, .menu-btn, .dock__sound, .social a, .social span { backdrop-filter: none; }
+  .chip:not(.chip--plain) { background: rgba(20, 28, 26, 0.66); }
+  .menu-btn, .dock__sound, .social a, .social span { background: rgba(0, 0, 0, 0.4); }
+  .listen { background: rgba(6, 18, 14, 0.55); }
+}
 
 /* ───────── Al pasar de página: la marea ─────────
    La página nueva no sube como una hoja: emerge en el lugar de la anterior, como si saliera del agua. Mientras llega se
@@ -549,6 +560,13 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .stack-page:not(.stack-page--first) > .screen { animation: none; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .stack-page:not(.stack-page--first) > .screen { animation: none; }
+}
+/* Pantallas táctiles: la página nueva sube con el dedo y tapa la anterior, sin la marea (29/10/2026: en el celular el
+   velo y el desenfoque ligados al dedo hacían que la pantalla pareciera vibrar, y pesan mucho en un celular sencillo). */
+@media (hover: none) and (pointer: coarse) {
+  .stack-page:not(.stack-page--first) { animation: none; }
+  .stack-page:not(.stack-page--first)::before, .stack-page:not(.stack-page--first)::after { content: none; }
   .stack-page:not(.stack-page--first) > .screen { animation: none; }
 }
 
@@ -751,6 +769,8 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .menu__sub .menu__link { min-height: 36px; font-size: 14px; border-left: 1px solid rgba(255, 255, 255, 0.18); padding-left: 14px; }
 .menu__sub .menu__link[aria-current='page'] { border-left-color: var(--gold); }
 .menu__social { margin-top: auto; padding-top: 12px; }
+.menu__credit { display: none; margin: -8px 0 0; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); }
+.menu__credit a { color: rgba(255, 255, 255, 0.82); font-weight: 600; text-decoration: none; }
 
 .social { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
 .social a, .social span {
@@ -784,12 +804,25 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .chip { font-size: 11px; letter-spacing: 0.12em; max-width: 60vw; }
   .ghost-link { font-size: 12px; letter-spacing: 0.1em; }
   .page-foot { padding: 0 12px max(10px, env(safe-area-inset-bottom)); }
-  /* Celular: en vertical contra el borde derecho, encima de «Desliza para seguir» y de las pestañas. */
-  .credit-mark {
+  /* Celular: la marca va donde se elija (ver chooseMarkPlace en Chrome.tsx). */
+  /* `arriba`: en la esquina de arriba, bajo el sonido y el menú, en dos líneas pequeñas alineadas a la derecha. */
+  [data-marca='arriba'] .credit-mark {
+    top: calc(max(14px, env(safe-area-inset-top)) + 52px); bottom: auto; right: 16px; width: 140px; text-align: right;
+    font-size: 8.5px; line-height: 1.45; letter-spacing: 0.16em; color: rgba(255, 255, 255, 0.5);
+  }
+  [data-marca='arriba'] .credit-mark a { display: block; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.72); }
+  /* `menu`: fuera de las páginas; queda al pie del menú y, en la bienvenida, abajo a la derecha. */
+  [data-marca='menu'] .credit-mark { display: none; }
+  [data-marca='menu'] body:has(.stack-page--first.is-active) .credit-mark {
+    display: block; right: 16px; bottom: max(10px, env(safe-area-inset-bottom)); font-size: 8.5px; letter-spacing: 0.16em;
+  }
+  [data-marca='menu'] .menu__credit { display: block; }
+  /* `lateral`: en vertical contra el borde derecho, encima de «Desliza para seguir» y de las pestañas. */
+  [data-marca='lateral'] .credit-mark {
     right: 3px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 120px); writing-mode: vertical-rl; transform: rotate(180deg);
     font-size: 9px; letter-spacing: 0.14em;
   }
-  body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 120px); }
+  [data-marca='lateral'] body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 120px); }
   .tabs { justify-content: flex-start; }
   .tab { font-size: 12px; }
   .quote { left: 20px; right: 20px; top: auto; bottom: 130px; transform: none; max-width: none; }
@@ -2475,4 +2508,9 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .gallery__card { height: min(52vh, 420px); }
   .quote { bottom: 70px; top: auto; transform: none; }
   .songs__yt { display: inline-flex; align-items: center; min-height: 44px; }
+}
+/* Celular de pie: el mapa va abajo, sobre «Desliza para seguir» (arriba puede ir la marca de agua); como solo aparece
+   un momento, ahí se lee de paso (29/10/2026). */
+@media (max-width: 640px) and (orientation: portrait) {
+  .route { top: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 66px); right: 8px; }
 }
