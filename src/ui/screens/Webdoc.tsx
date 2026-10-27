@@ -8,7 +8,7 @@ import {
   Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
   StationGuide, TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
-import { GalleryPanel, QuotePanel, RecipePanel, SongsPanel, TrailerPanel, VideoPanel } from '../components/Sections';
+import { FramedVideo, GalleryPanel, QuotePanel, RecipePanel, SongsPanel, VideoPanel } from '../components/Sections';
 import { ScrollCue } from '../components/ScrollCue';
 import { StationLocator } from '../components/StationLocator';
 
@@ -147,8 +147,8 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
       return (
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content">
-            {spec.trailer ? (
-              <TrailerPanel video={spec.video} background={getStation(spec.trailer)!.gallery!.background} active={playing} />
+            {spec.frame ? (
+              <FramedVideo video={spec.video} background={getStation(spec.frame)!.gallery!.background} note={spec.note} active={playing} />
             ) : (
               <VideoPanel video={spec.video} bar={spec.bar} active={playing} />
             )}

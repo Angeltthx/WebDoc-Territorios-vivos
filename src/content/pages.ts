@@ -6,7 +6,8 @@
 // (08/10/2026): "Historia" → "Tráiler historia" y sección "Video canción" en la estación 3;
 // (13/10/2026): tráiler nuevo en la estación 3 (une el scrollytelling y el tráiler en una sola página), los Video canción de las estaciones 3 y 4 intercambiados y video del Viche;
 // (19/10/2026): la portada y el intro son una sola página, y los nombres de la estación 4 son los del menú del cliente;
-// (20/10/2026): la estación 4 abre con un Pensamiento (sin las escenas Marea alta y Marea baja) y los Video canción vuelven a su estación.
+// (20/10/2026): la estación 4 abre con un Pensamiento (sin las escenas Marea alta y Marea baja) y los Video canción vuelven a su estación;
+// (27/10/2026): los Video canción y el Viche se ven desde YouTube, en un recuadro como los tráileres.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { StationId, VideoAsset } from '../domain/types';
@@ -67,8 +68,10 @@ export type PageBody =
   | { kind: 'quote'; station: StationId; label: string; tabs: Tabs }
   | {
     kind: 'video'; label: string; video: VideoAsset; tabs?: Tabs; bar?: string; closeTo?: string;
-    /** Tráiler historia: el video en un recuadro sobre el fondo de la galería de su estación, con el aviso del estreno. */
-    trailer?: StationId;
+    /** El video en un recuadro sobre el fondo de la galería de esa estación (no a pantalla completa). */
+    frame?: StationId;
+    /** Tráiler historia: con el aviso del estreno debajo. */
+    note?: boolean;
   }
   | { kind: 'gallery'; station: StationId; label: string; tabs: Tabs }
   | { kind: 'recipe'; label: string; tabs: Tabs }
@@ -89,7 +92,8 @@ export const pages: PageSpec[] = [
     label: 'Estación 1 · Tráiler historia',
     video: { title: 'El latido', stream: 'estacion-1' },
     tabs: chori('Tráiler historia'),
-    trailer: 'chori',
+    frame: 'chori',
+    note: true,
   },
   { id: 'chori-galeria', kind: 'gallery', station: 'chori', label: 'Estación 1 · Galería', tabs: chori('Galería') },
   { id: 'chori-receta', kind: 'recipe', label: 'Estación 1 · Receta', tabs: chori('Receta') },
@@ -102,7 +106,8 @@ export const pages: PageSpec[] = [
     label: 'Estación 2 · Tráiler historia',
     video: { title: 'Gente del Río', stream: 'estacion-2' },
     tabs: atrato('Tráiler historia'),
-    trailer: 'atrato',
+    frame: 'atrato',
+    note: true,
   },
   { id: 'atrato-galeria', kind: 'gallery', station: 'atrato', label: 'Estación 2 · Galería', tabs: atrato('Galería') },
   { id: 'transicion-2', kind: 'transition', index: 2 },
@@ -115,15 +120,17 @@ export const pages: PageSpec[] = [
     // Tráiler nuevo, con Orfelina (13/10/2026). Es también el scrollytelling: la página aparte sin video se quitó (13/10/2026).
     video: { title: 'El baile de las olas', stream: 'nuqui-trailer' },
     tabs: nuqui('Tráiler historia'),
-    trailer: 'nuqui',
+    frame: 'nuqui',
+    note: true,
   },
   {
     id: 'nuqui-video-cancion',
     kind: 'video',
     label: 'Estación 3 · Video canción',
     // El video musical de El baile de las olas (20/10/2026: vuelve de la estación 4, donde estaba desde el 13/10).
-    video: { title: 'El baile de las olas · Video canción', stream: 'estacion-3' },
+    video: { title: 'El baile de las olas · Video canción', stream: 'estacion-3', youtube: 'VlKEZqIWuUM' },
     tabs: nuqui('Video canción'),
+    frame: 'nuqui',
   },
   { id: 'nuqui-galeria', kind: 'gallery', station: 'nuqui', label: 'Estación 3 · Galería', tabs: nuqui('Galería') },
   { id: 'transicion-3', kind: 'transition', index: 3 },
@@ -135,7 +142,8 @@ export const pages: PageSpec[] = [
     label: 'Estación 4 · Tráiler historia',
     video: { title: 'Marea alta, marea baja', duration: '12:30', tint: '#58509a' },
     tabs: pangui('Tráiler historia'),
-    trailer: 'pangui',
+    frame: 'pangui',
+    note: true,
   },
   { id: 'pangui-galeria', kind: 'gallery', station: 'pangui', label: 'Estación 4 · Galería', tabs: pangui('Galería') },
   { id: 'pangui-cantos', kind: 'songs', label: 'Estación 4 · Manglar - Cantos', tabs: pangui('Manglar - Cantos') },
@@ -144,15 +152,17 @@ export const pages: PageSpec[] = [
     kind: 'video',
     label: 'Estación 4 · Video canción',
     // El video largo de Marea alta, marea baja (20/10/2026: vuelve de la estación 3).
-    video: { title: 'Marea alta, marea baja · Video canción', stream: 'cancion-marea' },
+    video: { title: 'Marea alta, marea baja · Video canción', stream: 'cancion-marea', youtube: 'RGco0eNnYv0' },
     tabs: pangui('Video canción'),
+    frame: 'pangui',
   },
   {
     id: 'pangui-viche',
     kind: 'video',
     label: 'Estación 4 · Un regalo de la selva',
-    video: { title: 'Viche curao, un regalo de la selva', stream: 'viche' },
+    video: { title: 'Viche curao, un regalo de la selva', stream: 'viche', youtube: 'y3h28Hk0uk8' },
     tabs: pangui('Un regalo de la selva'),
+    frame: 'pangui',
   },
   { id: 'transicion-4', kind: 'transition', index: 4 },
 

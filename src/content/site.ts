@@ -55,15 +55,33 @@ export const menu: MenuItem[] = [
   },
   { label: 'Volver a las raíces', to: 'transicion-4' },
   { label: 'Mapa interactivo', to: 'cierre' },
+  // Las páginas del Canva del cliente (27/10/2026), fuera del recorrido.
+  {
+    label: 'El proyecto',
+    href: '/el-proyecto',
+    children: [
+      { label: 'Equipo', href: '/el-proyecto/equipo' },
+      { label: 'Making-of', href: '/el-proyecto/making-of' },
+      { label: 'Blog y créditos', href: '/el-proyecto/blog' },
+    ],
+  },
+  {
+    label: 'Visita Nuquí',
+    href: '/visita-nuqui',
+    children: [
+      { label: 'El viche', href: '/visita-nuqui/el-viche' },
+      { label: 'Vive y reserva', href: '/visita-nuqui/vive-y-reserva' },
+    ],
+  },
   { label: 'Tu historia', href: '/cuenta-tu-historia' },
   { label: 'Tienda', href: '/tienda' },
 ];
 
 export type SocialNetwork = 'youtube' | 'instagram' | 'tiktok';
 
-/** YouTube es el canal oficial (30/09/2026); Instagram y TikTok siguen siendo enlaces de prueba. */
+/** YouTube es el canal oficial (30/09/2026) y TikTok, la cuenta del cliente (27/10/2026); Instagram sigue siendo de prueba. */
 export const social: { network: SocialNetwork; label: string; url?: string }[] = [
   { network: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/channel/UCOIVYoUtKmyV9HW7j-QgUfg' },
   { network: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/territorios_vivos/' },
-  { network: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/tag/territoriosvivo' },
+  { network: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/@territoriosvivos' },
 ];

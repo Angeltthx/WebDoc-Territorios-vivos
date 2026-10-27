@@ -81,13 +81,47 @@ export const stations: Station[] = [
       background: p('dji-0181-2', 'Comunidad embera entre la selva, vista desde el aire'),
       photos: gallery('estacion-1'),
     },
+    // «Receta para la ciudad», del PDF del cliente (Contenido/Receta, 27/10/2026), con sus fotos en el mismo orden.
     recipe: {
       eyebrow: 'Gastronomía embera',
-      title: 'Un plato del territorio, paso a paso — con los productos del río',
-      hero: p('6i3a3993-mejorado-nr-4', 'Una mujer embera sentada junto a racimos de plátano y un fogón', { focus: '40% 40%' }),
+      title: 'Receta para la ciudad',
+      intro: 'Hay un ritual que no cambia, sin importar si el suelo que pisas es de tierra húmeda o de asfalto gris.',
+      hero: p('receta-20', 'Pescado asado sobre una arepa de plátano, servido en un plato', { focus: '50% 55%' }),
       steps: [
-        p('6i3a4017-1', 'Preparación junto al fogón'),
-        p('6i3a3790-1', 'Pilar el grano en el mortero'),
+        {
+          text: 'En la selva, bajas el plátano con tus manos desde lo alto del árbol; en la ciudad, lo eliges con el mismo cuidado en los estantes del supermercado, buscando el verde más puro.',
+          photos: [p('receta-1', 'Un hombre carga racimos de plátano verde'), p('receta-2', 'Un racimo de plátano al hombro, bajo el techo de madera')],
+        },
+        {
+          text: 'Al llegar a la cocina, el gesto es idéntico: rallas la pulpa, dejas que el agua y la sal la conviertan en una masa rústica, amasas hasta que quede uniforme.',
+          photos: [
+            p('receta-3', 'Manos lavan plátanos pelados en una olla'),
+            p('receta-4', 'Manos pelan un plátano verde con un cuchillo'),
+            p('receta-5', 'La masa de plátano rallado en una olla'),
+            p('receta-7', 'Manos amasan el plátano rallado en una olla'),
+          ],
+        },
+        {
+          text: 'Cuando lo pones en la sartén caliente de tu estufa moderna, el sonido del aceite friendo es el mismo eco de las fogatas de la selva. Estás pendiente de que no se queme, guiado por la intuición, el aroma y el color dorado, no por el temporizador del reloj.',
+          photos: [p('receta-8', 'La cocina al aire libre, con la sartén sobre el fogón'), p('receta-9', 'La masa de plátano en la sartén sobre las brasas')],
+        },
+        {
+          text: 'El pez, que antes atrapabas en el río cristalino tras horas de silencio, hoy lo traes envuelto desde el mercado local. Lo limpias bajo el grifo, recordando el cauce de la corriente. Ya no tienes una rama recién cortada, pero ensartas el pescado con firmeza en un pincho de metal, cruzándolo de lado a lado.',
+          photos: [p('receta-11', 'Una mano tapa la sartén sobre el fogón'), p('receta-12', 'Un pescado ensartado en una vara')],
+        },
+        {
+          text: 'Lo llevas a la parrilla del balcón o al asador de la cocina. No hay piedras alrededor del fuego, pero el calor sigue transformando la carne, y tú giras la vara con la misma paciencia ancestral, esperando que el calor lo dore por ambos lados antes de echarle la sal al gusto.',
+          photos: [p('receta-13', 'El pescado se asa junto a las brasas'), p('receta-14', 'La arepa de plátano se dora en la sartén')],
+        },
+        {
+          text: 'Al final, sirves la comida en platos de cerámica en lugar de hojas de árbol de plátano, pero el alma de la receta permanece intacta. Te sientas en la terraza o junto a la ventana. Quizás las luces de la ciudad reemplacen a las luciérnagas, pero cuando pruebas el pescado y el plátano, y levantas la mirada para ver el mismo cielo oscuro, la charla con los que amas sabe a lo mismo: a hogar, a memoria y a raíces.',
+          photos: [
+            p('receta-16', 'La arepa de plátano servida en un plato junto al fogón'),
+            p('receta-22', 'El pescado asado servido en un plato'),
+            p('receta-17', 'Manos sirven el plato de pescado y plátano en la mesa'),
+            p('receta-20', 'Pescado asado sobre una arepa de plátano, servido en un plato'),
+          ],
+        },
       ],
     },
   },
@@ -200,6 +234,7 @@ export const stations: Station[] = [
         src: '/media/360/manglar-2026-10-13/master.m3u8',
         poster: '/media/360/manglar-2026-10-13/poster.webp',
         label: 'Estación 4 · Manglar 360°',
+        youtube: 'https://youtu.be/Glh_bb9vrDM',
       },
       songs: [
         { title: 'Llorilé', sub: 'Chachita canta' },
