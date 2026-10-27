@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject, type TouchEvent } from 'react';
 import type { Photo, Station, VideoAsset } from '../../domain/types';
 import { aspectOf, Backdrop, Img } from './Media';
 import { Arrow } from './Chrome';
@@ -349,30 +349,49 @@ function StoryPlayer({ id, title, active }: { id: string; title: string; active:
   );
 }
 
+/**
+ * Mueve una franja horizontal (la galería, los pasos de la receta) una tarjeta hacia `dir` (1 o -1). `align`: dónde
+ * queda la tarjeta, como en su scroll-snap (al centro de la franja o al comienzo).
+ */
+function stepTrack(el: HTMLElement, dir: number, align: 'center' | 'start') {
+  const box = el.getBoundingClientRect();
+  const ref = align === 'center' ? box.left + box.width / 2 : box.left + (parseFloat(getComputedStyle(el).paddingLeft) || 0);
+  const pos = (c: Element) => {
+    const r = c.getBoundingClientRect();
+    return align === 'center' ? r.left + r.width / 2 : r.left;
+  };
+  const cards = Array.from(el.children);
+  const current = cards.reduce((best, c, i) => {
+    const d = Math.abs(pos(c) - ref);
+    return d < best.d ? { i, d } : best;
+  }, { i: 0, d: Infinity }).i;
+  const next = cards[Math.max(0, Math.min(cards.length - 1, current + dir))];
+  el.scrollBy({ left: pos(next) - ref, behavior: 'smooth' });
+}
+
+/** Flechas ← → del teclado: pasan de tarjeta en tarjeta en la franja (solo en la página visible). Sin esto, con la
+ * navegación con cursor de Chrome (F7) las flechas mueven el cursor por las letras y la franja no avanza. */
+function useSideArrows(track: RefObject<HTMLElement | null>, align: 'center' | 'start') {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = track.current;
+      if (!el || !el.closest('.stack-page.is-active') || document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      stepTrack(el, e.key === 'ArrowRight' ? 1 : -1, align);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [track, align]);
+}
+
 export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['gallery']> }) {
   const [open, setOpen] = useState<number | null>(null);
   const [grid, setGrid] = useState(false);
   const track = useRef<HTMLDivElement>(null);
-
-  // Flechas ← → del teclado: pasan de foto en foto en la franja (solo en la página visible).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-      const el = track.current;
-      if (!el || !el.closest('.stack-page.is-active') || document.querySelector('dialog[open]')) return;
-      e.preventDefault();
-      const cards = Array.from(el.children) as HTMLElement[];
-      const center = el.scrollLeft + el.clientWidth / 2;
-      const current = cards.reduce((best, c, i) => {
-        const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - center);
-        return d < best.d ? { i, d } : best;
-      }, { i: 0, d: Infinity }).i;
-      const next = cards[Math.max(0, Math.min(cards.length - 1, current + (e.key === 'ArrowRight' ? 1 : -1)))];
-      el.scrollTo({ left: next.offsetLeft + next.offsetWidth / 2 - el.clientWidth / 2, behavior: 'smooth' });
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  useSideArrows(track, 'center');
 
   return (
     <>
@@ -549,10 +568,21 @@ function Lightbox({ photos, index, onChange }: { photos: Photo[]; index: number 
 
 /**
  * La receta (27/10/2026): el título y la introducción a un lado y los pasos en una franja que se desliza, cada uno con
- * su texto y sus fotos. Cualquier foto se amplía y desde ahí se recorren todas, en orden.
+ * su texto y sus fotos. Cualquier foto se amplía y desde ahí se recorren todas, en orden. Los pasos se recorren
+ * deslizando, con las flechas ← → del teclado o con los botones a los lados de la franja (28/10/2026).
  */
 export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']> }) {
   const [open, setOpen] = useState<number | null>(null);
+  const track = useRef<HTMLOListElement>(null);
+  // Hasta dónde se puede mover la franja: el botón de ese lado se apaga.
+  const [ends, setEnds] = useState({ start: true, end: false });
+  const measure = () => {
+    const el = track.current;
+    if (el) setEnds({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
+  };
+  useEffect(measure, []);
+  useSideArrows(track, 'start');
+  const step = (dir: number) => track.current && stepTrack(track.current, dir, 'start');
   const photos = recipe.steps.flatMap((s) => s.photos);
   let at = 0;
   return (
@@ -563,9 +593,12 @@ export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']>
           <p className="eyebrow">{recipe.eyebrow}</p>
           <h2>{recipe.title}</h2>
           <p className="recipe__intro">{recipe.intro}</p>
-          <p className="recipe__hint" aria-hidden="true">{recipe.steps.length} pasos · deslizar →</p>
+          <p className="recipe__hint" aria-hidden="true">
+            {recipe.steps.length} pasos · <span className="recipe__hint-desk">flechas ← → del teclado</span><span className="recipe__hint-touch">deslizar →</span>
+          </p>
         </div>
-        <ol className="recipe__steps" data-no-arrows="x">
+        <div className="recipe__track">
+        <ol className="recipe__steps" data-no-arrows="x" ref={track} onScroll={measure}>
           {recipe.steps.map((step, n) => {
             const first = at;
             at += step.photos.length;
@@ -584,6 +617,9 @@ export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']>
             );
           })}
         </ol>
+        <button type="button" className="round-btn recipe__prev" onClick={() => step(-1)} disabled={ends.start} aria-label="Paso anterior"><Arrow dir="left" /></button>
+        <button type="button" className="round-btn recipe__next" onClick={() => step(1)} disabled={ends.end} aria-label="Paso siguiente"><Arrow dir="right" /></button>
+        </div>
       </div>
       <Portal>
         <Lightbox photos={photos} index={open} onChange={setOpen} />

@@ -20,6 +20,8 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
+  /* Sin cursor de texto parpadeando fuera de los campos (se ve con la navegación con cursor de Chrome, F7). */
+  caret-color: transparent;
   background: var(--forest);
   color: #fff;
   font: 16px/1.55 var(--sans);
@@ -27,6 +29,7 @@ body {
   overscroll-behavior: none;
 }
 img { display: block; max-width: 100%; }
+input, textarea, select, [contenteditable]:not([contenteditable="false"]) { caret-color: auto; }
 button { font: inherit; color: inherit; cursor: pointer; }
 a { color: inherit; }
 h1, h2, p, blockquote, figure { margin: 0; }
@@ -343,6 +346,18 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .recipe__text h2 { margin-top: 6px; font: italic 400 clamp(26px, 3vw, 42px)/1.15 var(--sans); }
 .recipe__intro { margin: 14px 0 0; font-size: clamp(14px, 1.2vw, 17px); line-height: 1.6; }
 .recipe__hint { margin: 18px 0 0; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
+.recipe__track { position: relative; min-width: 0; max-height: 100%; display: grid; }
+/* A la altura del centro de las fotos de los pasos (16:10 dentro de la tarjeta). */
+.recipe__prev, .recipe__next { position: absolute; z-index: 2; top: calc(16px + (min(360px, 30vw) - 20px) * 0.3125); transform: translateY(-50%); backdrop-filter: blur(6px); transition: opacity 0.25s, background 0.2s; }
+.recipe__prev { left: -22px; }
+.recipe__next { right: clamp(16px, 3vw, 40px); }
+.recipe__prev:hover:not(:disabled), .recipe__next:hover:not(:disabled) { background: rgba(0, 0, 0, 0.5); color: var(--gold); }
+.recipe__prev:disabled, .recipe__next:disabled { opacity: 0; pointer-events: none; }
+.recipe__hint-touch { display: none; }
+@media (hover: none) {
+  .recipe__hint-desk { display: none; }
+  .recipe__hint-touch { display: inline; }
+}
 .recipe__steps {
   list-style: none; margin: 0; display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
   padding: 6px clamp(24px, 5vw, 80px) 6px 2px; align-items: flex-start; max-height: 100%;
@@ -731,6 +746,7 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .recipe__hint { margin-top: 10px; }
   .recipe__steps { padding-right: 56px; }
   .recipe__step { width: min(300px, 74vw); }
+  .recipe__prev, .recipe__next { display: none; }
   .recipe__body { font-size: 13px; line-height: 1.5; }
 }
 
