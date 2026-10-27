@@ -1,14 +1,14 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getStation, transitions, voices } from '../../content/journey';
+import { getStation, transitions } from '../../content/journey';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
-import { initAudioUnlock, isMuted, playTransition, setAmbient, setMuted, setVoice } from '../../application/sound';
+import { initAudioUnlock, isMuted, playTransition, setMuted, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
   Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
   StationGuide, TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
-import { GalleryPanel, QuotePanel, RecipePanel, SilencePanel, SongsPanel, VideoPanel } from '../components/Sections';
+import { FramedVideo, GalleryPanel, QuotePanel, RecipePanel, SongsPanel, VideoPanel } from '../components/Sections';
 import { ScrollCue } from '../components/ScrollCue';
 import { StationLocator } from '../components/StationLocator';
 
@@ -33,16 +33,14 @@ export function Webdoc() {
     setSeen((s) => (s.has(active) ? s : new Set(s).add(active)));
     document.title = `Territorios Vivos · ${active + 1} / ${pages.length}`;
     // Ola corta al cambiar de página (no al cargar), salvo al entrar a una transición con video,
-    // que trae su propio sonido (con la voz de Chachita). Ambiente de marea en su escena y voz de
-    // Chachita antes del Viche.
+    // que trae su propio sonido (con la voz de Chachita).
     const spec = pages[active];
     if (first.current) first.current = false;
     else if (!(spec.kind === 'transition' && transitions[spec.index].video)) playTransition();
-    setAmbient(spec.kind === 'silence' ? spec.tide : null);
     setVoice(voiceOf(spec));
   }, [active]);
 
-  useEffect(() => () => { setAmbient(null); setVoice(null); }, []);
+  useEffect(() => () => setVoice(null), []);
 
   const toggleSound = () => {
     setMuted(!muted);
@@ -99,9 +97,8 @@ export function Webdoc() {
 }
 
 function voiceOf(spec: PageSpec): string | null {
-  if (spec.kind === 'transition') return transitions[spec.index].voice ?? null;
-  if (spec.id === 'pangui-historia') return voices.panguiHistoria;
-  return null;
+  // El Tráiler historia de la estación 4 ya no lleva voz: la que sonaba ahí era la del Viche (20/10/2026).
+  return spec.kind === 'transition' ? transitions[spec.index].voice ?? null : null;
 }
 
 function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
@@ -128,6 +125,10 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
               Comenzar el viaje
               <Arrow dir="down" />
             </button>
+            {/* Crédito de la productora (pedido del cliente, 20/10/2026). */}
+            <p className="credit">
+              Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
+            </p>
           </div>
         </div>
       );
@@ -145,7 +146,13 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
     case 'video':
       return (
         <div className="screen" aria-label={spec.label}>
-          <div className="screen__content"><VideoPanel video={spec.video} bar={spec.bar} active={playing} /></div>
+          <div className="screen__content">
+            {spec.frame ? (
+              <FramedVideo video={spec.video} background={getStation(spec.frame)!.gallery!.background} note={spec.note} active={playing} />
+            ) : (
+              <VideoPanel video={spec.video} bar={spec.bar} active={playing} />
+            )}
+          </div>
           <TopBar label={spec.label} />
           {spec.tabs && <StationFoot tabs={spec.tabs} next={next} />}
         </div>
@@ -200,17 +207,6 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
         </div>
       );
     }
-
-    case 'silence':
-      return (
-        <div className="screen" aria-label={`${spec.label}: ${spec.title}`}>
-          <div className="screen__content"><SilencePanel tide={spec.tide} title={spec.title} hint={spec.hint} photo={spec.photo} /></div>
-          {/* La primera escena de la estación 4 es su apertura: ahí va su mapa, como en la cita de las demás. */}
-          {spec.tide === 'alta' && <StationLocator station={getStation('pangui')!} />}
-          <TopBar label={spec.label} />
-          <StationFoot tabs={spec.tabs} next={next} />
-        </div>
-      );
 
     case 'songs':
       return (

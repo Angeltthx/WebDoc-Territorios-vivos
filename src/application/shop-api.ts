@@ -2,6 +2,7 @@
 // Wompi) y ver cómo va un pedido al volver de pagar. La bolsa vive en este navegador (sobrevive al ir y volver de Wompi).
 
 import type { ShopItem } from '../content/stories';
+import { BASE } from './base';
 
 export interface Catalog {
   /** Por SKU: lo que manda la base de datos. */
@@ -68,7 +69,7 @@ export async function createOrder(items: { sku: string; cantidad: number }[], co
     res = await fetch('/api/tienda/pedidos', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ items, comprador, consentimiento, web }),
+      body: JSON.stringify({ items, comprador, consentimiento, web, base: BASE }),
     });
   } catch {
     throw new OrderError('No hay conexión. Revisa tu internet e intenta otra vez.');

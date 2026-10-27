@@ -111,7 +111,9 @@ export async function POST(request: Request) {
     throw e;
   }
   // Vuelve a /tienda/pedido/<referencia> (Wompi le agrega ?id=<transacción>).
-  const url = checkoutUrl({ referencia, total, expira, ...comprador }, `${returnBase(request)}/tienda/pedido/${referencia}`);
+  // Desde territoriosvivos.com.co/prueba se vuelve a la misma dirección (solo esa base: no es una dirección libre).
+  const base = body.base === '/prueba' ? '/prueba' : '';
+  const url = checkoutUrl({ referencia, total, expira, ...comprador }, `${returnBase(request)}${base}/tienda/pedido/${referencia}`);
   return json({ referencia, total, url }, 201);
 }
 

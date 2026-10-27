@@ -27,6 +27,9 @@ const fecha = (iso: string | null) =>
 /** El nombre de una dirección de la web, para las páginas más vistas. */
 const OTRAS: Record<string, string> = {
   '/tienda': 'Tienda', '/tienda/pedido': 'Tienda · vuelta del pago', '/cuenta-tu-historia': 'Tu historia (formulario)', '/costa-k7q4x': 'Mapa 3D (dirección directa)',
+  '/el-proyecto': 'El proyecto · Historia', '/el-proyecto/equipo': 'El proyecto · Equipo', '/el-proyecto/making-of': 'El proyecto · Making-of',
+  '/el-proyecto/blog': 'El proyecto · Blog', '/visita-nuqui': 'Visita Nuquí · Llévate Nuquí', '/visita-nuqui/el-viche': 'Visita Nuquí · El viche',
+  '/visita-nuqui/vive-y-reserva': 'Visita Nuquí · Vive y reserva', '/guia': 'Guía pedagógica',
 };
 function pageName(ruta: string) {
   if (OTRAS[ruta]) return OTRAS[ruta];

@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { pageIndex, pages } from '../content/pages';
+import { appPath, BASE } from './base';
 import { countPage } from './visits';
 
 export const TOTAL_PAGES = pages.length;
@@ -36,7 +37,7 @@ const HAS_SCROLLEND = typeof window !== 'undefined' && 'onscrollend' in window;
 export const pathFor = (index: number) => (index <= 0 ? '/' : `/${index + 1}`);
 
 function indexFromPath(pathname: string): number {
-  const n = Number(pathname.replace(/^\//, '') || '1');
+  const n = Number(appPath(pathname).replace(/^\//, '') || '1');
   return Number.isInteger(n) && n >= 1 && n <= TOTAL_PAGES ? n - 1 : 0;
 }
 
@@ -132,7 +133,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       if (i !== activeRef.current) {
         activeRef.current = i;
         setActive(i);
-        window.history.replaceState(null, '', pathFor(i));
+        window.history.replaceState(null, '', BASE + pathFor(i));
         countPage(pathFor(i), { vercel: true });
       }
       if (!HAS_SCROLLEND) {

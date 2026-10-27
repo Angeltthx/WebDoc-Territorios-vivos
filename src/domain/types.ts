@@ -8,7 +8,6 @@ export type SectionKind =
   | 'galeria'
   | 'receta'
   | 'scrolly'
-  | 'silencio'
   | 'cantos'
   | 'video-cancion'
   | 'viche';
@@ -33,6 +32,9 @@ export interface VideoAsset {
   src?: string;
   /** Video en streaming HLS: id en public/media/historias/<id> (master.m3u8 + poster.webp). */
   stream?: string;
+  /** Video en YouTube (id): se ve con su reproductor, para que las visitas cuenten en el canal (27/10/2026). Su imagen de
+   * espera es la de `stream`. */
+  youtube?: string;
   tint?: string;
 }
 
@@ -55,13 +57,12 @@ export interface Station {
   sections: Section[];
   video?: VideoAsset;
   gallery?: { intro: string; background: Photo; photos: Photo[] };
-  recipe?: { eyebrow: string; title: string; hero: Photo; steps: Photo[] };
+  recipe?: { eyebrow: string; title: string; intro: string; hero: Photo; steps: { text: string; photos: Photo[] }[] };
   scrolly?: { scenes: { photo: Photo; text: string }[] };
-  silence?: { title: string; hint: string; photo: Photo };
   songs?: {
     background: Photo;
     /** Experiencia 360: lista HLS y imagen equirrectangular de espera. */
-    panorama: { title: string; sub: string; src: string; poster: string; label: string };
+    panorama: { title: string; sub: string; src: string; poster: string; label: string; youtube?: string };
     songs: { title: string; sub: string }[];
   };
   viche?: VideoAsset;

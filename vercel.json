@@ -27,6 +27,18 @@
       "destination": "/app.html"
     },
     {
+      "source": "/guia",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/prueba",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/prueba/((?!media/|assets/|api/|@)[^.]*)",
+      "destination": "/app.html"
+    },
+    {
       "source": "/((?!media/|assets/|api/|@)[^.]*)",
       "destination": "/proximamente.html"
     }

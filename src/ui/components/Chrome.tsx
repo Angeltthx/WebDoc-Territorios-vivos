@@ -20,7 +20,7 @@ export const STATION_PAGE: Record<string, string> = {
   chori: 'chori-pensamiento',
   atrato: 'atrato-pensamiento',
   nuqui: 'nuqui-pensamiento',
-  pangui: 'pangui-marea-alta',
+  pangui: 'pangui-pensamiento',
 };
 
 /** Dirección de una página del recorrido, para llegar a ella desde fuera. */
@@ -197,7 +197,7 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
           <ol className="menu__list">
             {menu.map((item) => {
               const isOpen = expanded === item.label;
-              const subId = `menu-${item.to}`;
+              const subId = `menu-${(item.to ?? item.href ?? '').replace(/\W+/g, '-')}`;
               return (
                 <li key={item.label} className={`menu__item${item.children ? ' menu__item--station' : ''}${here(item) ? ' is-here' : ''}`}>
                   <div className="menu__row">

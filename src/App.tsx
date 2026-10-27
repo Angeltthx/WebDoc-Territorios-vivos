@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { BASE } from './application/base';
 import { countPage } from './application/visits';
 import { Webdoc } from './ui/screens/Webdoc';
 
@@ -15,6 +16,8 @@ const OrderPage = lazy(() => import('./ui/screens/OrderPage'));
 const Admin = lazy(() => import('./ui/screens/Admin'));
 // La guía pedagógica (a esta dirección lleva su QR).
 const Guide = lazy(() => import('./ui/screens/Guide'));
+// El proyecto y Visita Nuquí (el Canva del cliente, 27/10/2026).
+const Chapter = lazy(() => import('./ui/screens/Chapter'));
 const sheet = (el: ReactNode) => <Suspense fallback={null}><div className="sheet-page">{el}</div></Suspense>;
 
 /** Cuenta cada dirección a la que se llega (el recorrido cuenta sus páginas por su lado: ver journey.ts). */
@@ -29,7 +32,7 @@ function VisitTracker() {
 
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={BASE || undefined}>
       <VisitTracker />
       <Routes>
         <Route path="/" element={<Webdoc />} />
@@ -38,6 +41,8 @@ export function App() {
         {/* A donde vuelve la persona después de pagar en Wompi. */}
         <Route path="/tienda/pedido/:ref" element={sheet(<OrderPage />)} />
         <Route path="/cuenta-tu-historia" element={sheet(<StoryForm />)} />
+        <Route path="/el-proyecto/:tab?" element={<Suspense fallback={null}><Chapter path="/el-proyecto" /></Suspense>} />
+        <Route path="/visita-nuqui/:tab?" element={<Suspense fallback={null}><Chapter path="/visita-nuqui" /></Suspense>} />
         <Route path="/guia" element={<Suspense fallback={null}><Guide /></Suspense>} />
         <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
         <Route path="/:page" element={<Webdoc />} />

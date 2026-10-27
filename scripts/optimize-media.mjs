@@ -28,6 +28,7 @@ if (PREVIEW) await mkdir(PREVIEW, { recursive: true });
 const SKIP = new Set(['6i3a3563-1', '6i3a3815-3', 'dji-0504-1', 'flujo-trabajo-diapositiva-3']);
 
 const isImage = (f) => /\.(jpe?g|png)$/i.test(f);
+const renamed = new Map();
 const files = (await readdir(SRC)).filter((f) => isImage(f) && !SKIP.has(slug(f))).map((f) => path.join(SRC, f));
 
 const GALLERIES = path.join(SRC, 'Galerias');
@@ -42,10 +43,22 @@ if (existsSync(GALLERIES)) {
   await writeFile(path.resolve('src', 'content', 'galleries.json'), `{\n${lines.join(',\n')}\n}\n`);
 }
 
+// Fotos con su propia carpeta: la receta de la estación 1 (receta-N, 27/10/2026) y las páginas El proyecto y
+// Visita Nuquí (imágenes sacadas del Canva del cliente, ya con su nombre).
+for (const [folder, prefix] of [['Receta', 'receta-'], ['Proyecto', '']]) {
+  const dir = path.join(SRC, folder);
+  if (!existsSync(dir)) continue;
+  for (const f of (await readdir(dir)).filter(isImage)) {
+    const id = prefix + slug(f);
+    files.push(path.join(dir, f));
+    renamed.set(path.join(dir, f), id);
+  }
+}
+
 const done = new Set();
 for (const src of files) {
   const file = path.basename(src);
-  const id = slug(file);
+  const id = renamed.get(src) ?? slug(file);
   if (done.has(id)) continue;
   done.add(id);
   if (!process.env.FORCE && existsSync(path.join(OUT, `${id}.webp`))) continue;

@@ -23,6 +23,8 @@ const VIDEOS = {
   'nuqui-trailer': { file: 'Tráiler El baile de las olas - Orfelina.mp4', poster: 49 },
   // Viche de la estación 4 (13/10/2026).
   viche: { file: 'Tráiler Viche.mp4', poster: 10 },
+  // Making-of de la página El proyecto (27/10/2026).
+  'making-of': { file: 'Making of Territorios Vivos.mp4', poster: 12 },
 };
 
 const RENDITIONS = [

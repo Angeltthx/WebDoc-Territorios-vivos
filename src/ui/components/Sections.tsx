@@ -38,8 +38,105 @@ export function PressHint({ desk, touch }: { desk: string; touch: string }) {
 
 /** Pestañas Tráiler historia y Video canción: el video en streaming si ya existe; si no, el estado pendiente. */
 export function VideoPanel({ video, bar, active = false }: { video: VideoAsset; bar?: string; active?: boolean }) {
+  if (video.youtube) return <YouTubePlayer id={video.youtube} title={video.title} poster={video.stream && `/media/historias/${video.stream}/poster.webp`} active={active} />;
   if (video.stream) return <StoryPlayer id={video.stream} title={video.title} active={active} />;
   return <PendingVideo video={video} bar={bar} />;
+}
+
+/** Aviso bajo los tráileres (pedido del cliente, 20/10/2026). */
+const TRAILER_NOTE =
+  'Muy pronto podrás disfrutar de la historia completa en cines, eventos especiales y televisión. Síguenos en nuestras redes sociales para conocer las próximas fechas, horarios y lugares de proyección. ¡Mantente conectado para no perderte ningún detalle!';
+
+/** El video en un recuadro (no a pantalla completa) sobre el fondo de la galería de la estación; en los tráileres, con
+ * el aviso del estreno debajo. */
+export function FramedVideo({ video, background, note, active = false }: { video: VideoAsset; background: Photo; note?: boolean; active?: boolean }) {
+  return (
+    <>
+      <Backdrop photo={background} tint="rgba(8,16,14,.55)" blur />
+      <div className="trailer reveal">
+        <div className="trailer__frame"><VideoPanel video={video} active={active} /></div>
+        {note && <p className="trailer__note">{TRAILER_NOTE}</p>}
+      </div>
+    </>
+  );
+}
+
+interface YTPlayer { pauseVideo(): void; destroy(): void }
+interface YTNamespace {
+  Player: new (el: HTMLElement, opts: {
+    videoId: string;
+    playerVars: Record<string, number | string>;
+    events: { onStateChange?: (e: { data: number }) => void; onError?: () => void };
+  }) => YTPlayer;
+}
+
+let youtubeApi: Promise<YTNamespace> | null = null;
+/** La API de YouTube (una sola vez, la primera vez que se llega a una página con un video de YouTube). */
+function loadYouTube(): Promise<YTNamespace> {
+  youtubeApi ??= new Promise((resolve, reject) => {
+    const w = window as unknown as { YT?: YTNamespace; onYouTubeIframeAPIReady?: () => void };
+    if (w.YT?.Player) return resolve(w.YT);
+    const prev = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => { prev?.(); resolve(w.YT!); };
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    s.onerror = () => { youtubeApi = null; reject(new Error('YouTube')); };
+    document.head.appendChild(s);
+  });
+  return youtubeApi;
+}
+
+/**
+ * Video de YouTube (27/10/2026: el cliente quiere que las visitas del webdoc cuenten en su canal). Antes de reproducir se
+ * ve nuestra imagen de espera y el botón de siempre; al presionarlo aparece el reproductor de YouTube y arranca. Se pausa
+ * al salir de la página. Si YouTube no carga (sin conexión, bloqueado), queda el enlace para verlo allá.
+ */
+function YouTubePlayer({ id, title, poster, active }: { id: string; title: string; poster?: string; active: boolean }) {
+  const slot = useRef<HTMLDivElement>(null);
+  const player = useRef<YTPlayer | null>(null);
+  const [started, setStarted] = useState(false);
+  const [error, setError] = useState(false);
+
+  // La API se pide al llegar a la página, para que al presionar el video arranque enseguida.
+  useEffect(() => {
+    if (active) loadYouTube().catch(() => {});
+    else player.current?.pauseVideo();
+  }, [active]);
+
+  useEffect(() => () => player.current?.destroy(), []);
+
+  const start = () => {
+    setStarted(true);
+    setError(false);
+    loadYouTube().then((YT) => {
+      if (!slot.current || player.current) return;
+      player.current = new YT.Player(slot.current, {
+        videoId: id,
+        playerVars: { autoplay: 1, playsinline: 1, rel: 0 },
+        events: { onError: () => setError(true) },
+      });
+    }, () => setError(true));
+  };
+
+  return (
+    <div className={`story yt${started ? ' is-started' : ''}`} data-no-arrows="x">
+      {poster && <img className="story__video" src={poster} alt="" aria-hidden="true" />}
+      <div className="yt__slot"><div ref={slot} /></div>
+      {!started && (
+        <div className="video reveal">
+          <button type="button" className="play play--on-image" onClick={start} aria-label={`Reproducir ${title}`}>
+            <PlayGlyph />
+          </button>
+          <p className="video__title story__title">{title}</p>
+        </div>
+      )}
+      {error && (
+        <p className="notice notice--float" role="alert">
+          No se pudo cargar el video. <a href={`https://youtu.be/${id}`} target="_blank" rel="noopener noreferrer">Verlo en YouTube ↗</a>
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** Reproductor pendiente: portada y botón, hasta que se entregue el archivo final. */
@@ -450,35 +547,47 @@ function Lightbox({ photos, index, onChange }: { photos: Photo[]; index: number 
   );
 }
 
+/**
+ * La receta (27/10/2026): el título y la introducción a un lado y los pasos en una franja que se desliza, cada uno con
+ * su texto y sus fotos. Cualquier foto se amplía y desde ahí se recorren todas, en orden.
+ */
 export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']> }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const photos = recipe.steps.flatMap((s) => s.photos);
+  let at = 0;
   return (
     <>
-      <Backdrop photo={recipe.hero} tint="linear-gradient(90deg, rgba(6,14,11,.62), rgba(6,14,11,.3))" />
+      <Backdrop photo={recipe.hero} tint="linear-gradient(90deg, rgba(6,14,11,.78), rgba(6,14,11,.45))" blur />
       <div className="recipe reveal">
         <div className="recipe__text">
           <p className="eyebrow">{recipe.eyebrow}</p>
           <h2>{recipe.title}</h2>
+          <p className="recipe__intro">{recipe.intro}</p>
+          <p className="recipe__hint" aria-hidden="true">{recipe.steps.length} pasos · deslizar →</p>
         </div>
-        <div className="recipe__steps">
-          {recipe.steps.map((s) => (
-            <figure key={s.id}><Img photo={s} sizes="(max-width: 700px) 45vw, 22vw" /></figure>
-          ))}
-          <figure className="recipe__pending" aria-label="Video de la receta pendiente" />
-        </div>
+        <ol className="recipe__steps" data-no-arrows="x">
+          {recipe.steps.map((step, n) => {
+            const first = at;
+            at += step.photos.length;
+            return (
+              <li key={n} className="recipe__step">
+                <div className={`recipe__photos recipe__photos--${Math.min(step.photos.length, 4)}`}>
+                  {step.photos.map((ph, i) => (
+                    <button key={ph.id} type="button" onClick={() => setOpen(first + i)} aria-label={`Ampliar: ${ph.alt}`}>
+                      <Img photo={ph} sizes="(max-width: 700px) 80vw, 380px" />
+                    </button>
+                  ))}
+                </div>
+                <p className="recipe__num">{n + 1} / {recipe.steps.length}</p>
+                <p className="recipe__body">{step.text}</p>
+              </li>
+            );
+          })}
+        </ol>
       </div>
-    </>
-  );
-}
-
-/** Escena de silencio (marea alta / marea baja): sin voz, el título aparece despacio. */
-export function SilencePanel({ tide, title, hint, photo }: { tide: 'alta' | 'baja'; title: string; hint: string; photo: Photo }) {
-  return (
-    <>
-      <Backdrop photo={photo} tint={tide === 'alta' ? 'rgba(20,110,80,.5)' : 'rgba(30,90,110,.42)'} />
-      <div className={`silence silence--${tide}`}>
-        <h2 className="silence__title">{title}</h2>
-        <p className="silence__hint"><span aria-hidden="true">≋</span> {hint}</p>
-      </div>
+      <Portal>
+        <Lightbox photos={photos} index={open} onChange={setOpen} />
+      </Portal>
     </>
   );
 }
@@ -515,6 +624,10 @@ export function SongsPanel({ songs }: { songs: NonNullable<Station['songs']> }) 
             <span>{songs.panorama.sub}</span>
           </button>
           <PressHint desk="Presiona para ver el video 360" touch="Toca para ver el video 360" />
+          {/* El 360 se queda con nuestro visor; el enlace suma visitas en el canal del cliente (27/10/2026). */}
+          {panorama.youtube && (
+            <a className="songs__yt" href={panorama.youtube} target="_blank" rel="noopener noreferrer">También en YouTube ↗</a>
+          )}
         </div>
         <div className="songs__item">
           <button type="button" className="glass-card glass-card--song" onClick={() => setMsg('Los cantos se reproducirán cuando se entreguen las grabaciones.')}>
