@@ -259,6 +259,16 @@ const ICONS: Record<SocialNetwork, ReactNode> = {
   ),
 };
 
+/** «Una producción de Doinmedia»: marca de agua discreta abajo a la derecha, en todas las páginas (pedido del cliente,
+ * 28/10/2026; antes solo estaba en la bienvenida). */
+export function CreditMark() {
+  return (
+    <div className="credit-mark">
+      Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
+    </div>
+  );
+}
+
 /** Íconos de redes sociales. Sin dirección confirmada, el ícono se muestra sin enlace. */
 export function SocialLinks({ className = '' }: { className?: string }) {
   return (
