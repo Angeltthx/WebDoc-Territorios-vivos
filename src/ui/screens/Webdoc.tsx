@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getStation, transitions } from '../../content/journey';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
@@ -195,7 +195,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
             ))}
             {t.hint && <p className="transition__hint">{t.hint}</p>}
           </div>
-          {t.number > 0 && <RouteMap index={spec.index} />}
+          {t.number > 0 && <RouteMap index={spec.index} playing={playing} />}
           {!onPhoto && (
             <ol className="t-dots" aria-hidden="true">
               {transitions.map((_, i) => <li key={i} className={i === spec.index ? 'is-active' : ''} />)}
@@ -349,32 +349,68 @@ function Welcome({ playing, muted, unmute }: { playing: boolean; muted: boolean;
 const TRANSITIONS_VERSION = '2026-10-13';
 
 /**
- * El mapa del recorrido en cada transición, para que la gente sepa dónde va: una línea fina con las paradas
- * (Inicio, Chorí, Atrato, Nuquí, Panguí, Mar). Lo ya andado se ve entero, el tramo de esta transición se recorre con un
- * punto que avanza, y lo que falta queda punteado.
+ * El mapa del recorrido en cada transición, para que la gente sepa dónde va: un río con las paradas (Inicio, Chorí,
+ * Atrato, Nuquí, Panguí, Mar) y sus nombres. Por lo ya andado el agua corre sin parar; lo que falta queda punteado. Al
+ * llegar a la transición, el agua baja por el tramo nuevo con una gota al frente y, cuando llega, la parada siguiente
+ * se ilumina y hace ondas (28/10/2026). Cada vez que se vuelve a la transición, el agua vuelve a correr.
  */
-function RouteMap({ index }: { index: number }) {
+function RouteMap({ index, playing }: { index: number; playing: boolean }) {
   const route = transitions.filter((t) => t.number > 0);
   const stops = [route[0].from, ...route.map((t) => t.to)];
   const at = route.indexOf(transitions[index]);
-  const gap = 46;
-  const x = (i: number) => 8 + i * gap;
-  const y = (i: number) => (i % 2 ? 22 : 12);
-  const w = x(stops.length - 1) + 8;
+  const id = useId().replace(/:/g, '');
+  // Cada llegada vuelve a montar el dibujo: así sus animaciones empiezan desde cero.
+  const [arrival, setArrival] = useState(0);
+  useEffect(() => {
+    if (playing) setArrival((n) => n + 1);
+  }, [playing]);
+  const gap = 60;
+  const x = (i: number) => 14 + i * gap;
+  const y = (i: number) => (i % 2 ? 24 : 12);
+  const w = x(stops.length - 1) + 14;
+  // Cada tramo serpentea un poco: baja (o sube) a la mitad y sigue a la parada siguiente.
+  const seg = (i: number) => {
+    const [x0, y0, x1, y1] = [x(i), y(i), x(i + 1), y(i + 1)];
+    const xm = (x0 + x1) / 2;
+    const ym = (y0 + y1) / 2 + (i % 2 ? -5 : 5);
+    return `M ${x0} ${y0} C ${x0 + gap * 0.3} ${y0}, ${xm - gap * 0.2} ${ym}, ${xm} ${ym} S ${x1 - gap * 0.3} ${y1}, ${x1} ${y1}`;
+  };
   return (
     <figure className="route" aria-label={`Vas de ${stops[at]} a ${stops[at + 1]}`}>
-      <svg width={w} height={34} viewBox={`0 0 ${w} 34`} aria-hidden="true">
-        {stops.slice(1).map((_, i) => {
-          const d = `M ${x(i)} ${y(i)} C ${x(i) + gap / 2} ${y(i)}, ${x(i + 1) - gap / 2} ${y(i + 1)}, ${x(i + 1)} ${y(i + 1)}`;
-          return <path key={i} d={d} pathLength={1} className={i < at ? 'is-done' : i === at ? 'is-now' : ''} />;
-        })}
-        {stops.map((_, i) => (
-          <circle key={i} cx={x(i)} cy={y(i)} r={i === at + 1 ? 3.6 : 2.4} className={i <= at ? 'is-done' : i === at + 1 ? 'is-next' : ''} />
+      <svg key={arrival} width={w} height={50} viewBox={`0 0 ${w} 50`} aria-hidden="true">
+        <defs>
+          <linearGradient id={`agua-${id}`} gradientUnits="userSpaceOnUse" x1={x(at)} y1="0" x2={x(at + 1)} y2="0">
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset="1" stopColor="#9fe3f2" />
+          </linearGradient>
+          <path id={`tramo-${id}`} d={seg(at)} />
+        </defs>
+        {stops.slice(1).map((_, i) => (
+          <g key={i} className={i < at ? 'route__seg is-done' : i === at ? 'route__seg is-now' : 'route__seg'}>
+            <path className="route__bed" d={seg(i)} pathLength={1} />
+            {i <= at && <path className="route__water" d={seg(i)} pathLength={1} stroke={i === at ? `url(#agua-${id})` : undefined} />}
+            {i <= at && <path className="route__flow" d={seg(i)} pathLength={1} />}
+          </g>
         ))}
+        {/* La gota que baja por el tramo nuevo. */}
+        <circle className="route__drop" r={2.6}>
+          <animateMotion dur="3s" begin="0.8s" fill="freeze" calcMode="spline" keyTimes="0;1" keyPoints="0;1" keySplines="0.22 0.61 0.36 1">
+            <mpath href={`#tramo-${id}`} />
+          </animateMotion>
+        </circle>
+        {/* Ondas en la parada a la que se llega. */}
+        <circle className="route__ripple" cx={x(at + 1)} cy={y(at + 1)} r={3.4} />
+        <circle className="route__ripple route__ripple--late" cx={x(at + 1)} cy={y(at + 1)} r={3.4} />
+        {stops.map((name, i) => {
+          const cls = i <= at ? ' is-done' : i === at + 1 ? ' is-next' : '';
+          return (
+            <g key={name} className={`route__stop${cls}`}>
+              <circle cx={x(i)} cy={y(i)} r={i === at + 1 ? 3.4 : 2.4} />
+              <text x={x(i)} y={46} textAnchor="middle">{name}</text>
+            </g>
+          );
+        })}
       </svg>
-      <figcaption>
-        {stops[at]} <span aria-hidden="true">→</span> <strong>{stops[at + 1]}</strong>
-      </figcaption>
     </figure>
   );
 }
