@@ -263,6 +263,9 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
             })}
           </ol>
           <SocialLinks className="menu__social" />
+          <p className="menu__credit">
+            Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
+          </p>
         </nav>
       </dialog>
     </>
@@ -288,6 +291,24 @@ const ICONS: Record<SocialNetwork, ReactNode> = {
     </svg>
   ),
 };
+
+/**
+ * Dónde va la marca de agua en el celular, mientras se decide (29/10/2026): `arriba` (bajo el sonido y el menú),
+ * `menu` (dentro del menú y en la bienvenida) o `lateral` (vertical contra el borde, como estaba). Se elige con
+ * `?marca=…` en la dirección y se recuerda en este navegador. En el computador no cambia: abajo a la derecha.
+ */
+const MARK_PLACES = ['arriba', 'menu', 'lateral'];
+function chooseMarkPlace() {
+  let place = new URLSearchParams(window.location.search).get('marca');
+  try {
+    if (place && MARK_PLACES.includes(place)) localStorage.setItem('tv-marca', place);
+    else place = localStorage.getItem('tv-marca');
+  } catch {
+    /* sin almacenamiento: la de siempre */
+  }
+  document.documentElement.dataset.marca = place && MARK_PLACES.includes(place) ? place : MARK_PLACES[0];
+}
+chooseMarkPlace();
 
 /** «Una producción de Doinmedia»: marca de agua discreta abajo a la derecha, en todas las páginas (pedido del cliente,
  * 28/10/2026; antes solo estaba en la bienvenida). */

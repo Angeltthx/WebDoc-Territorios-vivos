@@ -7,7 +7,7 @@
 // Lo que se desplaza por su cuenta (galerías, paneles con su propio scroll, el mapa 3D) se respeta.
 // La URL refleja la página visible (/, /2 … /N).
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { pageIndex, pages } from '../content/pages';
 import { appPath, BASE } from './base';
 import { countPage } from './visits';
@@ -132,7 +132,8 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       const i = clamp(Math.round(el.scrollTop / el.clientHeight));
       if (i !== activeRef.current) {
         activeRef.current = i;
-        setActive(i);
+        // Sin prisa: el desplazamiento (el dedo) va primero; las páginas se actualizan cuando haya tiempo.
+        startTransition(() => setActive(i));
         window.history.replaceState(null, '', BASE + pathFor(i));
         countPage(pathFor(i), { vercel: true });
       }
