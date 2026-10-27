@@ -433,6 +433,8 @@ function TransitionVideo({ id, playing, near, muted, shade, fit = 'cover' }: {
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -440,12 +442,41 @@ function TransitionVideo({ id, playing, near, muted, shade, fit = 'cover' }: {
       v.pause();
       return;
     }
+    // Primero arranca en silencio (eso el navegador siempre lo deja) y después se le pone el sonido. Al llegar
+    // deslizando, el iPhone no cuenta el gesto como un toque: pedirlo con sonido de una lo dejaba quieto en la imagen.
+    // Si el navegador no deja el sonido, sigue en silencio y el sonido entra con el siguiente toque; si ni siquiera
+    // arrancó (p. ej. con ahorro de batería), ese toque lo arranca.
+    let off = false;
+    let check = 0;
+    const play = () => v.play().then(() => true, () => false);
+    const sound = () => {
+      if (off || mutedRef.current || !v.muted) return;
+      v.muted = false;
+      // Sin permiso para el sonido, el navegador lo pausa: vuelve al silencio y sigue.
+      window.clearTimeout(check);
+      check = window.setTimeout(() => {
+        if (!off && v.paused) {
+          v.muted = true;
+          void play();
+        }
+      }, 250);
+    };
+    const onTap = () => {
+      if (off) return;
+      if (v.paused) void play().then((ok) => ok && sound());
+      else sound();
+    };
     v.currentTime = 0;
-    v.muted = muted;
-    v.play().catch(() => {
-      v.muted = true;
-      void v.play().catch(() => {});
-    });
+    v.muted = true;
+    void play().then((ok) => ok && sound());
+    window.addEventListener('click', onTap, true);
+    window.addEventListener('touchend', onTap, true);
+    return () => {
+      off = true;
+      window.clearTimeout(check);
+      window.removeEventListener('click', onTap, true);
+      window.removeEventListener('touchend', onTap, true);
+    };
   }, [playing]);
   useEffect(() => {
     const v = ref.current;
