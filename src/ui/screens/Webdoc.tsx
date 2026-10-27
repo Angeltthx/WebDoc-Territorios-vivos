@@ -5,7 +5,7 @@ import { useScrollJourney } from '../../application/journey';
 import { initAudioUnlock, isMuted, playTransition, setMuted, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
-  Arrow, ChachitaTag, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
+  Arrow, ChachitaTag, CreditMark, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
   StationGuide, TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
 import { FramedVideo, GalleryPanel, QuotePanel, RecipePanel, SongsPanel, VideoPanel } from '../components/Sections';
@@ -91,6 +91,7 @@ export function Webdoc() {
         </button>
         <SocialLinks />
       </div>
+      <CreditMark />
       <StationGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </JourneyNav.Provider>
   );
@@ -125,10 +126,6 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
               Comenzar el viaje
               <Arrow dir="down" />
             </button>
-            {/* Crédito de la productora (pedido del cliente, 20/10/2026). */}
-            <p className="credit">
-              Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
-            </p>
           </div>
         </div>
       );

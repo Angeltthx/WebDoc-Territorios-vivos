@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { chapterByPath, type ChapterAction, type ChapterBody, type ChapterTab } from '../../content/chapters';
 import { Backdrop, Img } from '../components/Media';
-import { pagePath, SiteMenu, SocialLinks } from '../components/Chrome';
+import { CreditMark, pagePath, SiteMenu, SocialLinks } from '../components/Chrome';
 import { VideoPanel } from '../components/Sections';
 
 export default function ChapterScreen({ path }: { path: string }) {
@@ -66,6 +66,7 @@ export default function ChapterScreen({ path }: { path: string }) {
       {notice && <p className="notice notice--float" role="status">Muy pronto: estamos confirmando este dato con las comunidades.</p>}
       <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} />
       <div className="dock"><SocialLinks /></div>
+      <CreditMark />
     </div>
   );
 }
