@@ -403,7 +403,7 @@ export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['galler
               key={ph.id + i}
               type="button"
               className="gallery__card"
-              style={{ aspectRatio: String(aspectOf(ph.id)) }}
+              style={{ aspectRatio: String(aspectOf(ph.id)), ['--ar' as string]: aspectOf(ph.id) }}
               onClick={() => setOpen(i)}
               aria-label={`Ampliar: ${ph.alt}`}
             >
