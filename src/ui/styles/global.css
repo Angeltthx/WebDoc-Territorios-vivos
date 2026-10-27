@@ -399,28 +399,56 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .t-dots { position: absolute; bottom: 22px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; list-style: none; margin: 0; padding: 0; }
 .t-dots li { width: 10px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.55); }
 .t-dots li.is-active { width: 22px; background: #fff; }
-/* Mapa del recorrido en las transiciones: abajo a la derecha, pequeño. En celular, arriba bajo la barra. */
+/* Mapa del recorrido en las transiciones: abajo a la derecha, pequeño. En celular, arriba bajo la barra.
+   Un río con las paradas: por lo andado el agua corre sin parar; el tramo nuevo se llena con una gota al frente y la
+   parada a la que se llega se ilumina y hace ondas (28/10/2026). Tiempos: el agua baja de 0,8 s a 3,8 s. */
 .route {
-  position: absolute; z-index: 4; right: 22px; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 26px); margin: 0; display: grid; justify-items: end; gap: 4px;
-  font-size: 11.5px; letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.85); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45)); animation: fade 1s ease 0.6s both;
+  --water: #9fe3f2;
+  position: absolute; z-index: 4; right: 16px; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 22px); margin: 0;
+  padding: 8px 10px 4px; border-radius: 14px; background: radial-gradient(ellipse at center, rgba(6, 18, 14, 0.42), rgba(6, 18, 14, 0) 72%);
+  animation: fade 1s ease 0.4s both;
 }
-.route strong { font-weight: 600; color: #fff; }
-.route path { fill: none; stroke: rgba(255, 255, 255, 0.4); stroke-width: 1.2; stroke-dasharray: 0.04 0.05; }
-.route path.is-done { stroke: rgba(255, 255, 255, 0.8); stroke-dasharray: none; }
-.route path.is-now { stroke: var(--gold); stroke-width: 1.6; stroke-dasharray: 1; stroke-dashoffset: 1; animation: river-draw 3s var(--ease) 0.8s forwards; }
-.route circle { fill: rgba(255, 255, 255, 0.45); }
-.route circle.is-done { fill: #fff; }
-.route circle.is-next { fill: var(--gold); animation: route-pulse 1.8s ease-in-out 3.5s infinite; transform-box: fill-box; transform-origin: center; }
+.route svg { display: block; overflow: visible; max-width: calc(100vw - 32px); height: auto; }
+.route path { fill: none; stroke-linecap: round; }
+/* El cauce: punteado fino por donde falta; firme y suave por donde ya se pasó. */
+.route__bed { stroke: rgba(255, 255, 255, 0.38); stroke-width: 1.2; stroke-dasharray: 0.012 0.04; }
+.route__seg.is-done .route__bed, .route__seg.is-now .route__bed { stroke: rgba(255, 255, 255, 0.16); stroke-dasharray: none; stroke-width: 3.4; }
+/* El agua. */
+.route__water { stroke: rgba(255, 255, 255, 0.88); stroke-width: 1.8; filter: drop-shadow(0 0 2px rgba(159, 227, 242, 0.55)); }
+.route__seg.is-now .route__water { stroke-width: 2.2; stroke-dasharray: 1; stroke-dashoffset: 1; animation: river-draw 3s var(--ease) 0.8s forwards; filter: drop-shadow(0 0 3px rgba(159, 227, 242, 0.85)); }
+/* La corriente: destellos que avanzan sobre el agua, como reflejos que bajan con ella. */
+.route__flow { stroke: var(--water); stroke-width: 1.8; stroke-dasharray: 0.06 0.085; animation: river-flow 2.2s linear infinite; opacity: 0.95; filter: drop-shadow(0 0 2px var(--water)); }
+.route__seg.is-now .route__flow { opacity: 0; animation: river-flow 2.6s linear infinite, fade-in 0.8s ease 3.6s forwards; }
 @keyframes river-draw { to { stroke-dashoffset: 0; } }
-@keyframes route-pulse { 50% { transform: scale(1.5); } }
+@keyframes river-flow { to { stroke-dashoffset: -0.145; } } /* un ciclo del patrón: sin saltos */
+@keyframes fade-in { to { opacity: 0.95; } }
+/* La gota al frente del agua (se mueve con animateMotion, a la par del dibujo del tramo). */
+.route__drop { fill: #fff; opacity: 0; filter: drop-shadow(0 0 4px var(--water)) drop-shadow(0 0 1px #fff); animation: drop-life 3s 0.8s both; }
+@keyframes drop-life { 0% { opacity: 0; } 6%, 88% { opacity: 1; } 100% { opacity: 0; } }
+/* Las paradas y sus nombres. */
+.route__stop circle { fill: rgba(255, 255, 255, 0.4); }
+.route__stop.is-done circle { fill: #fff; }
+.route__stop text { font: 500 8.5px var(--sans); letter-spacing: 0.06em; fill: rgba(255, 255, 255, 0.5); paint-order: stroke; stroke: rgba(0, 0, 0, 0.35); stroke-width: 2px; }
+.route__stop.is-done text { fill: rgba(255, 255, 255, 0.8); }
+.route__stop.is-next circle { fill: rgba(255, 255, 255, 0.4); transform-box: fill-box; transform-origin: center; animation: stop-arrive 0.7s var(--ease) 3.6s forwards; }
+.route__stop.is-next text { fill: rgba(255, 255, 255, 0.6); animation: name-arrive 0.7s ease 3.6s forwards; }
+@keyframes stop-arrive { 0% { transform: scale(1); } 45% { transform: scale(1.7); fill: #fff; } 100% { transform: scale(1); fill: var(--water); } }
+@keyframes name-arrive { to { fill: #fff; font-weight: 700; } }
+/* Ondas, como una gota que cae en el agua: empiezan al llegar y siguen, despacio. */
+.route__ripple { fill: none; stroke: var(--water); stroke-width: 1; opacity: 0; transform-box: fill-box; transform-origin: center; animation: ripple 2.8s ease-out 3.7s infinite; }
+.route__ripple--late { animation-delay: 5.1s; }
+@keyframes ripple { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(3.6); opacity: 0; } }
+/* Con movimiento reducido (p. ej. «Efectos de animación» apagados en Windows) el agua igual llega, una vez: es lo que
+   cuenta a dónde se va. No sigue la corriente ni se repiten las ondas. Le gana a la regla general que acorta todo. */
 @media (prefers-reduced-motion: reduce) {
-  .route { animation: fade 1s ease 0.6s both !important; }
-  .route path.is-now { animation: none; stroke-dashoffset: 0; }
-  .route circle.is-next { animation: none; }
+  .route .route__seg.is-now .route__water, .route .route__drop { animation-duration: 3s !important; }
+  .route .route__stop.is-next circle, .route .route__stop.is-next text { animation-duration: 0.7s !important; }
+  .route .route__ripple { animation-duration: 2.8s !important; }
+  .route .route__ripple--late { display: none; }
+  .route .route__flow { animation: none !important; opacity: 0; }
 }
 @media (max-width: 640px) {
-  .route { top: 64px; bottom: auto; right: 14px; }
+  .route { top: 60px; bottom: auto; right: 8px; }
 }
 .rain { position: absolute; inset: 0; z-index: -1; opacity: 0.3; pointer-events: none;
   background-image: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 255, 255, 0.35) 22px 23px, transparent 23px 60px);
