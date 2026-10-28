@@ -2514,3 +2514,12 @@ button.ap-kpi:hover { background: var(--ap-head); }
 @media (max-width: 640px) and (orientation: portrait) {
   .route { top: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 66px); right: 8px; }
 }
+/* Pantallas táctiles: las páginas van una debajo de otra y la nueva empuja a la anterior (como en Instagram), sin
+   apilarse con position: sticky. En el iPhone, Safari acomoda lo «pegado» con un cuadro de retraso mientras se
+   desliza: la página de abajo se corría un instante y se veían las dos sobrepuestas arriba (29/10/2026). El planeta
+   también sube como las demás, ya visible. En el computador sigue el apilado. */
+@media (hover: none) and (pointer: coarse) {
+  .stack-page { position: relative; }
+  .stack-page.stack-page--closing, .stack-page.stack-page--closing.is-active { opacity: 1; transition: none; animation: none; }
+  .stack-page.stack-page--closing > .screen, .stack-page.stack-page--closing.is-active > .screen { transform: none; transition: none; }
+}
