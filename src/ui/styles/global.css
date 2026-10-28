@@ -2566,3 +2566,10 @@ button.ap-kpi:hover { background: var(--ap-head); }
     top: calc(max(14px, env(safe-area-inset-top)) + 52px); bottom: auto;
   }
 }
+/* Un video de transición que no pudo arrancar solo (el iPhone sin ningún toque en la visita): un toque lo arranca. */
+.tap-hint {
+  position: absolute; z-index: 3; left: 50%; top: 70%; transform: translateX(-50%); margin: 0; padding: 9px 18px;
+  border-radius: 999px; background: rgba(6, 18, 14, 0.55); border: 1px solid rgba(255, 255, 255, 0.35); color: #fff;
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; pointer-events: none;
+  animation: fade 0.6s ease both;
+}

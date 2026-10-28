@@ -1,6 +1,7 @@
 import { Suspense, lazy, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getStation, transitions } from '../../content/journey';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
+import { leaveVideo, registerAutoplay, setCurrentVideo } from '../../application/autoplay';
 import { useScrollJourney } from '../../application/journey';
 import { clearTrack, initAudioUnlock, isMuted, playTransition, preloadTrack, setMuted, setTrack, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
@@ -261,13 +262,16 @@ function Welcome({ playing, muted, unmute }: { playing: boolean; muted: boolean;
     v.loop = true;
   };
   // Al salir de la página se pausa (y si estaba hablando, se calla); al volver sigue de fondo.
+  useEffect(() => (ref.current ? registerAutoplay(ref.current) : undefined), []);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     if (playing) {
+      setCurrentVideo(v);
       void v.play().catch(() => {});
       return;
     }
+    leaveVideo(v);
     v.pause();
     if (!v.loop) {
       quiet(v);
@@ -436,9 +440,13 @@ function TransitionVideo({ id, playing, near, shade, fit = 'cover' }: {
   const ref = useRef<HTMLVideoElement>(null);
   const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
   const sound = `/media/transiciones/${id}-audio.m4a?v=${TRANSITIONS_VERSION}`;
+  // El video no pudo arrancar solo (el iPhone sin ningún toque en la visita): se avisa que un toque lo arranca.
+  const [stuck, setStuck] = useState(false);
   useEffect(() => {
     if (near) preloadTrack(sound);
   }, [near, sound]);
+  // Queda autorizado con el primer toque de la visita, para arrancar solo al llegar deslizando (ver autoplay.ts).
+  useEffect(() => (ref.current ? registerAutoplay(ref.current) : undefined), []);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -446,8 +454,19 @@ function TransitionVideo({ id, playing, near, shade, fit = 'cover' }: {
       v.pause();
       return;
     }
+    setCurrentVideo(v);
     // El sonido va con la imagen: arranca cuando el video corre (también al seguir tras cargar) y para si se detiene.
-    const onPlaying = () => setTrack(sound, () => v.currentTime);
+    // Si el video no arranca (el iPhone sin un toque todavía), el sonido no lo espera más de un segundo y medio: la
+    // voz de Chachita suena igual sobre la imagen, y cuando el video arranque se vuelven a juntar.
+    const onPlaying = () => {
+      window.clearTimeout(alone);
+      setStuck(false);
+      setTrack(sound, () => v.currentTime);
+    };
+    const alone = window.setTimeout(() => {
+      if (v.paused || v.readyState < 3) setTrack(sound, () => v.currentTime);
+      if (v.paused) setStuck(true);
+    }, 1500);
     const onWaiting = () => clearTrack(sound);
     // Si el video no arrancó solo (p. ej. el iPhone con ahorro de batería), el siguiente toque lo arranca.
     const onTap = () => {
@@ -465,6 +484,9 @@ function TransitionVideo({ id, playing, near, shade, fit = 'cover' }: {
       v.removeEventListener('waiting', onWaiting);
       window.removeEventListener('click', onTap, true);
       window.removeEventListener('touchend', onTap, true);
+      window.clearTimeout(alone);
+      setStuck(false);
+      leaveVideo(v);
       clearTrack(sound);
     };
   }, [playing, sound]);
@@ -482,6 +504,7 @@ function TransitionVideo({ id, playing, near, shade, fit = 'cover' }: {
         preload={near ? 'auto' : 'none'}
       />
       {shade && <div className="backdrop__tint" style={{ background: 'radial-gradient(ellipse at center, rgba(6,18,14,.28), rgba(6,18,14,.05) 70%)' }} />}
+      {stuck && <p className="tap-hint">Toca para ver el video</p>}
     </div>
   );
 }
