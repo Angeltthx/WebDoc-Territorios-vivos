@@ -491,7 +491,8 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 /* ───────── Recorrido vertical ─────────
    Cada página es "sticky": al desplazarse, la siguiente sube y cubre a la anterior.
    Cuándo se pasa de página (rueda, dedo, teclado) lo decide application/journey.ts (sin scroll snap del navegador,
-   que saltaba de página con cualquier movimiento pequeño). */
+   que saltaba de página con cualquier movimiento pequeño). En pantallas táctiles sí hay scroll snap, una página por
+   gesto (ver NATIVE_SNAP en journey.ts y el final de este archivo). */
 .scroller {
   position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden;
   overscroll-behavior: none; background: var(--forest); scrollbar-width: none;
@@ -2421,7 +2422,13 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .chapter-exp li { flex-direction: column; align-items: flex-start; border-radius: 16px; }
   .chapter__tabs {
     left: 0; right: 0; bottom: 0; transform: none; max-width: none; padding: 26px 16px max(10px, env(safe-area-inset-bottom));
-    background: linear-gradient(180deg, transparent, rgba(6, 14, 11, 0.88) 45%);
+  }
+  /* El fondo de las pestañas va aparte (en la fila, que se desliza de lado y se desvanece en los bordes, el texto que
+     pasaba por detrás se seguía viendo): opaco desde donde empiezan las pestañas. */
+  .chapter::after {
+    content: ''; position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; pointer-events: none;
+    height: calc(80px + max(10px, env(safe-area-inset-bottom)));
+    background: linear-gradient(180deg, transparent, rgba(6, 14, 11, 0.96) 26px);
   }
   .chapter .topbar .chip { max-width: 56vw; }
   .chapter__back-more { display: none; }
@@ -2519,7 +2526,43 @@ button.ap-kpi:hover { background: var(--ap-head); }
    desliza: la página de abajo se corría un instante y se veían las dos sobrepuestas arriba (29/10/2026). El planeta
    también sube como las demás, ya visible. En el computador sigue el apilado. */
 @media (hover: none) and (pointer: coarse) {
-  .stack-page { position: relative; }
+  /* El navegador ajusta la página al soltar, con su propia inercia: una página por gesto (ver NATIVE_SNAP). */
+  .scroller { scroll-snap-type: y mandatory; }
+  .stack-page { position: relative; scroll-snap-align: start; scroll-snap-stop: always; }
   .stack-page.stack-page--closing, .stack-page.stack-page--closing.is-active { opacity: 1; transition: none; animation: none; }
   .stack-page.stack-page--closing > .screen, .stack-page.stack-page--closing.is-active > .screen { transform: none; transition: none; }
+}
+/* Pantallas que se pisaban (29/10/2026, revisión en 320×568 … 844×390). */
+/* Tableta de pie: las pestañas van centradas abajo y la marca a la derecha quedaba encima de la última; sube. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .credit-mark { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 52px); }
+}
+/* El proyecto · Visita Nuquí en el celular: con la marca arriba, el texto empieza debajo de ella. */
+@media (max-width: 640px) {
+  [data-marca='arriba'] .chapter__body { padding-top: 104px; }
+}
+/* Celulares bajitos (iPhone SE y parecidos): la receta y los cantos se aprietan para caber entre la barra y las
+   pestañas, en vez de meterse debajo de ellas. */
+@media (max-width: 640px) and (max-height: 700px) and (orientation: portrait) {
+  .recipe { padding-top: 64px; padding-bottom: 100px; gap: 10px; }
+  [data-marca='arriba'] .recipe { padding-top: 92px; }
+  .recipe__text h2 { font-size: 22px; }
+  .recipe__intro { font-size: 13px; line-height: 1.45; }
+  .recipe__hint { margin-top: 6px; }
+  .recipe__step { width: min(260px, 72vw); padding: 8px; }
+  .recipe__photos { aspect-ratio: 16 / 8; }
+  .recipe__body { font-size: 13.5px; line-height: 1.5; max-height: 7.5em; overflow-y: auto; }
+  .songs { justify-content: flex-start; padding-top: 104px; padding-bottom: 100px; gap: 4px; }
+  .glass-card { min-height: 92px; padding: 14px; }
+}
+/* Pantallas angostas (320 px): el nombre de la sección no llega hasta «Volver». */
+@media (max-width: 360px) {
+  .chapter .topbar .chip { max-width: 46vw; }
+}
+/* Celular acostado: en el planeta y en El proyecto · Visita Nuquí la marca abajo quedaba sobre los textos; sube a la
+   esquina de arriba, bajo el sonido y el menú. */
+@media (max-height: 500px) and (orientation: landscape) {
+  body:has(.stack-page--closing.is-active) .credit-mark, body:has(.chapter) .credit-mark {
+    top: calc(max(14px, env(safe-area-inset-top)) + 52px); bottom: auto;
+  }
 }

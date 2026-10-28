@@ -1,8 +1,9 @@
 // Recorrido por desplazamiento vertical: cada página ocupa una pantalla, y se pasa de una en una.
 // - Rueda del mouse o trackpad: un giro (o un deslizamiento) = una página. El resto del gesto (la inercia del
 //   trackpad) no cuenta, para no saltarse varias.
-// - Celular: como los videos de Instagram. Pasa si el dedo recorre lo suficiente (SWIPE_DISTANCE) o si el gesto es
-//   rápido y decidido (SWIPE_VELOCITY); si no, vuelve a su sitio. La inercia del navegador no decide.
+// - Pantallas táctiles (celular, tableta): como los videos de Instagram, con el ajuste propio del navegador (scroll
+//   snap, una página por gesto; ver NATIVE_SNAP). Las pantallas táctiles con mouse o lápiz usan el dedo a mano:
+//   pasa si el dedo recorre lo suficiente (SWIPE_DISTANCE) o si el gesto es rápido y decidido (SWIPE_VELOCITY).
 // - Teclado: flechas, Av Pág / Re Pág y espacio, una página por pulsación.
 // Lo que se desplaza por su cuenta (galerías, paneles con su propio scroll, el mapa 3D) se respeta.
 // La URL refleja la página visible (/, /2 … /N).
@@ -30,6 +31,13 @@ const WHEEL_STEP = 30;
 const WHEEL_QUIET_MS = 200;
 /** …y nunca antes de esto (lo que tarda en llegar la página). */
 const WHEEL_LOCK_MS = 650;
+
+/**
+ * En las pantallas táctiles el navegador ajusta la página solo (scroll snap en los estilos): sigue al dedo y a su
+ * inercia sin cortes. Antes, al soltar se frenaba la inercia y se lanzaba un desplazamiento propio, y en el iPhone
+ * los dos movimientos chocaban: temblaba o dejaba de sentirse suave (29/10/2026).
+ */
+const NATIVE_SNAP = typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 /** Sin scrollend, un desplazamiento programado que todavía no llega se sigue esperando hasta este tiempo (ms). */
 const SETTLE_MAX_MS = 1500;
@@ -124,6 +132,12 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       // Con el dedo puesto no se decide nada: sin scrollend, el temporizador vencía en cuanto el dedo se quedaba quieto
       // un instante, y la página volvía sola a su sitio debajo del dedo (temblaba, o devolvía a la anterior).
       if (resizing() || touching) return;
+      // El navegador ya dejó la página en su sitio: solo se toma nota de dónde quedó.
+      if (NATIVE_SNAP) {
+        settling.current = false;
+        anchor.current = clamp(Math.round(el.scrollTop / el.clientHeight));
+        return;
+      }
       if (settling.current) {
         // Sin scrollend, una pausa del navegador (p. ej. mientras carga el planeta) no es la llegada: se sigue esperando.
         const away = Math.abs(el.scrollTop - goal.current * el.clientHeight) > 2;
@@ -228,6 +242,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     };
     const onTouchEnd = (e: TouchEvent) => {
       release(e);
+      if (NATIVE_SNAP) return;
       const t = touch;
       touch = null;
       if (!t || e.touches.length) return;
