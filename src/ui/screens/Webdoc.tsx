@@ -2,7 +2,7 @@ import { Suspense, lazy, memo, useCallback, useEffect, useId, useMemo, useRef, u
 import { getStation, transitions } from '../../content/journey';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { useScrollJourney } from '../../application/journey';
-import { initAudioUnlock, isMuted, playTransition, setMuted, setVoice } from '../../application/sound';
+import { clearTrack, initAudioUnlock, isMuted, playTransition, preloadTrack, setMuted, setTrack, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
   Arrow, ChachitaTag, CreditMark, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
@@ -188,7 +188,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
       const onPhoto = !!(t.background || t.video);
       return (
         <div className="screen screen--transition" style={{ background: t.color }} aria-label={t.label ?? `Transición ${t.number}: de ${t.from} a ${t.to}`}>
-          {t.video && <TransitionVideo id={t.video} playing={playing} near={near} muted={muted} shade={t.lines.length > 0} fit={t.fit} />}
+          {t.video && <TransitionVideo id={t.video} playing={playing} near={near} shade={t.lines.length > 0} fit={t.fit} />}
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
           <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
@@ -422,19 +422,23 @@ function RouteMap({ index, playing }: { index: number; playing: boolean }) {
 }
 
 /**
- * Video de una transición, con su propio sonido. Empieza desde el inicio cada vez que se llega
- * a la transición y se pausa al salir. Si el navegador no permite sonido todavía (sin gesto del
- * visitante), se reproduce en silencio. Solo se descarga cuando la transición está cerca.
+ * Video de una transición. Empieza desde el inicio cada vez que se llega a la transición y se pausa al salir. Corre
+ * siempre en silencio (eso los navegadores lo dejan sin un toque) y su sonido, sacado aparte, suena a la par por el
+ * audio del webdoc (setTrack): en el iPhone cada video pedía su propio toque para sonar y, al llegar deslizando, no
+ * sonaba; ese audio queda desbloqueado con el primer toque de la visita (29/10/2026). Solo se descarga cuando la
+ * transición está cerca.
  */
-function TransitionVideo({ id, playing, near, muted, shade, fit = 'cover' }: {
-  id: string; playing: boolean; near: boolean; muted: boolean; shade: boolean;
+function TransitionVideo({ id, playing, near, shade, fit = 'cover' }: {
+  id: string; playing: boolean; near: boolean; shade: boolean;
   /** `contain`: el video completo, sin recortar, con su imagen de espera desenfocada llenando los bordes. */
   fit?: 'cover' | 'contain';
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
-  const mutedRef = useRef(muted);
-  mutedRef.current = muted;
+  const sound = `/media/transiciones/${id}-audio.m4a?v=${TRANSITIONS_VERSION}`;
+  useEffect(() => {
+    if (near) preloadTrack(sound);
+  }, [near, sound]);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
@@ -442,46 +446,28 @@ function TransitionVideo({ id, playing, near, muted, shade, fit = 'cover' }: {
       v.pause();
       return;
     }
-    // Primero arranca en silencio (eso el navegador siempre lo deja) y después se le pone el sonido. Al llegar
-    // deslizando, el iPhone no cuenta el gesto como un toque: pedirlo con sonido de una lo dejaba quieto en la imagen.
-    // Si el navegador no deja el sonido, sigue en silencio y el sonido entra con el siguiente toque; si ni siquiera
-    // arrancó (p. ej. con ahorro de batería), ese toque lo arranca.
-    let off = false;
-    let check = 0;
-    const play = () => v.play().then(() => true, () => false);
-    const sound = () => {
-      if (off || mutedRef.current || !v.muted) return;
-      v.muted = false;
-      // Sin permiso para el sonido, el navegador lo pausa: vuelve al silencio y sigue.
-      window.clearTimeout(check);
-      check = window.setTimeout(() => {
-        if (!off && v.paused) {
-          v.muted = true;
-          void play();
-        }
-      }, 250);
-    };
+    // El sonido va con la imagen: arranca cuando el video corre (también al seguir tras cargar) y para si se detiene.
+    const onPlaying = () => setTrack(sound, () => v.currentTime);
+    const onWaiting = () => clearTrack(sound);
+    // Si el video no arrancó solo (p. ej. el iPhone con ahorro de batería), el siguiente toque lo arranca.
     const onTap = () => {
-      if (off) return;
-      if (v.paused) void play().then((ok) => ok && sound());
-      else sound();
+      if (v.paused) void v.play().catch(() => {});
     };
-    v.currentTime = 0;
-    v.muted = true;
-    void play().then((ok) => ok && sound());
+    v.addEventListener('playing', onPlaying);
+    v.addEventListener('waiting', onWaiting);
     window.addEventListener('click', onTap, true);
     window.addEventListener('touchend', onTap, true);
+    v.muted = true;
+    v.currentTime = 0;
+    void v.play().catch(() => {});
     return () => {
-      off = true;
-      window.clearTimeout(check);
+      v.removeEventListener('playing', onPlaying);
+      v.removeEventListener('waiting', onWaiting);
       window.removeEventListener('click', onTap, true);
       window.removeEventListener('touchend', onTap, true);
+      clearTrack(sound);
     };
-  }, [playing]);
-  useEffect(() => {
-    const v = ref.current;
-    if (v && playing) v.muted = muted;
-  }, [muted, playing]);
+  }, [playing, sound]);
   const poster = `/media/transiciones/${id}-poster.webp?v=${TRANSITIONS_VERSION}`;
   return (
     <div className={`backdrop${fit === 'contain' ? ' backdrop--contain' : ''}`} aria-hidden="true" style={{ backgroundImage: `url(${poster})` }}>
