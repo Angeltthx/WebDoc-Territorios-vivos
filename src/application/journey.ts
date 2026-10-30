@@ -1,6 +1,7 @@
 // Recorrido por desplazamiento vertical: cada página ocupa una pantalla, y se pasa de una en una.
 // - Rueda del mouse o trackpad: un giro (o un deslizamiento) = una página. El resto del gesto (la inercia del
-//   trackpad) no cuenta, para no saltarse varias.
+//   trackpad) no cuenta, para no saltarse varias. La página nueva empuja a la anterior hacia arriba, como en TikTok
+//   (ver GLIDE_MS).
 // - Pantallas táctiles (celular, tableta): como los videos de Instagram, con el ajuste propio del navegador (scroll
 //   snap, una página por gesto; ver NATIVE_SNAP). Las pantallas táctiles con mouse o lápiz usan el dedo a mano:
 //   pasa si el dedo recorre lo suficiente (SWIPE_DISTANCE) o si el gesto es rápido y decidido (SWIPE_VELOCITY).
@@ -39,6 +40,11 @@ const WHEEL_LOCK_MS = 650;
  */
 const NATIVE_SNAP = typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
+/** Computador: lo que tarda la página en deslizarse a la siguiente (ms)… */
+const GLIDE_MS = 700;
+/** …arrancando rápido y frenando suave al llegar, como al pasar un video en TikTok. */
+const glideEase = (t: number) => 1 - (1 - t) ** 4;
+
 /** Sin scrollend, un desplazamiento programado que todavía no llega se sigue esperando hasta este tiempo (ms). */
 const SETTLE_MAX_MS = 1500;
 
@@ -65,9 +71,13 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
   const goal = useRef(active); // a dónde va ese desplazamiento…
   const goalSince = useRef(0); // …y desde cuándo
 
+  const gliding = useRef(0); // cuadro de animación del deslizamiento propio en curso (0: ninguno)
+
   const scrollToIndex = useCallback((i: number, smooth = true) => {
     const el = scroller.current;
     if (!el) return;
+    cancelAnimationFrame(gliding.current);
+    gliding.current = 0;
     const target = clamp(i);
     anchor.current = target;
     const top = target * el.clientHeight;
@@ -79,8 +89,30 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     settling.current = smooth;
     goal.current = target;
     goalSince.current = performance.now();
-    el.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+    // Las pantallas táctiles usan el desplazamiento suave del navegador (el scroll snap no deja moverlo cuadro a cuadro).
+    if (!smooth || NATIVE_SNAP) {
+      el.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+      return;
+    }
+    // En el computador la página se desliza con animación propia, como en TikTok: el scroll suave del navegador se
+    // apaga en Windows cuando están desactivadas las animaciones del sistema, y la página cambiaba de golpe.
+    const from = el.scrollTop;
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / GLIDE_MS);
+      el.scrollTop = from + (top - from) * glideEase(t);
+      if (t < 1) {
+        gliding.current = requestAnimationFrame(step);
+        return;
+      }
+      gliding.current = 0;
+      settling.current = false;
+      anchor.current = target;
+    };
+    gliding.current = requestAnimationFrame(step);
   }, [scroller]);
+
+  useEffect(() => () => cancelAnimationFrame(gliding.current), []);
 
   // A una página lejana (desde el menú) se llega de una, sin pasar por todas las de en medio (y sus videos).
   const scrollToPage = useCallback((id: string) => {
@@ -132,6 +164,8 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       // Con el dedo puesto no se decide nada: sin scrollend, el temporizador vencía en cuanto el dedo se quedaba quieto
       // un instante, y la página volvía sola a su sitio debajo del dedo (temblaba, o devolvía a la anterior).
       if (resizing() || touching) return;
+      // El deslizamiento propio mueve la página cuadro a cuadro (cada paso puede avisar scrollend): él decide al llegar.
+      if (gliding.current) return;
       // El navegador ya dejó la página en su sitio: solo se toma nota de dónde quedó.
       if (NATIVE_SNAP) {
         settling.current = false;

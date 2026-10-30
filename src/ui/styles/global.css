@@ -489,10 +489,10 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .guide__place { font-size: 13px; color: var(--muted); font-style: italic; }
 
 /* ───────── Recorrido vertical ─────────
-   Cada página es "sticky": al desplazarse, la siguiente sube y cubre a la anterior.
-   Cuándo se pasa de página (rueda, dedo, teclado) lo decide application/journey.ts (sin scroll snap del navegador,
-   que saltaba de página con cualquier movimiento pequeño). En pantallas táctiles sí hay scroll snap, una página por
-   gesto (ver NATIVE_SNAP en journey.ts y el final de este archivo). */
+   Las páginas van una debajo de otra y la nueva empuja a la anterior hacia arriba, como en TikTok, en el celular y en
+   el computador (30/10/2026; antes, en el computador, la nueva subía y tapaba a la anterior, con la marea).
+   Cuándo se pasa de página (rueda, dedo, teclado) lo decide application/journey.ts; en pantallas táctiles con el scroll
+   snap del navegador, una página por gesto (ver NATIVE_SNAP en journey.ts y el final de este archivo). */
 .scroller {
   position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden;
   overscroll-behavior: none; background: var(--forest); scrollbar-width: none;
@@ -500,7 +500,7 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .scroller::-webkit-scrollbar { display: none; }
 /* Exactamente el alto de la pantalla (sin mínimo): el recorrido ubica cada página por ese alto, y con el celular
    acostado un mínimo más alto que la pantalla corría todas las páginas. */
-.stack-page { position: sticky; top: 0; height: 100dvh; overflow: hidden; background: var(--forest); }
+.stack-page { position: relative; height: 100dvh; overflow: hidden; background: var(--forest); }
 .stack-page.is-covered { visibility: hidden; }
 
 /* Las animaciones de entrada esperan a que la página llegue a la pantalla, y las de las páginas que no se están viendo
@@ -511,64 +511,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .chip:not(.chip--plain) { background: rgba(20, 28, 26, 0.66); }
   .menu-btn, .dock__sound, .social a, .social span { background: rgba(0, 0, 0, 0.4); }
   .listen { background: rgba(6, 18, 14, 0.55); }
-}
-
-/* ───────── Al pasar de página: la marea ─────────
-   La página nueva no sube como una hoja: emerge en el lugar de la anterior, como si saliera del agua. Mientras llega se
-   ve a través del agua (desenfocada, teñida del verde azul del mar y un poco más grande) y una franja de luz la cruza de
-   abajo hacia arriba, como una ola que pasa (con el sonido de ola del cambio de página); al asentarse queda nítida.
-   Todo ligado al desplazamiento: en el celular, cuanto más se arrastra, más emerge. Sin soporte, sube como antes. */
-@property --veil { syntax: '<number>'; inherits: true; initial-value: 0; }
-@property --swell { syntax: '<percentage>'; inherits: true; initial-value: 120%; }
-
-@supports (animation-timeline: view()) {
-  .stack-page:not(.stack-page--first) {
-    view-timeline: --page block;
-    animation: tide-in linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
-  }
-  /* El agua: un velo verde azul que se aclara al salir… */
-  .stack-page:not(.stack-page--first)::after {
-    content: ''; position: absolute; z-index: 29; inset: 0; pointer-events: none;
-    background: linear-gradient(180deg, rgba(120, 200, 215, 0.38), rgba(30, 105, 120, 0.42) 55%, rgba(10, 55, 66, 0.5));
-    opacity: var(--veil);
-  }
-  /* …y la ola: una franja de luz suave que la cruza de abajo hacia arriba. */
-  .stack-page:not(.stack-page--first)::before {
-    content: ''; position: absolute; z-index: 30; left: -10%; right: -10%; height: 70%; top: var(--swell); pointer-events: none;
-    background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(220, 245, 250, 0.32), rgba(160, 225, 235, 0.12) 45%, transparent 72%);
-    mix-blend-mode: screen; opacity: calc(var(--veil) * 1.6);
-  }
-  .stack-page:not(.stack-page--first) > .screen {
-    animation: tide-surface linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
-  }
-}
-/* La página se queda quieta en la pantalla (sube con el scroll y se compensa) mientras aparece. */
-@keyframes tide-in {
-  from { transform: translateY(-100%); opacity: 0; --veil: 1; --swell: 110%; }
-  45% { opacity: 0.85; --veil: 0.55; }
-  70% { opacity: 1; }
-  85% { --veil: 0; }
-  to { transform: none; opacity: 1; --veil: 0; --swell: -80%; }
-}
-@keyframes tide-surface {
-  from { transform: scale(1.06); filter: blur(10px) saturate(1.15); }
-  60% { filter: blur(2px) saturate(1.04); }
-  to { transform: none; filter: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  /* Sin movimiento: queda el fundido desde el agua (el velo), sin la ola ni el acercamiento. */
-  .stack-page:not(.stack-page--first)::before { content: none; }
-  .stack-page:not(.stack-page--first) > .screen { animation: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .stack-page:not(.stack-page--first) > .screen { animation: none; }
-}
-/* Pantallas táctiles: la página nueva sube con el dedo y tapa la anterior, sin la marea (29/10/2026: en el celular el
-   velo y el desenfoque ligados al dedo hacían que la pantalla pareciera vibrar, y pesan mucho en un celular sencillo). */
-@media (hover: none) and (pointer: coarse) {
-  .stack-page:not(.stack-page--first) { animation: none; }
-  .stack-page:not(.stack-page--first)::before, .stack-page:not(.stack-page--first)::after { content: none; }
-  .stack-page:not(.stack-page--first) > .screen { animation: none; }
 }
 
 /* ───────── Señal de seguir bajando (ver ScrollCue) ─────────
@@ -641,26 +583,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .play-hint__touch { display: block; }
 }
 
-/* ───────── Del recorrido al planeta (la última página) ─────────
-   En vez de subir como una hoja, el planeta aparece en el lugar de la página 26: mientras se desplaza se queda quieto en
-   la pantalla (ligado al scroll) y, al llegar, se funde encima en un segundo y medio con un acercamiento suave (por
-   tiempo, no por scroll: el desplazamiento dura muy poco para que se alcance a ver). Al subir, se desvanece. */
-.stack-page.stack-page--closing { opacity: 0; transition: opacity 0.6s ease; }
-.stack-page.stack-page--closing.is-active { opacity: 1; transition: opacity 1.5s ease; }
-.stack-page.stack-page--closing > .screen { transform: scale(1.1); transition: transform 0.6s ease; }
-.stack-page.stack-page--closing.is-active > .screen { transform: none; transition: transform 2.2s var(--ease); }
-@supports (animation-timeline: view()) {
-  .stack-page.stack-page--closing {
-    box-shadow: none; background: transparent;
-    animation: closing-hold linear both; animation-timeline: --page; animation-range: entry 0% entry 100%;
-  }
-  .stack-page.stack-page--closing::after, .stack-page.stack-page--closing::before { content: none; }
-  .stack-page.stack-page--closing > .screen { animation: none; }
-}
-@keyframes closing-hold { from { transform: translateY(-100%); } to { transform: none; } }
-@media (prefers-reduced-motion: reduce) {
-  .stack-page.stack-page--closing > .screen, .stack-page.stack-page--closing.is-active > .screen { transform: none; transition: none; }
-}
 
 /* ───────── Experiencia 360 ───────── */
 .glass-card--360 { position: relative; }
@@ -853,10 +775,8 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
-/* …pero los fundidos se quedan (no son movimiento): sin ellos, el planeta y la invitación aparecían de golpe. */
+/* …pero los fundidos se quedan (no son movimiento): sin ellos, la invitación aparecía de golpe. */
 @media (prefers-reduced-motion: reduce) {
-  .stack-page.stack-page--closing { transition-duration: 0.6s !important; }
-  .stack-page.stack-page--closing.is-active { transition-duration: 1.5s !important; }
   .cue { transition-property: opacity !important; transition-duration: 0.9s !important; }
   .map-loading, .globe-stage { transition-duration: 0.9s !important; }
   .map-screen.is-arriving .globe-stage > * { animation-duration: 1.6s !important; }
@@ -2521,16 +2441,11 @@ button.ap-kpi:hover { background: var(--ap-head); }
 @media (max-width: 640px) and (orientation: portrait) {
   .route { top: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 66px); right: 8px; }
 }
-/* Pantallas táctiles: las páginas van una debajo de otra y la nueva empuja a la anterior (como en Instagram), sin
-   apilarse con position: sticky. En el iPhone, Safari acomoda lo «pegado» con un cuadro de retraso mientras se
-   desliza: la página de abajo se corría un instante y se veían las dos sobrepuestas arriba (29/10/2026). El planeta
-   también sube como las demás, ya visible. En el computador sigue el apilado. */
+/* Pantallas táctiles: el navegador ajusta la página al soltar, con su propia inercia: una página por gesto (ver
+   NATIVE_SNAP). En el computador lo hace journey.ts. */
 @media (hover: none) and (pointer: coarse) {
-  /* El navegador ajusta la página al soltar, con su propia inercia: una página por gesto (ver NATIVE_SNAP). */
   .scroller { scroll-snap-type: y mandatory; }
-  .stack-page { position: relative; scroll-snap-align: start; scroll-snap-stop: always; }
-  .stack-page.stack-page--closing, .stack-page.stack-page--closing.is-active { opacity: 1; transition: none; animation: none; }
-  .stack-page.stack-page--closing > .screen, .stack-page.stack-page--closing.is-active > .screen { transform: none; transition: none; }
+  .stack-page { scroll-snap-align: start; scroll-snap-stop: always; }
 }
 /* Pantallas que se pisaban (29/10/2026, revisión en 320×568 … 844×390). */
 /* Tableta de pie: las pestañas van centradas abajo y la marca a la derecha quedaba encima de la última; sube. */
