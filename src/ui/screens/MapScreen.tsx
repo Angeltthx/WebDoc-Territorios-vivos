@@ -18,8 +18,14 @@ import { DIVE } from '../components/map/dive';
 import { MAP_TOWNS, createMapScene, type MapSceneHandle, type SpotFilter } from '../components/map/MapScene';
 import { QUALITY, TIER, TIER_LABEL, rememberCrash } from '../components/map/quality';
 import { SOLO, lastSteps, step } from '../components/map/diag';
+import { initAudioUnlock, playMapSound, setMapAmbience, type MapSound } from '../../application/sound';
 
 type Phase = 'loading' | 'globe' | 'diving' | 'landing' | 'map' | 'leaving';
+
+/** Lo que suena al tocar cada animal (ver playMapSound): la ballena y la tortuga se zambullen, la rana croa… */
+const ANIMAL_SOUND: Record<string, MapSound> = {
+  ballena: 'chapuzon', tortuga: 'chapuzon-chico', cangrejo: 'chapuzon-chico', pava: 'pajaro', rana: 'rana',
+};
 
 const INVITE_SEEN = 'mapa-invitacion-vista';
 const FILTER_KEY = 'mapa-filtro';
@@ -99,6 +105,17 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   filterRef.current = filter;
   /** La costa se arma cuando la página es la visible (ver `active`). */
   const wantMap = useRef<(() => void) | null>(null);
+  // La selva suena mientras se ve la costa (no en el planeta) y la página es la visible.
+  const hearing = useRef(false);
+  useEffect(() => {
+    hearing.current = active && (phase === 'landing' || phase === 'map');
+    setMapAmbience(hearing.current);
+  }, [active, phase]);
+  useEffect(() => () => setMapAmbience(false), []);
+  // Fuera del recorrido (la dirección del mapa sola), el audio se desbloquea aquí con el primer toque.
+  useEffect(() => {
+    if (!embedded) initAudioUnlock();
+  }, [embedded]);
   useEffect(() => {
     activeRef.current = active;
     if (!active) setEngaged(false);
@@ -158,6 +175,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
         paused: SOLO !== 'costa',
         onSelect: (p) => {
           setPlace(p);
+          if (p?.kind === 'nature' && ANIMAL_SOUND[p.id]) playMapSound(ANIMAL_SOUND[p.id]);
           if (p?.kind === 'town') setTown(p.id);
         },
         onInteract: () => setHint(false),
@@ -165,6 +183,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
         onPull: setPull,
         onSpot: setSpot,
         onLost,
+        // Los saltos de la ballena se oyen más quedos que cuando se la toca: suelen pasar lejos.
+        onSplash: (strength) => hearing.current && playMapSound('chapuzon', 0.25 + 0.3 * strength),
       }).then((m) => {
         handle.current = m;
         m.setFilter(filterRef.current);

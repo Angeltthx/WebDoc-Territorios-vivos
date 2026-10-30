@@ -18,6 +18,7 @@ const Admin = lazy(() => import('./ui/screens/Admin'));
 const Guide = lazy(() => import('./ui/screens/Guide'));
 // El proyecto y Visita Nuquí (el Canva del cliente, 27/10/2026).
 const Chapter = lazy(() => import('./ui/screens/Chapter'));
+const Album = lazy(() => import('./ui/screens/Album'));
 const sheet = (el: ReactNode) => <Suspense fallback={null}><div className="sheet-page">{el}</div></Suspense>;
 
 /** Cuenta cada dirección a la que se llega (el recorrido cuenta sus páginas por su lado: ver journey.ts). */
@@ -43,6 +44,7 @@ export function App() {
         <Route path="/cuenta-tu-historia" element={sheet(<StoryForm />)} />
         <Route path="/el-proyecto/:tab?" element={<Suspense fallback={null}><Chapter path="/el-proyecto" /></Suspense>} />
         <Route path="/visita-nuqui/:tab?" element={<Suspense fallback={null}><Chapter path="/visita-nuqui" /></Suspense>} />
+        <Route path="/album-musical" element={<Suspense fallback={null}><Album /></Suspense>} />
         <Route path="/guia" element={<Suspense fallback={null}><Guide /></Suspense>} />
         <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
         <Route path="/:page" element={<Webdoc />} />

@@ -424,9 +424,10 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 }
 
 /* ───────── 360 · Cantos ───────── */
-.songs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: clamp(16px, 11vw, 170px); padding: 0 80px 20px; }
+/* Las dos tarjetas a la misma altura (debajo del 360 va una línea más): alineadas por arriba y el par centrado. */
+.songs { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; align-items: flex-start; justify-content: center; gap: clamp(16px, 11vw, 170px); padding: 0 80px 20px; }
 .glass-card {
-  display: grid; justify-items: center; align-content: center; gap: 4px; width: min(260px, 40vw); min-height: 130px; padding: 20px;
+  display: grid; justify-items: center; align-content: center; gap: 4px; width: min(260px, 40vw); height: 168px; padding: 16px 20px;
   border-radius: 22px; border: 0; background: rgba(28, 28, 28, 0.6); backdrop-filter: blur(10px); text-align: center; font-size: 12px;
   transition: transform 0.3s var(--ease), background 0.3s;
 }
@@ -621,6 +622,22 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .songs__item { display: grid; justify-items: center; }
 .songs__yt { margin-top: 10px; font-size: 12px; letter-spacing: 0.06em; color: #fff; text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.4); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
 .songs__yt:hover { color: var(--gold); border-color: var(--gold); }
+/* «Chachita canta»: el reproductor dentro de la tarjeta, con la misma forma que la del 360 (ícono, título y, de
+   subtítulo, el canto de turno). Abajo, en línea fina: anterior, escuchar/pausar (un anillo que se llena mientras
+   suena) y siguiente. */
+.song-card { gap: 3px; }
+.song-card:hover { transform: none; }
+.song-card__now { font-style: italic; }
+.song-card__controls { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.song-card__controls button { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border: 0; padding: 0; background: none; color: rgba(255, 255, 255, 0.8); transition: color 0.2s; }
+.song-card__controls button:hover { color: #fff; }
+.song-card__skip svg { width: 15px; height: 15px; }
+.song-card__ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.song-card__ring circle { fill: none; stroke-width: 1; }
+.song-card__ring circle:first-child { stroke: rgba(255, 255, 255, 0.45); }
+.song-card__ring circle:last-child { stroke: #fff; stroke-width: 1.6; stroke-linecap: round; transition: stroke-dasharray 0.25s linear; }
+.song-card__glyph { width: 12px; height: 12px; fill: currentColor; }
+.songs__item:has(.song-card.is-playing) .play-hint { visibility: hidden; }
 .stack-page.is-active .play-hint > span { animation: cue-breathe 2.8s ease-in-out 4s infinite; }
 .play-hint__touch { display: none; }
 @keyframes play-hint-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 0.92; transform: none; } }
@@ -632,11 +649,13 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 
 
 /* ───────── Experiencia 360 ───────── */
-.glass-card--360 { position: relative; }
-.glass-card--360::after {
+/* El 360 y los cantos, con el mismo reborde que palpita (mientras suena un canto, el suyo se queda quieto). */
+.glass-card--360, .glass-card--song { position: relative; }
+.glass-card--360::after, .glass-card--song::after {
   content: ''; position: absolute; inset: -1px; border-radius: inherit; border: 1px solid rgba(255, 255, 255, 0.45);
   animation: pano-pulse 2.8s ease-out infinite; pointer-events: none;
 }
+.song-card.is-playing::after { animation: none; opacity: 0.7; }
 @keyframes pano-pulse { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(1.12); } }
 
 .pano {
@@ -804,8 +823,8 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .gallery { padding-bottom: 140px; }
   .gallery__track { padding: 6px 20px; }
   .gallery__card { height: min(46vh, 420px); max-width: 84vw; }
-  .songs { flex-direction: column; gap: 14px; padding: 60px 20px 120px; }
-  .glass-card { width: min(300px, 86vw); min-height: 110px; }
+  .songs { flex-direction: column; flex-wrap: nowrap; align-items: center; gap: 14px; padding: 60px 20px 120px; }
+  .glass-card { width: min(300px, 86vw); height: 150px; }
   .transition { padding: 0 24px 60px; }
   .page-note { padding: 0 24px; bottom: 120px; }
   .closing__actions { left: 0; right: 0; justify-content: center; padding-bottom: 20px; }
@@ -2272,13 +2291,17 @@ button.ap-kpi:hover { background: var(--ap-head); }
 .locator__box { fill: rgba(6, 18, 14, 0.35); stroke: rgba(255, 255, 255, 0.6); stroke-width: 0.6; vector-effect: non-scaling-stroke; }
 .locator__colombia { stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.5; }
 .locator .locator__inset-choco { fill: var(--gold); stroke: var(--gold); stroke-width: 0.6; }
+/* Nuquí (el mapa del cliente): más ancho que el Chocó, y el Chocó pequeño en la esquina libre. */
+.locator--nuqui { aspect-ratio: 208 / 307; height: min(56vh, 520px); }
+.locator__inset-outline { stroke: rgba(255, 255, 255, 0.7); stroke-width: 0.8; }
 /* Los textos llevan un borde oscuro para leerse sobre cualquier foto. */
 .locator text { fill: #fff; font-family: var(--sans); paint-order: stroke; stroke: rgba(4, 12, 10, 0.7); stroke-width: 3px; stroke-linejoin: round; }
 .locator__name { font: italic 600 16px var(--serif); letter-spacing: 0.08em; opacity: 0.9; }
 .locator__small { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.85; }
 .locator__label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; }
 .locator__label tspan + tspan { font-weight: 400; font-style: italic; }
-.locator__other { fill: rgba(255, 255, 255, 0.85); stroke: rgba(6, 18, 14, 0.6); stroke-width: 0.8; }
+/* Las otras estaciones: oscuras con aro blanco, para verse también sobre la línea de la costa. */
+.locator__other { fill: rgba(6, 18, 14, 0.9); stroke: #fff; stroke-width: 1.2; }
 .locator__dot { fill: var(--gold); stroke: #fff; stroke-width: 1.4; }
 .locator__pulse { fill: none; stroke: var(--gold); stroke-width: 1.2; transform-box: fill-box; transform-origin: center; animation: locator-pulse 2.4s ease-out infinite; }
 @keyframes locator-pulse { from { transform: scale(0.8); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
@@ -2287,6 +2310,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
 }
 @media (max-width: 640px) {
   .locator { right: auto; left: 12px; top: 64px; translate: none; height: min(34vh, 300px); }
+  .locator--nuqui { height: min(26vh, 220px); }
   /* Más chico en pantalla: las letras crecen para seguir leyéndose. */
   .locator__name { font-size: 24px; }
   .locator__small { font-size: 12px; }
@@ -2323,6 +2347,54 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .reader__pages { grid-template-columns: repeat(2, minmax(0, 640px)); justify-content: center; row-gap: 32px; column-gap: 0;
     width: auto; padding: 32px 24px 96px; }
   .reader__page:first-child, .reader__page:last-child:nth-child(even) { grid-column: 1 / -1; justify-self: center; width: min(44vw, 640px); }
+}
+
+/* ───────── Álbum musical (30/10/2026) ─────────
+   La portada grande sobre la foto del estudio, oscurecida, y al lado el disco: el nombre en Fraunces, el artista y las
+   canciones en filas (el número en itálica dorada, el nombre y la duración); cada una abre su video. */
+.album-page { position: fixed; inset: 0; overflow: hidden; color: #fff; background: #0c1512; }
+.album-page__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(3px) saturate(0.9); transform: scale(1.04); }
+.album-page::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(8, 12, 10, 0.55), rgba(8, 12, 10, 0.82) 55%, rgba(8, 12, 10, 0.9));
+}
+.album {
+  position: absolute; inset: 0; overflow-y: auto; display: grid; grid-template-columns: auto minmax(0, 460px);
+  justify-content: center; align-content: safe center; align-items: center; gap: clamp(32px, 5vw, 80px);
+  padding: 84px clamp(20px, 5vw, 80px) 72px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.album__cover { width: min(56vh, 520px, 40vw); aspect-ratio: 1; border-radius: 3px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55), 0 6px 16px rgba(0, 0, 0, 0.35); }
+.album__title {
+  margin: 0; font: 400 clamp(36px, 3.6vw, 56px)/1 'Fraunces', var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100;
+  letter-spacing: -0.02em;
+}
+.album__title span { display: block; margin-top: 8px; font: italic 300 clamp(18px, 1.6vw, 24px)/1.2 'Fraunces', var(--serif); font-variation-settings: 'opsz' 36, 'SOFT' 100; letter-spacing: 0; color: rgba(255, 255, 255, 0.8); }
+.album__artist { margin: 18px 0 0; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
+.album__tracks { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid rgba(255, 255, 255, 0.16); }
+.album__tracks li { border-bottom: 1px solid rgba(255, 255, 255, 0.16); }
+.album__track {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 20px; align-items: baseline; gap: 12px; width: 100%;
+  min-height: 56px; padding: 14px 4px; border: 0; background: none; text-align: left; transition: color 0.2s, background 0.2s;
+}
+.album__track:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); color: var(--gold); }
+.album__track:disabled { cursor: default; }
+.album__num { font: italic 300 22px/1 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; color: var(--gold); }
+.album__name { font-size: 16px; }
+.album__time { font-size: 13px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.6); }
+.album__play { align-self: center; width: 14px; height: 14px; fill: currentColor; opacity: 0; transition: opacity 0.2s; }
+.album__track:hover:not(:disabled) .album__play, .album__track:focus-visible .album__play { opacity: 1; }
+.album__listen { margin-top: 28px; }
+/* El video de una canción, encima de la página. */
+.album-video__frame { position: absolute; inset: 64px 70px 40px; display: grid; place-items: center; }
+.album-video__frame iframe { width: min(100%, calc((100dvh - 104px) * 16 / 9)); aspect-ratio: 16 / 9; border: 0; border-radius: 4px; background: #000; }
+@media (max-width: 900px) {
+  .album { grid-template-columns: minmax(0, 1fr); justify-items: center; align-content: start; gap: 24px; padding: 76px 20px 110px; }
+  .album__cover { width: min(72vw, 360px); }
+  .album__info { width: 100%; max-width: 460px; }
+  .album-video__frame { inset: 60px 12px 24px; }
+}
+@media (max-width: 640px) {
+  [data-marca='arriba'] .album { padding-top: 104px; }
 }
 
 /* ───────── El proyecto · Visita Nuquí (el Canva del cliente, 27/10/2026) ───────── */
@@ -2410,6 +2482,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   }
   .chapter .topbar .chip { max-width: 56vw; }
   .chapter__back-more { display: none; }
+  .album-page .dock { display: none; }
 }
 @media (max-width: 640px) {
   .chapter-team__thanks { grid-template-columns: 1fr 1fr; }
@@ -2531,7 +2604,11 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .recipe__photos { aspect-ratio: 16 / 8; }
   .recipe__body { font-size: 13.5px; line-height: 1.5; max-height: 7.5em; overflow-y: auto; }
   .songs { justify-content: flex-start; padding-top: 104px; padding-bottom: 100px; gap: 4px; }
-  .glass-card { min-height: 92px; padding: 14px; }
+  /* El reproductor de los cantos ya dice qué hacer: sin el aviso de abajo, y más compacto. */
+  .song-card + .play-hint, .glass-card__icon { display: none; }
+  .glass-card { height: 118px; padding: 10px 14px; }
+  .glass-card strong { margin-top: 0; }
+  .song-card__controls { margin-top: 2px; }
 }
 /* Pantallas angostas (320 px): el nombre de la sección no llega hasta «Volver». */
 @media (max-width: 360px) {

@@ -238,8 +238,9 @@ export const stations: Station[] = [
         youtube: 'https://youtu.be/Glh_bb9vrDM',
       },
       songs: [
-        { title: 'Llorilé', sub: 'Chachita canta' },
-        { title: 'Morenita Nuquiseña', sub: 'Chachita canta' },
+        // Las grabaciones llegaron el 29/10/2026 (npm run media:audio).
+        { title: 'Llorilé', sub: 'Chachita canta', src: '/media/audio/cantos/llorile.mp3' },
+        { title: 'Morenita Nuquiseña', sub: 'Chachita canta', src: '/media/audio/cantos/morenita-nuquisena.mp3' },
       ],
     },
     viche: {

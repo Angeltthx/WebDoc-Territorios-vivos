@@ -62,7 +62,8 @@ export interface Station {
     background: Photo;
     /** Experiencia 360: lista HLS y imagen equirrectangular de espera. */
     panorama: { title: string; sub: string; src: string; poster: string; label: string; youtube?: string };
-    songs: { title: string; sub: string }[];
+    /** `src`: la grabación (mp3); sin ella, el canto queda anunciado. */
+    songs: { title: string; sub: string; src?: string }[];
   };
   viche?: VideoAsset;
 }
