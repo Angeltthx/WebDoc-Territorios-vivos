@@ -60,6 +60,7 @@ export const menu: MenuItem[] = [
     label: 'El proyecto',
     href: '/el-proyecto',
     children: [
+      { label: 'Historia', href: '/el-proyecto' },
       { label: 'Equipo', href: '/el-proyecto/equipo' },
       { label: 'Making-of', href: '/el-proyecto/making-of' },
       { label: 'Blog', href: '/el-proyecto/blog' },
@@ -69,6 +70,7 @@ export const menu: MenuItem[] = [
     label: 'Visita Nuquí',
     href: '/visita-nuqui',
     children: [
+      { label: 'Llévate Nuquí', href: '/visita-nuqui' },
       { label: 'El viche', href: '/visita-nuqui/el-viche' },
       { label: 'Vive y reserva', href: '/visita-nuqui/vive-y-reserva' },
     ],

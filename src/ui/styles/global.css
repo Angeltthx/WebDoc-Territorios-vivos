@@ -714,52 +714,88 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .menu-btn:hover span:nth-child(2) { transform: translateX(3px); }
 .topbar { padding-right: 70px; }
 
-/* Panel que se despliega desde la derecha: la página sigue a la vista detrás, oscurecida. */
+/* Panel que se despliega desde la derecha: la página sigue a la vista detrás, oscurecida (30/10/2026: más ancho y con
+   todo a la vista, en dos columnas: el recorrido como un río y, al lado, lo que está fuera de él). */
 .menu {
-  width: min(400px, 100vw); height: 100dvh; max-width: none; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0;
-  background: rgba(8, 26, 22, 0.96); backdrop-filter: blur(14px); color: #fff; overflow: auto; overscroll-behavior: contain;
-  box-shadow: -18px 0 50px rgba(0, 0, 0, 0.35);
+  width: min(940px, 100vw); height: 100dvh; max-width: none; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0;
+  background: #0c1d17; color: #fff; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent; box-shadow: -24px 0 60px rgba(0, 0, 0, 0.4);
 }
-.menu[open] { animation: menu-in 0.4s var(--ease) both; }
-@keyframes menu-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
-.menu::backdrop { background: rgba(4, 12, 10, 0.45); }
-.menu__panel { min-height: 100%; display: flex; flex-direction: column; gap: 20px; padding: max(14px, env(safe-area-inset-top)) 22px max(22px, env(safe-area-inset-bottom)); }
+.menu[open] { animation: menu-in 0.45s var(--ease) both; }
+@keyframes menu-in { from { transform: translateX(48px); opacity: 0; } to { transform: none; opacity: 1; } }
+.menu::backdrop { background: rgba(4, 12, 10, 0.5); }
+.menu__panel { min-height: 100%; display: flex; flex-direction: column; gap: clamp(20px, 3vh, 32px); padding: max(14px, env(safe-area-inset-top)) clamp(20px, 3.4vw, 44px) max(24px, env(safe-area-inset-bottom)); }
 .menu__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
-.menu__brand { font: 700 14px var(--serif); letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.85; }
+.menu__brand { font: 400 22px/1 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em; }
 .menu__brand em { font-style: italic; }
-/* El recorrido como un río: una línea fina hacia abajo con un punto en cada parada (más grande en las estaciones). */
-.menu__list { position: relative; list-style: none; margin: 0; padding: 0 0 0 22px; display: grid; gap: 0; }
-.menu__list::before { content: ''; position: absolute; left: 4px; top: 14px; bottom: 14px; width: 1px; background: rgba(255, 255, 255, 0.28); }
-.menu__item { position: relative; }
-.menu__item::before {
-  content: ''; position: absolute; left: -22px; top: 15px; width: 9px; height: 9px; border-radius: 50%;
-  background: var(--forest); box-shadow: 0 0 0 1.2px rgba(255, 255, 255, 0.55); transition: background 0.25s, box-shadow 0.25s;
+.menu__cols { flex: 1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+.menu__title {
+  margin: 0 0 18px; font: 400 15px/1.2 var(--sans); color: rgba(255, 255, 255, 0.6);
 }
-.menu__item--station::before { left: -24px; top: 13px; width: 13px; height: 13px; }
-.menu__item.is-here::before { background: var(--gold); box-shadow: 0 0 0 1.2px var(--gold), 0 0 0 5px rgba(232, 187, 82, 0.2); }
-.menu__row { display: flex; align-items: center; gap: 6px; }
+.menu__journey, .menu__beyond { min-width: 0; }
+/* Lo de fuera del recorrido se queda a la vista mientras se baja por el río. */
+.menu__beyond { position: sticky; top: 0; display: flex; flex-direction: column; }
+
+/* El río: un cauce de agua que baja con las paradas encima. Las estaciones llevan un punto de su color; los tramos de
+   río y las puntas (la bienvenida, el mapa), uno pequeño. */
+.menu__river { position: relative; list-style: none; margin: 0; padding: 0 0 0 30px; display: grid; gap: 2px; }
+.menu__river::before {
+  content: ''; position: absolute; left: 7px; top: 18px; bottom: 18px; width: 3px; border-radius: 2px;
+  background: rgba(143, 196, 214, 0.32);
+}
+.menu__stop, .menu__station { position: relative; }
+.menu__stop::before, .menu__station::before {
+  content: ''; position: absolute; border-radius: 50%; transition: transform 0.25s var(--ease), background 0.25s;
+}
+.menu__stop::before { left: -27px; top: 15px; width: 9px; height: 9px; background: #0c1d17; box-shadow: 0 0 0 2px rgba(143, 196, 214, 0.75); }
+.menu__station::before { left: -30px; top: 16px; width: 15px; height: 15px; background: var(--accent, var(--gold)); box-shadow: 0 0 0 4px #0c1d17; }
+.menu__stop.is-here::before { background: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.menu__station.is-here::before { transform: scale(1.25); box-shadow: 0 0 0 4px #0c1d17, 0 0 0 6px var(--accent, var(--gold)); }
 .menu__link {
-  flex: 1; min-height: 40px; padding: 6px 0; border: 0; background: none; text-align: left; color: rgba(255, 255, 255, 0.82);
-  font: 500 15px/1.3 var(--sans); transition: color 0.2s;
+  display: inline-flex; align-items: center; min-height: 40px; padding: 4px 0; border: 0; background: none; text-align: left;
+  font: italic 400 15px/1.3 var(--sans); color: rgba(255, 255, 255, 0.72); transition: color 0.2s;
 }
-.menu__item--station > .menu__row .menu__link { font: 700 17px/1.25 var(--serif); color: #fff; }
-.menu__link:hover { color: var(--gold); }
-.menu__link[aria-current='page'] { color: var(--gold); }
-.menu__toggle {
-  flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: #fff;
-  transition: background 0.2s;
+.menu__station { padding: 4px 0 6px; }
+.menu__station-link {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 4px 0; border: 0; background: none; text-align: left; color: #fff;
 }
-.menu__toggle:hover { background: rgba(255, 255, 255, 0.1); }
-.menu__toggle svg { transition: transform 0.3s var(--ease); }
-.menu__toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
-/* Secciones de la estación: aparecen debajo al desplegarla. */
-.menu__sub { list-style: none; margin: 0; padding: 0 0 6px 14px; display: none; }
-.menu__sub.is-open { display: grid; animation: rise 0.35s var(--ease) both; }
-.menu__sub .menu__link { min-height: 36px; font-size: 14px; border-left: 1px solid rgba(255, 255, 255, 0.18); padding-left: 14px; }
-.menu__sub .menu__link[aria-current='page'] { border-left-color: var(--gold); }
-.menu__social { margin-top: auto; padding-top: 12px; }
-.menu__credit { display: none; margin: -8px 0 0; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); }
-.menu__credit a { color: rgba(255, 255, 255, 0.82); font-weight: 600; text-decoration: none; }
+.menu__station-name { font: 400 clamp(21px, 1.9vw, 25px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em; transition: color 0.2s; }
+.menu__station-meta { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.menu__station-link:hover .menu__station-name, .menu__station-link[aria-current='page'] .menu__station-name { color: var(--gold); }
+/* Las secciones de una estación, siempre a la vista, en una fila que se acomoda. */
+.menu__sections, .menu__parts { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 18px; }
+.menu__section {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 2px 0; border: 0; background: none;
+  font: 400 15px/1.3 var(--sans); color: rgba(255, 255, 255, 0.82); transition: color 0.2s;
+}
+/* El final del recorrido, el mapa: como una estación, con el punto dorado. */
+.menu__stop--end::before { left: -30px; top: 16px; width: 15px; height: 15px; background: var(--gold); box-shadow: 0 0 0 4px #0c1d17; }
+.menu__stop--end .menu__link { font: 400 clamp(21px, 1.9vw, 25px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; color: #fff; }
+.menu__link:hover, .menu__section:hover, .menu__link[aria-current='page'], .menu__section[aria-current='page'] { color: var(--gold); }
+
+/* Fuera del recorrido: cada parte con su nombre grande y, debajo, todas sus páginas. */
+.menu__groups { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.menu__group-link {
+  padding: 4px 0; border: 0; background: none; text-align: left; color: #fff;
+  font: 400 clamp(21px, 1.9vw, 25px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em;
+  transition: color 0.2s;
+}
+.menu__group-link:hover { color: var(--gold); }
+/* Las partes van en un recuadro apenas más claro, para leerse como un grupo. */
+.menu__group--parts { padding: 14px 18px 10px; margin: 0 -18px; border-radius: 6px; background: rgba(255, 255, 255, 0.045); }
+.menu__foot { padding-top: 28px; display: grid; gap: 12px; }
+.menu__social { padding: 0; }
+.menu__credit { margin: 0; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.menu__credit a { color: #fff; font-weight: 600; text-decoration: none; }
+.menu__credit a:hover { color: var(--gold); }
+/* Al abrir, las dos columnas entran una tras otra. */
+.menu[open] .menu__journey { animation: rise 0.5s var(--ease) 0.08s both; }
+.menu[open] .menu__beyond { animation: rise 0.5s var(--ease) 0.16s both; }
+@media (max-width: 760px) {
+  .menu__cols { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .menu__beyond { position: static; }
+  .menu__group--parts { margin: 0 -8px; padding: 12px 14px 8px; }
+}
 
 .social { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
 .social a, .social span {
@@ -807,7 +843,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   [data-marca='menu'] body:has(.stack-page--first.is-active) .credit-mark {
     display: block; right: 16px; bottom: max(10px, env(safe-area-inset-bottom)); font-size: 8.5px; letter-spacing: 0.16em;
   }
-  [data-marca='menu'] .menu__credit { display: block; }
   /* `lateral`: en vertical contra el borde derecho, encima de «Desliza para seguir» y de las pestañas. */
   [data-marca='lateral'] .credit-mark {
     right: 3px; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 120px); writing-mode: vertical-rl; transform: rotate(180deg);
