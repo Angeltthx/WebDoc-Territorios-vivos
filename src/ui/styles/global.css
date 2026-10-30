@@ -31,9 +31,16 @@ body {
 img { display: block; max-width: 100%; }
 input, textarea, select, [contenteditable]:not([contenteditable="false"]) { caret-color: auto; }
 button { font: inherit; color: inherit; cursor: pointer; }
-a { color: inherit; }
+a { color: inherit; text-underline-offset: 0.2em; }
 h1, h2, p, blockquote, figure { margin: 0; }
+/* Los títulos parten en líneas parejas y los párrafos no dejan una palabra sola al final. */
+h1, h2, h3, blockquote p { text-wrap: balance; }
+p { text-wrap: pretty; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+/* Lo que se selecciona, en los colores del webdoc (y no el azul del navegador). */
+::selection { background: rgba(232, 187, 82, 0.85); color: var(--forest); }
+/* Sin el destello gris o azul del navegador al tocar en el celular: los botones ya muestran su estado. */
+html { -webkit-tap-highlight-color: transparent; }
 .muted { opacity: 0.72; }
 .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.9; }
 
@@ -95,7 +102,6 @@ h1, h2, p, blockquote, figure { margin: 0; }
   padding: 0 72px max(14px, env(safe-area-inset-bottom)); pointer-events: none;
 }
 .page-foot > * { pointer-events: auto; }
-.page-foot__note { font-size: 12px; opacity: 0.9; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
 /* Invitación a seguir bajando, sobre las pestañas de cada estación. */
 .scroll-hint {
   display: grid; justify-items: center; gap: 0; border: 0; background: none; padding: 4px 12px; min-height: 44px;
@@ -192,6 +198,10 @@ h1, h2, p, blockquote, figure { margin: 0; }
 }
 .credit-mark a { pointer-events: auto; color: rgba(255, 255, 255, 0.85); font-weight: 600; text-decoration: none; }
 .credit-mark a:hover { color: var(--gold); }
+/* Con muchas pestañas (la estación 4 tiene seis) la fila llega a la esquina: la marca sube por encima de ella. */
+@media (min-width: 641px) {
+  body:has(.stack-page.is-active .tabs > :nth-child(5)) .credit-mark { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 50px); }
+}
 /* En el mapa del final, encima de sus herramientas. */
 body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 44px); }
 
@@ -1960,7 +1970,7 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .ap-pad { padding: 16px 18px; }
 .ap-error { margin: 0; color: var(--ap-bad); font-size: 13px; }
 .ap-ok { margin-left: 8px; color: var(--ap-good); font-size: 12px; }
-.ap-note { margin: 0; padding: 9px 12px; border: 1px solid var(--ap-line-2); border-left: 3px solid var(--ap-line); background: var(--ap-head); font-size: 12.5px; color: var(--ap-muted); }
+.ap-note { margin: 0; padding: 9px 12px; border: 1px solid var(--ap-line-2); background: var(--ap-head); font-size: 12.5px; color: var(--ap-muted); }
 .ap-note a { color: var(--ap-accent); }
 .ap-h3 { margin: 4px 0 0; font: 600 13px var(--ap-font); color: var(--ap-text); }
 
@@ -2425,7 +2435,6 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .tabs[data-more='both'] { mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
   /* Galería: cada foto con su proporción, sin franjas vacías arriba y abajo. */
   .gallery__card { height: auto; width: min(84vw, calc(46vh * var(--ar, 1.5))); max-width: none; }
-  .page-foot__note { display: none; }
   /* Textos de lectura. */
   .transition__quote, .transition__line { font-size: 21px; line-height: 1.4; }
   .chapter p { font-size: 15px; line-height: 1.6; }
@@ -2466,7 +2475,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .dock__sound { width: 44px; height: 44px; }
   .stack-page .topbar { padding-right: 120px; }
   .stack-page .topbar__right { display: none; }
-  .cue, .scroll-hint, .page-foot__note { display: none; }
+  .cue, .scroll-hint { display: none; }
   .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 48px); right: 16px; }
   .route { top: 52px; bottom: auto; }
   .trailer { padding-top: 60px; padding-bottom: 70px; }
