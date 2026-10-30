@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createContext, useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pathFor } from '../../application/journey';
 import { stations } from '../../content/journey';
@@ -187,9 +187,12 @@ const stationOf = (page: string) => page.split('-')[0];
 
 /**
  * Menú principal: botón fijo arriba a la derecha y un panel que se despliega desde ese lado, sin tapar toda la página
- * (pedido del cliente, 19/10/2026). Tiene todas las paradas del recorrido, en orden, como un río con un punto en cada
- * una; las estaciones se abren para mostrar sus secciones. La página que se está viendo queda marcada y su estación,
- * abierta. Fuera del recorrido (la tienda, «Tu historia») lleva a la dirección de cada página.
+ * (pedido del cliente, 19/10/2026). Todo a la vista, sin nada plegado (30/10/2026: «Making-of» y las secciones de cada
+ * estación quedaban escondidas):
+ * - El recorrido, como un río: cada estación con un punto de su color y sus secciones debajo, y entre una y otra el
+ *   tramo de río que las une. La página que se está viendo queda marcada.
+ * - Al lado, lo que está fuera del recorrido: El proyecto y Visita Nuquí con todas sus partes, el álbum, «Tu historia»
+ *   y la tienda.
  */
 export function SiteMenu({ open, onOpen, onClose, current }: {
   open: boolean;
@@ -201,72 +204,81 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
   const ref = useDialog(open);
   const { scrollToPage, inJourney } = useJourneyNav();
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const here = (item: MenuItem) => !!item.to && !!current && (item.to === current || (!!item.children && stationOf(item.to) === stationOf(current)));
-  // Al abrir, la estación donde se está queda desplegada.
-  useEffect(() => {
-    if (open) setExpanded(menu.find((item) => item.children && here(item))?.label ?? null);
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const journey = menu.filter((item) => item.to);
+  const beyond = menu.filter((item) => !item.to);
+  const isStation = (item: MenuItem) => !!item.children;
+  const here = (item: MenuItem) => !!item.to && !!current && (item.to === current || (isStation(item) && stationOf(item.to) === stationOf(current)));
   const go = (item: MenuItem) => {
     onClose();
     if (item.href) navigate(item.href);
     else if (item.to && inJourney) scrollToPage(item.to);
     else if (item.to) navigate(pagePath(item.to));
   };
+  const link = (item: MenuItem, className = 'menu__link') => (
+    <button type="button" className={className} aria-current={item.to && item.to === current ? 'page' : undefined} onClick={() => go(item)}>
+      {item.label}
+    </button>
+  );
   return (
     <>
       <button type="button" className="menu-btn" onClick={onOpen} aria-label="Abrir menú" aria-haspopup="dialog">
         <span /><span /><span />
       </button>
       <dialog ref={ref} className="menu" onClose={onClose} onClick={(e) => e.target === ref.current && onClose()} aria-label="Menú">
-        <nav className="menu__panel">
+        <div className="menu__panel">
           <div className="menu__head">
             <p className="menu__brand">Territorios <em>Vivos</em></p>
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar menú">✕</button>
           </div>
-          <ol className="menu__list">
-            {menu.map((item) => {
-              const isOpen = expanded === item.label;
-              const subId = `menu-${(item.to ?? item.href ?? '').replace(/\W+/g, '-')}`;
-              return (
-                <li key={item.label} className={`menu__item${item.children ? ' menu__item--station' : ''}${here(item) ? ' is-here' : ''}`}>
-                  <div className="menu__row">
-                    <button type="button" className="menu__link" aria-current={item.to === current ? 'page' : undefined} onClick={() => go(item)}>
-                      {item.label}
-                    </button>
-                    {item.children && (
-                      <button
-                        type="button"
-                        className="menu__toggle"
-                        aria-expanded={isOpen}
-                        aria-controls={subId}
-                        aria-label={`${isOpen ? 'Ocultar' : 'Ver'} secciones de ${item.label}`}
-                        onClick={() => setExpanded(isOpen ? null : item.label)}
-                      >
-                        <Arrow dir="down" />
+          <div className="menu__cols">
+            <nav className="menu__journey" aria-labelledby="menu-recorrido">
+              <h2 id="menu-recorrido" className="menu__title">El recorrido</h2>
+              <ol className="menu__river">
+                {journey.map((item) => {
+                  if (!isStation(item)) {
+                    // El último, el mapa, es el final del recorrido: va como una estación.
+                    const end = item === journey[journey.length - 1];
+                    return <li key={item.label} className={`menu__stop${end ? ' menu__stop--end' : ''}${here(item) ? ' is-here' : ''}`}>{link(item)}</li>;
+                  }
+                  const [number, name] = item.label.split(' · ');
+                  const station = stations.find((s) => s.id === stationOf(item.to!));
+                  return (
+                    <li key={item.label} className={`menu__station${here(item) ? ' is-here' : ''}`} style={station ? { ['--accent' as string]: station.accent } : undefined}>
+                      <button type="button" className="menu__station-link" aria-current={item.to === current ? 'page' : undefined} onClick={() => go(item)}>
+                        <span className="menu__station-name">{name ?? item.label}</span>
+                        <span className="menu__station-meta">{number}{station ? ` · ${station.place}` : ''}</span>
                       </button>
+                      <ul className="menu__sections">
+                        {item.children!.map((sub) => <li key={sub.label}>{link(sub, 'menu__section')}</li>)}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
+            <nav className="menu__beyond" aria-labelledby="menu-mas">
+              <h2 id="menu-mas" className="menu__title">Más del documental</h2>
+              <ul className="menu__groups">
+                {beyond.map((item) => (
+                  <li key={item.label} className={`menu__group${item.children ? ' menu__group--parts' : ''}`}>
+                    {link(item, 'menu__group-link')}
+                    {item.children && (
+                      <ul className="menu__parts">
+                        {item.children.map((sub) => <li key={sub.label}>{link(sub, 'menu__section')}</li>)}
+                      </ul>
                     )}
-                  </div>
-                  {item.children && (
-                    <ul id={subId} className={`menu__sub${isOpen ? ' is-open' : ''}`} inert={!isOpen ? true : undefined}>
-                      {item.children.map((sub) => (
-                        <li key={sub.label}>
-                          <button type="button" className="menu__link" aria-current={sub.to === current ? 'page' : undefined} onClick={() => go(sub)}>
-                            {sub.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-          <SocialLinks className="menu__social" />
-          <p className="menu__credit">
-            Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
-          </p>
-        </nav>
+                  </li>
+                ))}
+              </ul>
+              <div className="menu__foot">
+                <SocialLinks className="menu__social" />
+                <p className="menu__credit">
+                  Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
+                </p>
+              </div>
+            </nav>
+          </div>
+        </div>
       </dialog>
     </>
   );
