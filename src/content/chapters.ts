@@ -77,15 +77,15 @@ export const chapters: Chapter[] = [
           eyebrow: 'Cómo nació Territorios Vivos',
           title: 'La historia del proyecto y nuestro compromiso',
           paragraphs: [
-            'Territorios Vivos nació de un viaje al Pacífico chocoano y de una convicción: que las historias de estos territorios debían contarse desde adentro, con las voces de quienes los habitan. Durante meses acompañamos a Chachita, Lizandro, Orfelina y Harold en Nuquí, Panguí, Bocas de Jagua y Quibdó, y entendimos que el agua —el río, la lluvia, la marea— era el hilo que unía todas sus historias.',
-            'Este webdoc es el resultado de ese encuentro. No es un producto turístico ni un documental tradicional: es un puente entre quien mira desde lejos y un territorio vivo que respira, resiste y cuida.',
+            'Territorios Vivos nació de un viaje al Pacífico chocoano y de una convicción: que las historias de estos territorios debían contarse desde adentro, con las voces de quienes los habitan. Durante meses acompañamos a Chachita, Lizandro, Orfelina y Harold en Nuquí, Panguí, Bocas de Jagua y Quibdó, y entendimos que el agua (el río, la lluvia, la marea) era el hilo que unía todas sus historias.',
+            'Este documental interactivo es el resultado de ese encuentro. No es un producto turístico ni un documental tradicional: es un puente entre quien mira desde lejos y un territorio vivo que respira, resiste y cuida.',
           ],
           photo: p('proyecto-playa-canoa', 'Una canoa verde en la playa, frente a las casas de madera y el muelle'),
           aside: {
             eyebrow: 'Nuestro compromiso',
             paragraphs: [
               'Nos comprometemos con un turismo responsable que retorne a las comunidades, respete sus tiempos y saberes, y no las convierta en paisaje. Cada visita, cada compra de viche, cada reserva llega directo a quien sostiene el territorio.',
-              'Viajar con respeto es el corazón de este proyecto — y la invitación que dejamos en la guía.',
+              'Viajar con respeto es el corazón de este proyecto, y la invitación que dejamos en la guía.',
             ],
           },
         },
@@ -132,7 +132,7 @@ export const chapters: Chapter[] = [
       },
       {
         slug: 'blog',
-        label: 'Blog y créditos',
+        label: 'Blog',
         background: p('dji-0460', 'La costa de Nuquí y la selva vistas desde el aire'),
         body: {
           kind: 'blog',
@@ -179,7 +179,7 @@ export const chapters: Chapter[] = [
               action: { label: 'Ver la guía', href: '/guia', primary: true },
             },
           ],
-          note: 'El afiche (papel) y la guía son los dos objetos que extienden el webdoc al mundo físico.',
+          note: 'El afiche (papel) y la guía son los dos objetos que extienden el documental interactivo al mundo físico.',
         },
       },
       {
@@ -205,9 +205,9 @@ export const chapters: Chapter[] = [
           kind: 'experiences',
           eyebrow: 'Experiencias en el territorio · Reserva directa',
           items: [
-            { title: 'Manglares con Chachita · Panguí', sub: 'guianza, gastronomía y viche con las mujeres', action: { label: 'Reservar', pending: true } },
-            { title: 'Río Chorí con Lizandro · Etnoaldea Kipará Té', sub: 'comunidad Embera, sendero y cascada', action: { label: 'Reservar', pending: true } },
-            { title: 'Danza con Orfelina · Grupo Serranías del Porvenir', sub: 'muestra cultural y danza tradicional', action: { label: 'Reservar', pending: true } },
+            { title: 'Manglares con Chachita · Panguí', sub: 'guianza, gastronomía y viche con las mujeres', action: { label: 'Reservar', href: 'https://wa.me/573215870509' } },
+            { title: 'Río Chorí con Lizandro · Etnoaldea Kipará Té', sub: 'comunidad Embera, sendero y cascada', action: { label: 'Reservar', href: 'https://wa.me/573135077806' } },
+            { title: 'Danza con Orfelina · Grupo Serranías del Porvenir', sub: 'muestra cultural y danza tradicional', action: { label: 'Reservar', href: 'https://wa.me/573146475820' } },
           ],
         },
       },

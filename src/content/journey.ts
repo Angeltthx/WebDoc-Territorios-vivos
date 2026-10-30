@@ -10,7 +10,7 @@ const p = (id: string, alt: string, extra: Partial<Photo> = {}): Photo => ({ id,
 // Galerías: la selección del cliente por estación (30/09/2026), en src/content/galleries.json,
 // generado por `npm run media` desde ../Contenido/Galerias/estacion-N.
 // Las fotos ya descritas conservan su texto; las demás llevan uno genérico hasta el inventario editorial.
-const DESCRIBED: Record<string, Pick<Photo, 'alt' | 'caption' | 'tag'>> = {
+const DESCRIBED: Record<string, Pick<Photo, 'alt' | 'caption'>> = {
   '6i3a3478': { alt: 'Orfelina Marmolejo abraza a una niña', caption: 'Orfelina Marmolejo' },
   '6i3a3497-mejorado-nr': { alt: 'El grupo de danza reunido', caption: 'El grupo de danza' },
   '6i3a3560': { alt: 'Una bailarina de amarillo sonríe', caption: 'Danza' },
@@ -32,9 +32,9 @@ const DESCRIBED: Record<string, Pick<Photo, 'alt' | 'caption' | 'tag'>> = {
   '6i3a5631': { alt: 'Un niño abraza a su perro en la playa', caption: 'La playa' },
   '6i3a5673': { alt: 'Harold Vergara junto a las canoas', caption: 'Harold Vergara' },
   '6i3a5677': { alt: 'Harold Vergara sentado sobre una canoa azul', caption: 'Harold Vergara' },
-  'dji-0181': { alt: 'Comunidad embera entre la selva, vista desde el aire', caption: 'Chorí desde el aire', tag: 'dron' },
-  'dji-0498': { alt: 'El río Atrato bajo un cielo de nubes', caption: 'El río grande', tag: 'dron' },
-  'dji-0504': { alt: 'El malecón de Quibdó sobre el Atrato', caption: 'Quibdó', tag: 'dron' },
+  'dji-0181': { alt: 'Comunidad embera entre la selva, vista desde el aire', caption: 'Chorí desde el aire' },
+  'dji-0498': { alt: 'El río Atrato bajo un cielo de nubes', caption: 'El río grande' },
+  'dji-0504': { alt: 'El malecón de Quibdó sobre el Atrato', caption: 'Quibdó' },
   'humpback-whale-s-tail-peeking-out-of-the-sea-in-summer': { alt: 'La cola de una ballena jorobada sobre el mar', caption: 'Ballena jorobada' },
   'ovidio-hinestroza-choncai-la-marea': { alt: 'Ovidio Hinestroza en su tienda de frutas', caption: 'Ovidio Hinestroza · Choncai La Marea' },
 };
@@ -47,7 +47,7 @@ const gallery = (key: keyof typeof galleries): Photo[] =>
   galleries[key].map((id, i) => {
     const d = DESCRIBED[id.replace(/-\d{1,2}$/, '')];
     const drone = id.startsWith('dji-');
-    return { id, alt: d?.alt ?? `${PLACES[key]} · fotografía ${i + 1}${drone ? ', vista desde el aire' : ''}`, caption: d?.caption, tag: d?.tag ?? (drone ? 'dron' : undefined) };
+    return { id, alt: d?.alt ?? `${PLACES[key]} · fotografía ${i + 1}${drone ? ', vista desde el aire' : ''}`, caption: d?.caption };
   });
 
 export const stations: Station[] = [
@@ -205,7 +205,8 @@ export const stations: Station[] = [
     // Pensamiento en lugar de las escenas Marea alta y Marea baja, con la misma imagen (pedido del cliente, 20/10/2026).
     quote: {
       text: 'Aquí tenemos los elementos de la vida: el agua dulce, el agua salada, todo un tema de tradición, de cultura',
-      author: 'Panguí',
+      // El nombre de ella y no el del lugar (pedido del cliente, 27/10/2026).
+      author: 'Ruth “Chachita” Martínez',
       portrait: p('6i3a4281', 'Una mujer toca las ramas del manglar', { focus: '55% 30%' }),
     },
     sections: [

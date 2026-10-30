@@ -18,7 +18,6 @@ export interface Photo {
   alt: string;
   /** Crédito o pie; se muestra "por confirmar" hasta tener el inventario editorial. */
   caption?: string;
-  tag?: 'dron';
   /** Punto focal para object-position, p. ej. "60% 30%". */
   focus?: string;
 }

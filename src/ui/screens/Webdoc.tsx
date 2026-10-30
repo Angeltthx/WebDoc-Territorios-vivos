@@ -169,7 +169,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
           <div className="screen__content"><GalleryPanel gallery={gallery} /></div>
           <TopBar plain label={spec.label} />
           <StationFoot tabs={spec.tabs} next={next}>
-            <p className="page-foot__note">{gallery.intro.toLowerCase()} · deslizar →</p>
+            <p className="page-foot__note">{gallery.intro} · deslizar →</p>
           </StationFoot>
         </div>
       );

@@ -37,6 +37,8 @@ export default function ChapterScreen({ path }: { path: string }) {
   const act = (a: ChapterAction) => {
     if (a.pending) setNotice(true);
     else if (a.page) navigate(pagePath(a.page));
+    // Fuera de la web (el WhatsApp de las reservas): en otra pestaña, sin perder la página.
+    else if (a.href && /^https?:/.test(a.href)) window.open(a.href, '_blank', 'noopener,noreferrer');
     else if (a.href) navigate(a.href);
   };
 

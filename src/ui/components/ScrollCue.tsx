@@ -4,7 +4,7 @@
 // terminar el video o tras un rato quieta, y la gente no sabía que había que seguir). Solo se aparta mientras corre el
 // video de la página (para no tapar sus controles) o hay una ventana abierta, y vuelve apenas se pausa o se cierra.
 
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Arrow } from './Chrome';
 
 /** Lo que tarda en aparecer al llegar a una página (que primero se vea la página). */
@@ -15,6 +15,9 @@ const CHECK_MS = 400;
 /** Lo que la página ya tiene para seguir («Sigue bajando», «Comenzar el viaje»): la señal toma su lugar y su texto. */
 const ANCHOR = '.stack-page.is-active .scroll-hint, .stack-page.is-active .start-btn';
 
+/** Aire entre la flecha y las pestañas de abajo (px). */
+const ABOVE_TABS = 6;
+
 /** ¿Algo está en primer plano? Un video de la página corriendo (los de fondo van en bucle) o una ventana abierta. */
 function busy() {
   const playing = [...document.querySelectorAll<HTMLVideoElement>('.stack-page.is-active video')]
@@ -24,8 +27,10 @@ function busy() {
 
 export function ScrollCue({ page, off, onNext }: { page: number; off: boolean; onNext: () => void }) {
   const [shown, setShown] = useState(false);
-  /** Dónde va (sobre el «Sigue bajando» de la página, si lo tiene) y qué dice. */
-  const [place, setPlace] = useState<{ bottom: number | null; label: string }>({ bottom: null, label: 'Sigue bajando' });
+  const self = useRef<HTMLButtonElement>(null);
+  /** Dónde va (sobre el «Sigue bajando» de la página, si lo tiene) y qué dice. Se ubica desde arriba: en el iPhone la
+   * barra de Safari cambia el alto de la ventana, y medida desde abajo la flecha caía sobre las pestañas (29/10/2026). */
+  const [place, setPlace] = useState<{ top: number | null; label: string }>({ top: null, label: 'Sigue bajando' });
 
   useEffect(() => {
     setShown(false);
@@ -33,9 +38,9 @@ export function ScrollCue({ page, off, onNext }: { page: number; off: boolean; o
     const check = () => {
       const a = document.querySelector<HTMLElement>(ANCHOR);
       const r = a?.getBoundingClientRect();
-      const bottom = r && r.height ? window.innerHeight - r.bottom : null;
+      const top = r && r.height ? Math.round(r.bottom - (self.current?.offsetHeight ?? 0) - ABOVE_TABS) : null;
       const label = a?.textContent?.trim() || 'Sigue bajando';
-      setPlace((p) => (p.bottom === bottom && p.label === label ? p : { bottom, label }));
+      setPlace((p) => (p.top === top && p.label === label ? p : { top, label }));
       setShown(!busy());
     };
     let every = 0;
@@ -51,9 +56,10 @@ export function ScrollCue({ page, off, onNext }: { page: number; off: boolean; o
 
   return (
     <button
+      ref={self}
       type="button"
       className={`cue${shown ? ' is-shown' : ''}`}
-      style={place.bottom !== null ? ({ '--cue-bottom': `${place.bottom}px` } as CSSProperties) : undefined}
+      style={place.top !== null ? ({ '--cue-top': `${place.top}px` } as CSSProperties) : undefined}
       onClick={onNext}
       aria-label="Seguir a la página siguiente"
       aria-hidden={!shown}

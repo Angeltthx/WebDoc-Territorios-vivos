@@ -90,7 +90,8 @@ export const pages: PageSpec[] = [
     id: 'chori-historia',
     kind: 'video',
     label: 'Estación 1 · Tráiler historia',
-    video: { title: 'El latido', stream: 'estacion-1' },
+    // Tráileres en YouTube (pedido del cliente, 27 y 29/10/2026): las visitas cuentan en su canal.
+    video: { title: 'El latido', stream: 'estacion-1', youtube: 'IYu6xq8E0M8' },
     tabs: chori('Tráiler historia'),
     frame: 'chori',
     note: true,
@@ -104,7 +105,7 @@ export const pages: PageSpec[] = [
     id: 'atrato-historia',
     kind: 'video',
     label: 'Estación 2 · Tráiler historia',
-    video: { title: 'Gente del Río', stream: 'estacion-2' },
+    video: { title: 'Gente del Río', stream: 'estacion-2', youtube: 'etXkt8ilPug' },
     tabs: atrato('Tráiler historia'),
     frame: 'atrato',
     note: true,
@@ -118,7 +119,7 @@ export const pages: PageSpec[] = [
     kind: 'video',
     label: 'Estación 3 · Tráiler historia',
     // Tráiler nuevo, con Orfelina (13/10/2026). Es también el scrollytelling: la página aparte sin video se quitó (13/10/2026).
-    video: { title: 'El baile de las olas', stream: 'nuqui-trailer' },
+    video: { title: 'El baile de las olas', stream: 'nuqui-trailer', youtube: '9Fb2jTRxgQ4' },
     tabs: nuqui('Tráiler historia'),
     frame: 'nuqui',
     note: true,
@@ -140,7 +141,7 @@ export const pages: PageSpec[] = [
     id: 'pangui-historia',
     kind: 'video',
     label: 'Estación 4 · Tráiler historia',
-    video: { title: 'Marea alta, marea baja', duration: '12:30', tint: '#58509a' },
+    video: { title: 'Marea alta, marea baja', youtube: 'emQGjdx3UNE' },
     tabs: pangui('Tráiler historia'),
     frame: 'pangui',
     note: true,
@@ -163,6 +164,8 @@ export const pages: PageSpec[] = [
     video: { title: 'Viche curao, un regalo de la selva', stream: 'viche', youtube: 'y3h28Hk0uk8' },
     tabs: pangui('Un regalo de la selva'),
     frame: 'pangui',
+    // Con el aviso del estreno debajo, como los tráileres (pedido del cliente, 27/10/2026).
+    note: true,
   },
   { id: 'transicion-4', kind: 'transition', index: 4 },
 
