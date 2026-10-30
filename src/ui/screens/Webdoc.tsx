@@ -213,7 +213,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
     case 'songs':
       return (
         <div className="screen" aria-label={spec.label}>
-          <div className="screen__content"><SongsPanel songs={getStation('pangui')!.songs!} /></div>
+          <div className="screen__content"><SongsPanel songs={getStation('pangui')!.songs!} active={playing} /></div>
           <TopBar plain label={spec.label} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>

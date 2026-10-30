@@ -10,6 +10,9 @@
 //   aparte (<id>-audio.m4a). El video corre en silencio y este sonido va a la par, desde `at()` (29/10/2026): en el
 //   iPhone cada video pedía su propio toque para sonar y, al llegar deslizando, no sonaba; este audio queda
 //   desbloqueado con el primer toque de la visita y suena en todos los videos que siguen.
+// - setMapAmbience(on) / playMapSound(kind): el mapa 3D del final (30/10/2026). Mientras se ve la costa, la selva en
+//   bucle (el bosque, las cigarras y las olas) y, de vez en cuando, un pájaro; al tocar un animal, su sonido, y cuando la
+//   ballena salta, el chapuzón. Grabaciones de BigSoundBank, CC0 (Contenido/sonidos-mapa-bigsoundbank-cc0).
 // Los navegadores solo permiten audio tras un gesto del visitante (clic, toque o tecla);
 // si se pide antes, queda pendiente y empieza con el primer gesto.
 // En el iPhone, el audio del webdoc suena aunque el celular esté en silencio (como un video o la música): ver
@@ -24,6 +27,22 @@ const TRANSITION_VOLUME = 0.55;
 const VOICE_VOLUME = 1;
 const TRACK_VOLUME = 1;
 const AMBIENT_VOLUME: Record<Tide, number> = { alta: 0.5, baja: 0.45 };
+/** El mapa 3D: las capas del ambiente (en bucle, a la vez) y los sonidos sueltos (se elige uno al azar). */
+const MAP_LOOPS = [
+  { url: '/media/audio/mapa/selva.mp3', volume: 0.5 },
+  { url: '/media/audio/mapa/cigarras.mp3', volume: 0.1 },
+  { url: '/media/audio/mapa/olas.mp3', volume: 0.22 },
+];
+export type MapSound = 'chapuzon' | 'chapuzon-chico' | 'rana' | 'pajaro';
+/** `fallback`: si la grabación aún no está en el sitio, una ola de las que rompen al cambiar de página. */
+const MAP_SOUNDS: Record<MapSound, { urls: string[]; volume: number; fallback?: string }> = {
+  chapuzon: { urls: ['/media/audio/mapa/chapuzon-1.mp3', '/media/audio/mapa/chapuzon-2.mp3'], volume: 0.7, fallback: WAVES[1] },
+  'chapuzon-chico': { urls: ['/media/audio/mapa/chapuzon-chico.mp3'], volume: 0.6, fallback: WAVES[0] },
+  rana: { urls: ['/media/audio/mapa/ranas.mp3'], volume: 0.75 },
+  pajaro: { urls: ['/media/audio/mapa/pajaro.mp3'], volume: 0.45 },
+};
+/** Entre un pájaro y el siguiente, mientras suena el ambiente del mapa (ms). */
+const BIRD_EVERY: [number, number] = [14000, 32000];
 /** Gestos que los navegadores aceptan para permitir audio. */
 const GESTURES = ['pointerdown', 'click', 'touchend', 'keydown'] as const;
 
@@ -38,6 +57,8 @@ let voice: { id: string; out: GainNode; src: AudioBufferSourceNode | null } | nu
 let ambient: { tide: Tide; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
 let wantedTrack: { url: string; at: () => number } | null = null;
 let track: { url: string; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
+let wantedMap = false;
+let mapAmbience: { out: GainNode; srcs: AudioBufferSourceNode[]; bird: number } | null = null;
 
 // iPhone (Safari 16.4+): el audio del webdoc es reproducción, como un video; sin esto, con el interruptor de silencio
 // puesto no se oye nada.
@@ -67,10 +88,12 @@ export function setMuted(muted: boolean) {
     stopAmbient();
     stopVoice();
     stopTrack();
+    stopMapAmbience();
   } else {
     if (wanted) void startAmbient(wanted);
     if (wantedVoice) void startVoice(wantedVoice);
     if (wantedTrack) void startTrack();
+    if (wantedMap) void startMapAmbience();
   }
 }
 
@@ -119,6 +142,7 @@ export function initAudioUnlock() {
       if (wanted && !isMuted()) void startAmbient(wanted);
       if (wantedVoice && !isMuted()) void startVoice(wantedVoice);
       if (wantedTrack && !isMuted()) void startTrack();
+      if (wantedMap && !isMuted()) void startMapAmbience();
     };
     if (ac.state === 'running') go();
     else void ac.resume().then(go, () => {});
@@ -289,4 +313,84 @@ function stopTrack() {
   const { out, src } = track;
   track = null;
   fadeOut(out, src, 0.6);
+}
+
+// ───────── El mapa 3D ─────────
+
+async function startMapAmbience() {
+  const ac = audio();
+  if (!ac || !master || isMuted() || mapAmbience) return;
+  const out = ac.createGain();
+  out.gain.value = 0.0001;
+  out.connect(master);
+  const current = { out, srcs: [] as AudioBufferSourceNode[], bird: 0 };
+  mapAmbience = current;
+  const buffers = await Promise.all(MAP_LOOPS.map((l) => load(l.url)));
+  if (mapAmbience !== current) return; // ya se salió del mapa
+  MAP_LOOPS.forEach((layer, i) => {
+    const buffer = buffers[i];
+    if (!buffer) return;
+    const src = ac.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const g = ac.createGain();
+    g.gain.value = layer.volume;
+    src.connect(g).connect(out);
+    // Cada capa arranca en un punto distinto: así no se repiten juntas.
+    src.start(0, Math.random() * buffer.duration);
+    current.srcs.push(src);
+  });
+  const t = ac.currentTime;
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(1, t + 2.5);
+  const nextBird = () => {
+    current.bird = window.setTimeout(() => {
+      if (mapAmbience !== current) return;
+      playMapSound('pajaro');
+      nextBird();
+    }, BIRD_EVERY[0] + Math.random() * (BIRD_EVERY[1] - BIRD_EVERY[0]));
+  };
+  nextBird();
+}
+
+function stopMapAmbience() {
+  if (!mapAmbience || !ctx) return;
+  const { out, srcs, bird } = mapAmbience;
+  mapAmbience = null;
+  window.clearTimeout(bird);
+  const t = ctx.currentTime;
+  out.gain.cancelScheduledValues(t);
+  out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), t);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+  for (const src of srcs) src.stop(t + 1.6);
+  window.setTimeout(() => out.disconnect(), 1800);
+}
+
+/** El ambiente del mapa 3D: suena mientras se ve la costa; false lo desvanece. */
+export function setMapAmbience(on: boolean) {
+  if (on === wantedMap) return;
+  wantedMap = on;
+  if (on) void startMapAmbience();
+  else stopMapAmbience();
+}
+
+/** Un sonido suelto del mapa (un animal tocado, el chapuzón de la ballena). `volume` lo atenúa (0…1). */
+export function playMapSound(kind: MapSound, volume = 1) {
+  if (isMuted()) return;
+  const ac = audio();
+  if (!ac || !master) return;
+  const { urls, volume: base, fallback } = MAP_SOUNDS[kind];
+  void load(urls[Math.floor(Math.random() * urls.length)])
+    .then((buffer) => buffer ?? (fallback ? load(fallback) : null))
+    .then((buffer) => {
+      if (!buffer || !master) return;
+      const src = ac.createBufferSource();
+      src.buffer = buffer;
+      // Un poco más agudo o grave cada vez, para que no suene siempre igual.
+      src.playbackRate.value = 0.94 + Math.random() * 0.12;
+      const g = ac.createGain();
+      g.gain.value = base * volume;
+      src.connect(g).connect(master);
+      src.start();
+    });
 }

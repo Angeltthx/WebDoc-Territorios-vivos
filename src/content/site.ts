@@ -62,7 +62,7 @@ export const menu: MenuItem[] = [
     children: [
       { label: 'Equipo', href: '/el-proyecto/equipo' },
       { label: 'Making-of', href: '/el-proyecto/making-of' },
-      { label: 'Blog y créditos', href: '/el-proyecto/blog' },
+      { label: 'Blog', href: '/el-proyecto/blog' },
     ],
   },
   {
@@ -73,6 +73,8 @@ export const menu: MenuItem[] = [
       { label: 'Vive y reserva', href: '/visita-nuqui/vive-y-reserva' },
     ],
   },
+  // El disco (pedido del cliente, 27/10/2026).
+  { label: 'Álbum musical', href: '/album-musical' },
   { label: 'Tu historia', href: '/cuenta-tu-historia' },
   { label: 'Tienda', href: '/tienda' },
 ];

@@ -671,10 +671,47 @@ export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']>
   );
 }
 
-export function SongsPanel({ songs }: { songs: NonNullable<Station['songs']> }) {
+/** Los cantos de Chachita: al tocar la tarjeta suena el primero y aparece la lista; al terminar uno, sigue el otro. */
+function useSongs(list: { src?: string }[], active: boolean) {
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [current, setCurrent] = useState<number | null>(null);
+  const [paused, setPaused] = useState(true);
+  const play = (i: number) => {
+    const src = list[i]?.src;
+    if (!src) return;
+    // Se crea dentro del toque: así el iPhone deja que suene.
+    const a = (audio.current ??= new Audio());
+    if (current !== i) {
+      a.src = src;
+      a.onended = () => (i + 1 < list.length ? play(i + 1) : (setCurrent(null), setPaused(true)));
+      setCurrent(i);
+    }
+    void a.play().then(() => setPaused(false), () => setPaused(true));
+  };
+  const toggle = (i: number) => {
+    const a = audio.current;
+    if (current === i && a && !a.paused) {
+      a.pause();
+      setPaused(true);
+    } else play(i);
+  };
+  // Al salir de la página, los cantos se callan.
+  useEffect(() => {
+    if (!active && audio.current && !audio.current.paused) {
+      audio.current.pause();
+      setPaused(true);
+    }
+  }, [active]);
+  useEffect(() => () => audio.current?.pause(), []);
+  return { current, paused, toggle };
+}
+
+export function SongsPanel({ songs, active = false }: { songs: NonNullable<Station['songs']>; active?: boolean }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [video360, setVideo360] = useState<HTMLVideoElement | null>(null);
   const { panorama } = songs;
+  const recorded = songs.songs.some((s) => s.src);
+  const player = useSongs(songs.songs, active);
 
   // El video se crea y se activa dentro del clic: así iPhone/Safari permiten reproducir con sonido.
   const open360 = () => {
@@ -709,12 +746,33 @@ export function SongsPanel({ songs }: { songs: NonNullable<Station['songs']> }) 
           )}
         </div>
         <div className="songs__item">
-          <button type="button" className="glass-card glass-card--song" onClick={() => setMsg('Los cantos se reproducirán cuando se entreguen las grabaciones.')}>
+          <button
+            type="button"
+            className="glass-card glass-card--song"
+            aria-pressed={player.current !== null && !player.paused}
+            onClick={() => (recorded ? player.toggle(player.current ?? 0) : setMsg('Los cantos se reproducirán cuando se entreguen las grabaciones.'))}
+          >
             <span className="glass-card__icon" aria-hidden="true">♪</span>
             <strong>Chachita canta</strong>
             <span>{songs.songs.map((s) => s.title).join(' · ')}</span>
           </button>
-          <PressHint desk="Presiona para escuchar la canción" touch="Toca para escuchar la canción" />
+          {player.current === null ? (
+            <PressHint desk="Presiona para escuchar la canción" touch="Toca para escuchar la canción" />
+          ) : (
+            <ol className="songs__list">
+              {songs.songs.map((s, i) => {
+                const on = player.current === i && !player.paused;
+                return (
+                  <li key={s.title}>
+                    <button type="button" className={`songs__track${player.current === i ? ' is-current' : ''}`} onClick={() => player.toggle(i)} aria-label={`${on ? 'Pausar' : 'Escuchar'} ${s.title}`}>
+                      <svg viewBox="0 0 16 16" aria-hidden="true">{on ? <path d="M4 3h3v10H4zM9 3h3v10H9z" /> : <path d="M4 2.5v11l9-5.5z" />}</svg>
+                      {s.title}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </div>
       </div>
       {msg && <p className="notice notice--float" role="status">{msg}</p>}

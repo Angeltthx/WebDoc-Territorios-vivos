@@ -600,6 +600,8 @@ export interface MapSceneOptions {
   onLost?: () => void;
   /** Se eligió (o se soltó) uno de los puntos del resto del Chocó. */
   onSpot?: (point: ChocoPoint | null) => void;
+  /** La ballena rompió el agua al caer de un salto (`strength` 0–1): para su chapuzón. */
+  onSplash?: (strength: number) => void;
 }
 
 /** Cede el turno a la página entre las etapas pesadas: en un teléfono modesto, armar todo de corrido la congela. */
@@ -609,7 +611,7 @@ const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
  * Arma la costa por etapas (cediendo el turno entre una y otra, así el planeta de la entrada sigue respondiendo) y
  * compila sus sombreadores sin congelar la página. Se resuelve cuando ya se puede llegar a ella.
  */
-export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost, onSpot }: MapSceneOptions): Promise<MapSceneHandle> {
+export async function createMapScene(host: HTMLElement, { onSelect, onInteract, paused = false, onZoomOut, onPull, onLost, onSpot, onSplash }: MapSceneOptions): Promise<MapSceneHandle> {
   // Las historias aprobadas se piden de una vez: llegan mientras se arma la costa.
   const stories = fetchStories();
   const renderer = new WebGLRenderer({ antialias: QUALITY.antialias, powerPreference: 'high-performance' });
@@ -649,6 +651,7 @@ export async function createMapScene(host: HTMLElement, { onSelect, onInteract, 
   step('costa: fauna');
   const fauna = await buildFauna(rand, pace, (x, z, size, strength) => {
     uniforms.uSplash.value[splashSlot++ % 4].set(x, z, uniforms.uTime.value, size * (0.55 + 0.45 * strength));
+    onSplash?.(strength);
   });
   await pace();
   const rocks = buildRocks(rand);
