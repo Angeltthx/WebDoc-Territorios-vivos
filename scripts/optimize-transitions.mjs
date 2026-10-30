@@ -1,7 +1,10 @@
 // Convierte los videos de transición (4K, ../Contenido/Transiciones) a versiones web en
 // public/media/transiciones: t1…t4, intro y cierre en 1080p y 720p, con su sonido original (desde el
 // 05/10/2026 la voz de Chachita viene integrada en cada video) y una imagen de espera.
+// Además, el sonido de cada video aparte (<id>-audio.m4a): en el recorrido el video corre en silencio y su sonido suena
+// por el audio del webdoc, que se desbloquea con un solo toque (en el iPhone cada video pedía su propio toque).
 // Uso: npm run media:transiciones [id…]  (sin ids convierte todos)
+//      npm run media:transiciones -- --audio [id…]  (solo saca el sonido de los videos ya convertidos)
 // Los medios no se versionan en git: se generan localmente a partir de los originales.
 import ffmpeg from 'ffmpeg-static';
 import sharp from 'sharp';
@@ -24,7 +27,21 @@ const idOf = (file) => {
   if (/^cierre/i.test(file)) return 'cierre';
   return null;
 };
-const only = process.argv.slice(2);
+/** El sonido del video ya convertido, tal cual (sin volver a comprimirlo). */
+const extractAudio = (id) => {
+  const out = path.join(OUT, `${id}-audio.m4a`);
+  run(['-i', path.join(OUT, `${id}-720.mp4`), '-vn', '-c:a', 'copy', '-movflags', '+faststart', out]);
+  console.log(path.basename(out));
+};
+
+const args = process.argv.slice(2);
+const audioOnly = args.includes('--audio');
+const only = args.filter((a) => a !== '--audio');
+if (audioOnly) {
+  const ids = readdirSync(OUT).map((f) => f.match(/^(.+)-720\.mp4$/)?.[1]).filter(Boolean);
+  for (const id of ids) if (!only.length || only.includes(id)) extractAudio(id);
+  process.exit(0);
+}
 const files = readdirSync(SRC).filter((f) => /\.mp4$/i.test(f));
 for (const file of files) {
   const id = idOf(file);
@@ -41,4 +58,5 @@ for (const file of files) {
   await sharp(frame).webp({ quality: 70 }).toFile(path.join(OUT, `${id}-poster.webp`));
   rmSync(frame);
   console.log(`${id}-poster.webp`);
+  extractAudio(id);
 }

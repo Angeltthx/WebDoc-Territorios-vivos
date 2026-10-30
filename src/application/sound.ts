@@ -6,8 +6,14 @@
 //   al salir de la página se desvanece.
 // - setAmbient('alta' | 'baja' | null): ambiente de marea en bucle solo en su escena
 //   (marea-alta.mp3 / marea-baja.mp3). Si el archivo no existe, la escena queda en silencio.
+// - setTrack(url, at) / clearTrack(url): el sonido de un video de transición (la voz de Chachita integrada), sacado
+//   aparte (<id>-audio.m4a). El video corre en silencio y este sonido va a la par, desde `at()` (29/10/2026): en el
+//   iPhone cada video pedía su propio toque para sonar y, al llegar deslizando, no sonaba; este audio queda
+//   desbloqueado con el primer toque de la visita y suena en todos los videos que siguen.
 // Los navegadores solo permiten audio tras un gesto del visitante (clic, toque o tecla);
 // si se pide antes, queda pendiente y empieza con el primer gesto.
+// En el iPhone, el audio del webdoc suena aunque el celular esté en silencio (como un video o la música): ver
+// audioSession más abajo.
 
 export type Tide = 'alta' | 'baja';
 
@@ -16,6 +22,7 @@ const TIDES: Record<Tide, string> = { alta: '/media/audio/marea-alta.mp3', baja:
 const WAVES = ['/media/audio/ola-1.mp3', '/media/audio/ola-2.mp3', '/media/audio/ola-3.mp3'];
 const TRANSITION_VOLUME = 0.55;
 const VOICE_VOLUME = 1;
+const TRACK_VOLUME = 1;
 const AMBIENT_VOLUME: Record<Tide, number> = { alta: 0.5, baja: 0.45 };
 /** Gestos que los navegadores aceptan para permitir audio. */
 const GESTURES = ['pointerdown', 'click', 'touchend', 'keydown'] as const;
@@ -29,6 +36,17 @@ let wanted: Tide | null = null;
 let wantedVoice: string | null = null;
 let voice: { id: string; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
 let ambient: { tide: Tide; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
+let wantedTrack: { url: string; at: () => number } | null = null;
+let track: { url: string; out: GainNode; src: AudioBufferSourceNode | null } | null = null;
+
+// iPhone (Safari 16.4+): el audio del webdoc es reproducción, como un video; sin esto, con el interruptor de silencio
+// puesto no se oye nada.
+try {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = 'playback';
+} catch {
+  /* sin audioSession: como siempre */
+}
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
 
 export function isMuted(): boolean {
@@ -48,9 +66,11 @@ export function setMuted(muted: boolean) {
   if (muted) {
     stopAmbient();
     stopVoice();
+    stopTrack();
   } else {
     if (wanted) void startAmbient(wanted);
     if (wantedVoice) void startVoice(wantedVoice);
+    if (wantedTrack) void startTrack();
   }
 }
 
@@ -84,13 +104,24 @@ function load(url: string): Promise<AudioBuffer | null> {
 
 /** Activa el audio con el primer gesto del visitante y precarga las olas. */
 export function initAudioUnlock() {
+  let started = false;
   const unlock = () => {
     unlocked = true;
-    audio();
-    WAVES.forEach((url) => void load(url));
-    if (wanted && !isMuted()) void startAmbient(wanted);
-    if (wantedVoice && !isMuted()) void startVoice(wantedVoice);
-    for (const type of GESTURES) window.removeEventListener(type, unlock, true);
+    const ac = audio();
+    if (!ac) return;
+    // Solo cuenta cuando el audio de verdad quedó activo: en el iPhone un deslizamiento no lo activa (no es un toque),
+    // y se sigue esperando el primer toque en vez de darlo por desbloqueado.
+    const go = () => {
+      if (started || ac.state !== 'running') return;
+      started = true;
+      for (const type of GESTURES) window.removeEventListener(type, unlock, true);
+      WAVES.forEach((url) => void load(url));
+      if (wanted && !isMuted()) void startAmbient(wanted);
+      if (wantedVoice && !isMuted()) void startVoice(wantedVoice);
+      if (wantedTrack && !isMuted()) void startTrack();
+    };
+    if (ac.state === 'running') go();
+    else void ac.resume().then(go, () => {});
   };
   for (const type of GESTURES) window.addEventListener(type, unlock, true);
 }
@@ -208,4 +239,54 @@ export function setVoice(id: string | null) {
   wantedVoice = id;
   if (id) void startVoice(id);
   else stopVoice();
+}
+
+/**
+ * Sonido de un video de transición: suena desde `at()` (el punto del video, que sigue corriendo en silencio) y en
+ * bucle, como el video. Si el audio aún no está desbloqueado, empieza con el primer toque, en el punto en que vaya.
+ */
+export function setTrack(url: string, at: () => number) {
+  wantedTrack = { url, at };
+  void startTrack();
+}
+
+/** Apaga el sonido del video `url` (si es el que suena; el de la página siguiente puede haber empezado ya). */
+export function clearTrack(url: string) {
+  if (wantedTrack?.url !== url) return;
+  wantedTrack = null;
+  stopTrack();
+}
+
+/** Descarga el sonido de un video antes de llegar a él (si el audio ya está desbloqueado). */
+export function preloadTrack(url: string) {
+  if (unlocked) void load(url);
+}
+
+async function startTrack() {
+  const want = wantedTrack;
+  const ac = audio();
+  if (!want || !ac || !master || isMuted()) return;
+  stopTrack();
+  const out = ac.createGain();
+  out.gain.value = TRACK_VOLUME;
+  out.connect(master);
+  const current = { url: want.url, out, src: null as AudioBufferSourceNode | null };
+  track = current;
+
+  const buffer = await load(want.url);
+  if (!buffer || track !== current || wantedTrack !== want) return;
+  const src = ac.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  src.connect(out);
+  // El punto del video al momento de sonar (la descarga pudo tardar): así la voz va con la imagen.
+  src.start(0, Math.max(0, want.at()) % buffer.duration);
+  current.src = src;
+}
+
+function stopTrack() {
+  if (!track) return;
+  const { out, src } = track;
+  track = null;
+  fadeOut(out, src, 0.6);
 }
