@@ -102,7 +102,6 @@ html { -webkit-tap-highlight-color: transparent; }
   padding: 0 72px max(14px, env(safe-area-inset-bottom)); pointer-events: none;
 }
 .page-foot > * { pointer-events: auto; }
-.page-foot__note { font-size: 12px; opacity: 0.9; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
 /* Invitación a seguir bajando, sobre las pestañas de cada estación. */
 .scroll-hint {
   display: grid; justify-items: center; gap: 0; border: 0; background: none; padding: 4px 12px; min-height: 44px;
@@ -2436,7 +2435,6 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .tabs[data-more='both'] { mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
   /* Galería: cada foto con su proporción, sin franjas vacías arriba y abajo. */
   .gallery__card { height: auto; width: min(84vw, calc(46vh * var(--ar, 1.5))); max-width: none; }
-  .page-foot__note { display: none; }
   /* Textos de lectura. */
   .transition__quote, .transition__line { font-size: 21px; line-height: 1.4; }
   .chapter p { font-size: 15px; line-height: 1.6; }
@@ -2477,7 +2475,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .dock__sound { width: 44px; height: 44px; }
   .stack-page .topbar { padding-right: 120px; }
   .stack-page .topbar__right { display: none; }
-  .cue, .scroll-hint, .page-foot__note { display: none; }
+  .cue, .scroll-hint { display: none; }
   .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 48px); right: 16px; }
   .route { top: 52px; bottom: auto; }
   .trailer { padding-top: 60px; padding-bottom: 70px; }

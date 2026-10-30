@@ -1,4 +1,4 @@
-import { Suspense, lazy, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { getStation, transitions } from '../../content/journey';
 import { pages, type PageSpec, type Tabs } from '../../content/pages';
 import { leaveVideo, registerAutoplay, setCurrentVideo } from '../../application/autoplay';
@@ -168,9 +168,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><GalleryPanel gallery={gallery} /></div>
           <TopBar plain label={spec.label} />
-          <StationFoot tabs={spec.tabs} next={next}>
-            <p className="page-foot__note">{gallery.intro} · deslizar →</p>
-          </StationFoot>
+          <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
     }
@@ -228,7 +226,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
 }
 
 /** Pie de las páginas de estación: invitación a seguir bajando y pestañas. */
-function StationFoot({ tabs, next, children }: { tabs: Tabs; next?: string; children?: ReactNode }) {
+function StationFoot({ tabs, next }: { tabs: Tabs; next?: string }) {
   const { scrollToPage } = useJourneyNav();
   return (
     <footer className="page-foot">
@@ -239,7 +237,6 @@ function StationFoot({ tabs, next, children }: { tabs: Tabs; next?: string; chil
         </button>
       )}
       <PageTabs tabs={tabs} />
-      {children}
     </footer>
   );
 }
