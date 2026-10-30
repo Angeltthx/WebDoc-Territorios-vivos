@@ -337,46 +337,80 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .lightbox__next { right: 14px; }
 
 /* ───────── Receta ───────── */
-/* El texto a la izquierda y los pasos en una franja que se desliza (27/10/2026). */
+/* Como la página de un libro de cocina (30/10/2026): el título en Fraunces con su subtítulo, la introducción y un riel
+   que marca el paso; a la derecha los pasos, sin tarjetas, uno tras otro sobre el fondo oscurecido: las fotos, el
+   número grande con su línea y el texto. */
 .recipe {
   position: absolute; inset: 0; display: grid; grid-template-columns: minmax(240px, 26vw) minmax(0, 1fr); align-items: center;
-  gap: clamp(20px, 3vw, 48px); padding: 76px 0 130px clamp(24px, 5.5vw, 80px);
+  gap: clamp(28px, 4vw, 64px); padding: var(--recipe-top, 76px) 0 var(--recipe-bottom, 130px) clamp(24px, 5.5vw, 80px);
 }
-.recipe__text { max-width: 420px; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45); }
-.recipe__text h2 { margin-top: 6px; font: italic 400 clamp(26px, 3vw, 42px)/1.15 var(--sans); }
-.recipe__intro { margin: 14px 0 0; font-size: clamp(14px, 1.2vw, 17px); line-height: 1.6; }
-.recipe__hint { margin: 18px 0 0; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
+.recipe__text { max-width: 400px; }
+.recipe__text h2 {
+  margin: 0; font: 400 clamp(34px, 3.6vw, 54px)/1.02 'Fraunces', var(--serif);
+  font-variation-settings: 'opsz' 144, 'SOFT' 100; letter-spacing: -0.02em; text-wrap: balance;
+}
+.recipe__dek { margin: 10px 0 0; font: italic 300 clamp(16px, 1.3vw, 19px)/1.3 'Fraunces', var(--serif); font-variation-settings: 'opsz' 24, 'SOFT' 100; color: var(--gold); }
+.recipe__intro { margin: 22px 0 0; max-width: 34ch; font-size: clamp(15px, 1.15vw, 17px); line-height: 1.6; color: rgba(255, 255, 255, 0.86); text-wrap: pretty; }
+/* El riel: una marca por paso; la del paso que se ve se alarga en dorado. Cada marca lleva a su paso. */
+.recipe__rail { display: flex; gap: 6px; margin: 28px 0 0; }
+.recipe__rail button {
+  position: relative; width: 22px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer;
+  transition: width 0.5s var(--ease);
+}
+.recipe__rail button::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; border-radius: 1px;
+  background: rgba(255, 255, 255, 0.32); transition: background 0.3s;
+}
+.recipe__rail button:hover::before { background: rgba(255, 255, 255, 0.7); }
+.recipe__rail button.is-current { width: 48px; }
+.recipe__rail button.is-current::before { background: var(--gold); }
 .recipe__track { position: relative; min-width: 0; max-height: 100%; display: grid; }
-/* A la altura del centro de las fotos de los pasos (16:10 dentro de la tarjeta). */
-.recipe__prev, .recipe__next { position: absolute; z-index: 2; top: calc(16px + (min(360px, 30vw) - 20px) * 0.3125); transform: translateY(-50%); backdrop-filter: blur(6px); transition: opacity 0.25s, background 0.2s; }
+/* A la altura del centro de las fotos de los pasos (16:10). */
+.recipe__prev, .recipe__next { position: absolute; z-index: 2; top: calc(6px + min(380px, 30vw) * 0.3125); transform: translateY(-50%); backdrop-filter: blur(6px); transition: opacity 0.25s, background 0.2s; }
 .recipe__prev { left: -22px; }
 .recipe__next { right: clamp(16px, 3vw, 40px); }
 .recipe__prev:hover:not(:disabled), .recipe__next:hover:not(:disabled) { background: rgba(0, 0, 0, 0.5); color: var(--gold); }
 .recipe__prev:disabled, .recipe__next:disabled { opacity: 0; pointer-events: none; }
-.recipe__hint-touch { display: none; }
-@media (hover: none) {
-  .recipe__hint-desk { display: none; }
-  .recipe__hint-touch { display: inline; }
-}
 .recipe__steps {
-  list-style: none; margin: 0; display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+  list-style: none; margin: 0; display: flex; gap: clamp(28px, 3vw, 48px); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
   padding: 6px clamp(24px, 5vw, 80px) 6px 2px; align-items: flex-start; max-height: 100%;
 }
 .recipe__steps::-webkit-scrollbar { display: none; }
+/* Cada paso cabe en la pantalla: si el texto no alcanza, se desplaza dentro del paso (se desvanece abajo mientras
+   quede texto), en vez de meterse debajo de «Sigue bajando» y las pestañas. */
 .recipe__step {
-  flex: none; width: min(360px, 30vw); scroll-snap-align: start; padding: 10px; border-radius: 8px;
-  background: rgba(10, 22, 18, 0.62); backdrop-filter: blur(6px); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); animation: rise 0.8s var(--ease) both;
+  flex: none; width: min(380px, 30vw); scroll-snap-align: start; animation: rise 0.8s var(--ease) both;
+  display: flex; flex-direction: column; max-height: calc(100dvh - var(--recipe-top, 76px) - var(--recipe-bottom, 130px) - 12px);
 }
 .recipe__step:nth-child(2) { animation-delay: 0.1s; }
 .recipe__step:nth-child(3) { animation-delay: 0.2s; }
-.recipe__photos { display: grid; gap: 4px; aspect-ratio: 16 / 10; border-radius: 4px; overflow: hidden; }
+.recipe__photos { flex: none; display: grid; gap: 3px; aspect-ratio: 16 / 10; border-radius: 2px; overflow: hidden; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4); }
 .recipe__photos--2 { grid-template-columns: 1fr 1fr; }
 .recipe__photos--4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 .recipe__photos button { padding: 0; border: 0; min-height: 0; overflow: hidden; background: #243029; cursor: zoom-in; }
 .recipe__photos img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s var(--ease); }
 .recipe__photos button:hover img { transform: scale(1.05); }
-.recipe__num { margin: 12px 4px 4px; font-size: 11px; letter-spacing: 0.16em; color: var(--gold); }
-.recipe__body { margin: 0 4px 6px; font-size: 14px; line-height: 1.6; }
+/* El número del paso, grande, con una línea fina que corre hasta el borde. */
+.recipe__num {
+  flex: none; display: flex; align-items: center; gap: 14px; margin: 18px 0 8px;
+  font: italic 300 40px/1 'Fraunces', var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; color: var(--gold);
+}
+.recipe__num::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.22); }
+.recipe__body {
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  margin: 0; font-size: 15.5px; line-height: 1.62; color: rgba(255, 255, 255, 0.9); text-wrap: pretty;
+}
+.recipe__body::-webkit-scrollbar { display: none; }
+.recipe__body.is-clipped { mask-image: linear-gradient(#000 calc(100% - 2.4em), transparent); }
+/* Computadores bajitos (portátiles con la barra del navegador): fotos más apaisadas, para que el texto del paso quepa
+   por encima de las pestañas. */
+@media (min-width: 901px) and (max-height: 720px) {
+  .recipe { --recipe-top: 64px; --recipe-bottom: 124px; }
+  .recipe__photos { aspect-ratio: 16 / 8; }
+  .recipe__prev, .recipe__next { top: calc(6px + min(380px, 30vw) * 0.25); }
+  .recipe__num { margin: 12px 0 6px; font-size: 32px; }
+  .recipe__body { font-size: 15px; line-height: 1.55; }
+}
 
 /* ───────── 360 · Cantos ───────── */
 .songs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: clamp(16px, 11vw, 170px); padding: 0 80px 20px; }
@@ -714,12 +748,14 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .guide__list { grid-template-columns: repeat(2, 1fr); }
   .recipe { grid-template-columns: 1fr; align-content: center; padding: 70px 0 130px 20px; gap: 14px; }
   .recipe__text { padding-right: 56px; }
-  .recipe__text h2 { font-size: 26px; }
-  .recipe__intro { margin-top: 8px; font-size: 13.5px; line-height: 1.5; }
-  .recipe__hint { margin-top: 10px; }
-  .recipe__steps { padding-right: 56px; }
-  .recipe__step { width: min(300px, 74vw); }
+  .recipe__text h2 { font-size: 32px; }
+  .recipe__dek { margin-top: 6px; font-size: 16px; }
+  .recipe__intro { margin-top: 10px; font-size: 14px; line-height: 1.5; }
+  .recipe__rail { margin-top: 6px; }
+  .recipe__steps { padding-right: 56px; gap: 24px; }
+  .recipe__step { width: min(300px, 74vw); max-height: none; }
   .recipe__prev, .recipe__next { display: none; }
+  .recipe__num { margin: 12px 0 6px; font-size: 30px; }
   .recipe__body { font-size: 14.5px; line-height: 1.55; }
 }
 
@@ -2426,8 +2462,11 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .trailer__frame { width: min(880px, 100%, calc((100vh - 140px) * 16 / 9)); }
   .trailer__note { display: none; }
   .recipe { grid-template-columns: minmax(200px, 30vw) minmax(0, 1fr); align-content: center; gap: 20px; padding: 58px 0 64px 24px; }
-  .recipe__intro { font-size: 13px; line-height: 1.5; }
-  .recipe__step { width: 250px; padding: 8px; }
+  .recipe__text h2 { font-size: 28px; }
+  .recipe__intro { margin-top: 10px; font-size: 13px; line-height: 1.5; }
+  .recipe__rail { margin-top: 4px; }
+  .recipe__step { width: 250px; max-height: none; }
+  .recipe__num { margin: 8px 0 4px; font-size: 24px; }
   .recipe__photos { aspect-ratio: 16 / 8; }
   .recipe__body { font-size: 12.5px; line-height: 1.5; max-height: 9em; overflow-y: auto; }
   .recipe__prev, .recipe__next { display: none; }
@@ -2455,16 +2494,20 @@ button.ap-kpi:hover { background: var(--ap-head); }
 /* El proyecto · Visita Nuquí en el celular: con la marca arriba, el texto empieza debajo de ella. */
 @media (max-width: 640px) {
   [data-marca='arriba'] .chapter__body { padding-top: 104px; }
+  /* Igual la receta: el título empieza debajo de la marca. */
+  [data-marca='arriba'] .recipe { padding-top: 104px; }
 }
 /* Celulares bajitos (iPhone SE y parecidos): la receta y los cantos se aprietan para caber entre la barra y las
    pestañas, en vez de meterse debajo de ellas. */
 @media (max-width: 640px) and (max-height: 700px) and (orientation: portrait) {
   .recipe { padding-top: 64px; padding-bottom: 100px; gap: 10px; }
-  [data-marca='arriba'] .recipe { padding-top: 92px; }
-  .recipe__text h2 { font-size: 22px; }
-  .recipe__intro { font-size: 13px; line-height: 1.45; }
-  .recipe__hint { margin-top: 6px; }
-  .recipe__step { width: min(260px, 72vw); padding: 8px; }
+  [data-marca='arriba'] .recipe { padding-top: 100px; }
+  .recipe__text h2 { font-size: 26px; }
+  .recipe__dek { font-size: 15px; }
+  .recipe__intro { margin-top: 6px; font-size: 13px; line-height: 1.45; }
+  .recipe__rail { margin-top: 0; }
+  .recipe__step { width: min(260px, 72vw); }
+  .recipe__num { margin: 8px 0 4px; font-size: 24px; }
   .recipe__photos { aspect-ratio: 16 / 8; }
   .recipe__body { font-size: 13.5px; line-height: 1.5; max-height: 7.5em; overflow-y: auto; }
   .songs { justify-content: flex-start; padding-top: 104px; padding-bottom: 100px; gap: 4px; }
