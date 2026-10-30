@@ -424,9 +424,10 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 }
 
 /* ───────── 360 · Cantos ───────── */
-.songs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: clamp(16px, 11vw, 170px); padding: 0 80px 20px; }
+/* Las dos tarjetas a la misma altura (debajo del 360 va una línea más): alineadas por arriba y el par centrado. */
+.songs { position: absolute; inset: 0; display: flex; flex-wrap: wrap; align-content: center; align-items: flex-start; justify-content: center; gap: clamp(16px, 11vw, 170px); padding: 0 80px 20px; }
 .glass-card {
-  display: grid; justify-items: center; align-content: center; gap: 4px; width: min(260px, 40vw); min-height: 130px; padding: 20px;
+  display: grid; justify-items: center; align-content: center; gap: 4px; width: min(260px, 40vw); height: 168px; padding: 16px 20px;
   border-radius: 22px; border: 0; background: rgba(28, 28, 28, 0.6); backdrop-filter: blur(10px); text-align: center; font-size: 12px;
   transition: transform 0.3s var(--ease), background 0.3s;
 }
@@ -621,25 +622,21 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .songs__item { display: grid; justify-items: center; }
 .songs__yt { margin-top: 10px; font-size: 12px; letter-spacing: 0.06em; color: #fff; text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.4); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
 .songs__yt:hover { color: var(--gold); border-color: var(--gold); }
-/* «Chachita canta»: el reproductor dentro de la tarjeta. El canto de turno, una línea fina de avance y, abajo, anterior,
-   escuchar/pausar (el botón grande, dorado al sonar) y siguiente. */
-.song-card { padding: 18px 20px 14px; gap: 6px; }
+/* «Chachita canta»: el reproductor dentro de la tarjeta, con la misma forma que la del 360 (ícono, título y, de
+   subtítulo, el canto de turno). Abajo, en línea fina: anterior, escuchar/pausar (un anillo que se llena mientras
+   suena) y siguiente. */
+.song-card { gap: 3px; }
 .song-card:hover { transform: none; }
-.song-card__now { display: grid; gap: 2px; margin: 4px 0 0; font: italic 400 15px/1.3 'Fraunces', var(--serif); font-variation-settings: 'opsz' 24, 'SOFT' 100; color: rgba(255, 255, 255, 0.92); }
-.song-card__count { font: 500 10px var(--sans); letter-spacing: 0.16em; text-transform: uppercase; font-style: normal; color: rgba(255, 255, 255, 0.55); }
-.song-card__bar { width: 100%; height: 2px; margin-top: 6px; border-radius: 1px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
-.song-card__bar i { display: block; height: 100%; background: var(--gold); transform-origin: left; transition: transform 0.25s linear; }
-.song-card__controls { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
-.song-card__controls button { display: grid; place-items: center; border: 0; padding: 0; color: #fff; transition: color 0.2s, background 0.2s, transform 0.2s; }
-.song-card__controls svg { fill: currentColor; }
-.song-card__skip { width: 40px; height: 40px; border-radius: 50%; background: none; opacity: 0.75; }
-.song-card__skip svg { width: 13px; height: 13px; }
-.song-card__skip:hover { opacity: 1; color: var(--gold); }
-.song-card__play { width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45); }
-.song-card__play svg { width: 16px; height: 16px; }
-.song-card__play:hover { background: rgba(255, 255, 255, 0.24); }
-.song-card.is-playing .song-card__play { background: var(--gold); color: var(--forest); box-shadow: none; }
-/* Sonando, el aviso de abajo ya sobra. */
+.song-card__now { font-style: italic; }
+.song-card__controls { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.song-card__controls button { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border: 0; padding: 0; background: none; color: rgba(255, 255, 255, 0.8); transition: color 0.2s; }
+.song-card__controls button:hover { color: #fff; }
+.song-card__skip svg { width: 15px; height: 15px; }
+.song-card__ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.song-card__ring circle { fill: none; stroke-width: 1; }
+.song-card__ring circle:first-child { stroke: rgba(255, 255, 255, 0.45); }
+.song-card__ring circle:last-child { stroke: #fff; stroke-width: 1.6; stroke-linecap: round; transition: stroke-dasharray 0.25s linear; }
+.song-card__glyph { width: 12px; height: 12px; fill: currentColor; }
 .songs__item:has(.song-card.is-playing) .play-hint { visibility: hidden; }
 .stack-page.is-active .play-hint > span { animation: cue-breathe 2.8s ease-in-out 4s infinite; }
 .play-hint__touch { display: none; }
@@ -652,11 +649,13 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 
 
 /* ───────── Experiencia 360 ───────── */
-.glass-card--360 { position: relative; }
-.glass-card--360::after {
+/* El 360 y los cantos, con el mismo reborde que palpita (mientras suena un canto, el suyo se queda quieto). */
+.glass-card--360, .glass-card--song { position: relative; }
+.glass-card--360::after, .glass-card--song::after {
   content: ''; position: absolute; inset: -1px; border-radius: inherit; border: 1px solid rgba(255, 255, 255, 0.45);
   animation: pano-pulse 2.8s ease-out infinite; pointer-events: none;
 }
+.song-card.is-playing::after { animation: none; opacity: 0.7; }
 @keyframes pano-pulse { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(1.12); } }
 
 .pano {
@@ -824,8 +823,8 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .gallery { padding-bottom: 140px; }
   .gallery__track { padding: 6px 20px; }
   .gallery__card { height: min(46vh, 420px); max-width: 84vw; }
-  .songs { flex-direction: column; gap: 14px; padding: 60px 20px 120px; }
-  .glass-card { width: min(300px, 86vw); min-height: 110px; }
+  .songs { flex-direction: column; flex-wrap: nowrap; align-items: center; gap: 14px; padding: 60px 20px 120px; }
+  .glass-card { width: min(300px, 86vw); height: 150px; }
   .transition { padding: 0 24px 60px; }
   .page-note { padding: 0 24px; bottom: 120px; }
   .closing__actions { left: 0; right: 0; justify-content: center; padding-bottom: 20px; }
@@ -2606,10 +2605,10 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .recipe__body { font-size: 13.5px; line-height: 1.5; max-height: 7.5em; overflow-y: auto; }
   .songs { justify-content: flex-start; padding-top: 104px; padding-bottom: 100px; gap: 4px; }
   /* El reproductor de los cantos ya dice qué hacer: sin el aviso de abajo, y más compacto. */
-  .song-card + .play-hint, .song-card .glass-card__icon { display: none; }
-  .song-card { padding: 12px 16px 8px; gap: 2px; }
-  .song-card strong { margin-top: 0; }
-  .glass-card { min-height: 92px; padding: 14px; }
+  .song-card + .play-hint, .glass-card__icon { display: none; }
+  .glass-card { height: 118px; padding: 10px 14px; }
+  .glass-card strong { margin-top: 0; }
+  .song-card__controls { margin-top: 2px; }
 }
 /* Pantallas angostas (320 px): el nombre de la sección no llega hasta «Volver». */
 @media (max-width: 360px) {

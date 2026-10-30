@@ -753,21 +753,18 @@ export function SongsPanel({ songs, active = false }: { songs: NonNullable<Stati
             <div className={`glass-card glass-card--song song-card${player.playing ? ' is-playing' : ''}`}>
               <span className="glass-card__icon" aria-hidden="true">♪</span>
               <strong>Chachita canta</strong>
-              <p className="song-card__now" aria-live="polite">
-                <span className="song-card__count">{player.index + 1} de {songs.songs.length}</span>
-                {songs.songs[player.index].title}
-              </p>
-              <div className="song-card__bar" aria-hidden="true"><i style={{ transform: `scaleX(${player.progress})` }} /></div>
+              <span className="song-card__now" aria-live="polite">{songs.songs[player.index].title}</span>
               <div className="song-card__controls">
-                <button type="button" className="song-card__skip" onClick={() => player.go(-1)} aria-label="Canto anterior">
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM14 3v10L6 8z" /></svg>
-                </button>
+                <button type="button" className="song-card__skip" onClick={() => player.go(-1)} aria-label="Canto anterior"><Arrow dir="left" /></button>
                 <button type="button" className="song-card__play" onClick={player.toggle} aria-label={`${player.playing ? 'Pausar' : 'Escuchar'} ${songs.songs[player.index].title}`}>
-                  <svg viewBox="0 0 16 16" aria-hidden="true">{player.playing ? <path d="M4 3h3v10H4zM9 3h3v10H9z" /> : <path d="M5 2.5v11l9-5.5z" />}</svg>
+                  {/* El anillo se llena mientras suena el canto. */}
+                  <svg className="song-card__ring" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle cx="20" cy="20" r="19" />
+                    <circle cx="20" cy="20" r="19" pathLength={1} strokeDasharray={`${player.progress} 1`} />
+                  </svg>
+                  <svg className="song-card__glyph" viewBox="0 0 16 16" aria-hidden="true">{player.playing ? <path d="M4.5 3h2.4v10H4.5zM9.1 3h2.4v10H9.1z" /> : <path d="M5 2.8v10.4l8.5-5.2z" />}</svg>
                 </button>
-                <button type="button" className="song-card__skip" onClick={() => player.go(1)} aria-label="Canto siguiente">
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM2 3v10l8-5z" /></svg>
-                </button>
+                <button type="button" className="song-card__skip" onClick={() => player.go(1)} aria-label="Canto siguiente"><Arrow dir="right" /></button>
               </div>
             </div>
           ) : (
