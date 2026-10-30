@@ -48,7 +48,7 @@ export const MAP_PLACES: MapPlace[] = [
   { id: 'museo-melele', name: 'Museo Melelé', kind: 'site', at: { town: 'nuqui', along: -0.4, inland: 0.35 }, handle: 'museo_melele', near: 'Nuquí' },
   town('nuqui', 'Nuquí'),
   { id: 'escombros-nuqui', name: 'Escombros del Mar', kind: 'site', at: { town: 'nuqui', along: 0.35, inland: 0.2 }, handle: 'escombrosdelmarhostal', near: 'Nuquí' },
-  { id: 'las-serranias', name: 'Danza tradicional Las Serranías', kind: 'site', at: { town: 'nuqui', along: 1.0, inland: 0.15 }, handle: 'orfelinamarmolejo', near: 'Nuquí' },
+  { id: 'las-serranias', name: 'Fundación Cultural y Ambiental Serranías del Porvenir', kind: 'site', at: { town: 'nuqui', along: 1.0, inland: 0.15 }, handle: 'fundacionserraniasdelporvenir', near: 'Nuquí' },
   { id: 'posada-chachita', name: 'Posada ecoturística Chachita', kind: 'site', at: { town: 'pangui', along: -0.45, inland: 0.06 }, handle: 'posadaecoturisticachachita', near: 'Panguí' },
   town('pangui', 'Panguí'),
   { id: 'escombros-coqui', name: 'Escombros del Mar', kind: 'site', at: { town: 'coqui', along: -1.0, inland: 0.15 }, handle: 'escombrosdelmarhostal', near: 'Coquí' },

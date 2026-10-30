@@ -116,8 +116,10 @@ h1, h2, p, blockquote, figure { margin: 0; }
 .tab:hover { color: #fff; }
 .tab.is-active { color: #fff; }
 .tab.is-active::after { height: 2px; background: #fff; }
-.tab--warm { color: #f4d7a6; }
-.tab--warm::after { background: #f4d7a6aa; }
+/* «Un regalo de la selva»: dorada solo cuando es la página que se ve (antes lo era siempre y parecía la seleccionada
+   estando en otra; pedido del cliente, 27/10/2026). */
+.tab--warm.is-active { color: #f4d7a6; }
+.tab--warm.is-active::after { background: #f4d7a6; }
 .tab--off { cursor: default; }
 
 
@@ -323,7 +325,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.65)); opacity: 0; transition: opacity 0.25s;
 }
 .grid-view__item:hover .grid-view__caption, .grid-view__item:focus-visible .grid-view__caption { opacity: 1; }
-.gallery__tag { position: absolute; z-index: 1; top: 10px; left: 10px; font-size: 11px; padding: 3px 8px; border-radius: 5px; background: rgba(0, 0, 0, 0.5); }
 
 .lightbox { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: rgba(5, 12, 10, 0.95); color: #fff; }
 .lightbox::backdrop { background: rgba(5, 12, 10, 0.8); }
@@ -552,11 +553,13 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
    bajando»), con la letra del webdoc y la flecha del recorrido: la flecha se mece hacia abajo y palpita con un
    resplandor tenue detrás; el texto respira. Entra fundiéndose y nunca tapa nada (es pequeña y casi transparente). */
 .cue {
-  position: fixed; z-index: 50; left: 50%; bottom: var(--cue-bottom, max(10px, env(safe-area-inset-bottom)));
+  position: fixed; z-index: 50; left: 50%; bottom: max(10px, env(safe-area-inset-bottom));
   display: grid; justify-items: center; gap: 2px; padding: 4px 12px; min-height: 44px; border: 0; background: none; color: #fff; cursor: pointer;
   opacity: 0; translate: -50% 8px; pointer-events: none;
   transition: opacity 0.9s var(--ease), translate 1s var(--ease);
 }
+/* Sobre el «Sigue bajando» de la página (ver ScrollCue): ubicada desde arriba. */
+.cue[style*='--cue-top'] { top: var(--cue-top); bottom: auto; }
 .cue.is-shown { opacity: 0.92; translate: -50% 0; pointer-events: auto; }
 .cue.is-shown:hover { opacity: 1; }
 .cue__label {
@@ -1161,6 +1164,8 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 @media (max-width: 640px) {
   .map-filter { top: 60px; bottom: auto; left: 0; right: 0; justify-content: center; gap: 18px; }
   .map-filter__opt { font-size: 11px; min-height: 40px; }
+  /* Con la marca arriba a la derecha, los filtros van debajo de ella (se cruzaban; pedido del cliente, 29/10/2026). */
+  [data-marca='arriba'] .map-filter { top: calc(max(14px, env(safe-area-inset-top)) + 86px); }
 }
 @media (min-width: 641px) {
   .map-screen--embedded .map-filter { left: 76px; }
@@ -2314,7 +2319,14 @@ button.ap-kpi:hover { background: var(--ap-head); }
 .chapter { position: fixed; inset: 0; z-index: 0; isolation: isolate; overflow: hidden; color: #fff; background: #10211b; }
 .chapter__body {
   position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
-  display: grid; align-content: center; padding: 84px clamp(20px, 5vw, 80px) 96px;
+  /* Centrado «seguro»: si el contenido no cabe en la pantalla, empieza debajo del letrero de arriba y se desplaza,
+     en vez de salirse por arriba y quedar debajo de él (Historia y Blog; pedido del cliente, 27/10/2026). */
+  display: grid; align-content: safe center; padding: 84px clamp(20px, 5vw, 80px) 96px;
+}
+/* Lo que se desplaza por detrás de las pestañas se desvanece en un fondo oscuro (en el celular, opaco; abajo). */
+.chapter::after {
+  content: ''; position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; height: 84px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(6, 14, 11, 0.85) 60%);
 }
 .chapter__tabs { position: absolute; z-index: 5; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: calc(100vw - 120px); }
 .chapter h1 { margin: 8px 0 14px; font: italic 400 clamp(26px, 2.8vw, 40px)/1.15 var(--sans); }
@@ -2424,7 +2436,6 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .globe-title__gate { font-size: 11px; line-height: 1.5; }
   .play-hint__touch { font-size: 11.5px; }
   .listen__text small { font-size: 11px; }
-  .gallery__tag { font-size: 12px; }
   /* Toques de al menos 44 px. */
   .songs__yt, .reader__back, .sheet__back, .story-how { display: inline-flex; align-items: center; min-height: 44px; }
   .songs__yt { margin-top: 2px; }

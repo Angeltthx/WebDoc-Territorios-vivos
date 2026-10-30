@@ -407,7 +407,6 @@ export function GalleryPanel({ gallery }: { gallery: NonNullable<Station['galler
               onClick={() => setOpen(i)}
               aria-label={`Ampliar: ${ph.alt}`}
             >
-              {ph.tag === 'dron' && <span className="gallery__tag">◈ dron</span>}
               <Img photo={ph} sizes="(max-width: 700px) 80vw, 40vw" />
             </button>
           ))}
