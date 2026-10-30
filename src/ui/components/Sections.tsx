@@ -566,36 +566,80 @@ function Lightbox({ photos, index, onChange }: { photos: Photo[]; index: number 
   );
 }
 
+/** El texto de un paso: si no cabe en la pantalla se desplaza, y se desvanece abajo mientras quede texto por leer. */
+function StepText({ text }: { text: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [clipped, setClipped] = useState(false);
+  const check = () => {
+    const el = ref.current;
+    if (el) setClipped(el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+  };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    check();
+    const resize = new ResizeObserver(check);
+    resize.observe(el);
+    return () => resize.disconnect();
+  }, []);
+  return <p ref={ref} className={`recipe__body${clipped ? ' is-clipped' : ''}`} onScroll={check}>{text}</p>;
+}
+
 /**
  * La receta (27/10/2026): el título y la introducción a un lado y los pasos en una franja que se desliza, cada uno con
  * su texto y sus fotos. Cualquier foto se amplía y desde ahí se recorren todas, en orden. Los pasos se recorren
- * deslizando, con las flechas ← → del teclado o con los botones a los lados de la franja (28/10/2026).
+ * deslizando, con las flechas ← → del teclado o con los botones a los lados de la franja (28/10/2026). Como página de
+ * libro de cocina (30/10/2026): sin tarjetas ni etiquetas, y un riel que marca el paso y lleva a cualquiera.
  */
 export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']> }) {
   const [open, setOpen] = useState<number | null>(null);
   const track = useRef<HTMLOListElement>(null);
   // Hasta dónde se puede mover la franja: el botón de ese lado se apaga.
   const [ends, setEnds] = useState({ start: true, end: false });
+  // El paso que está al comienzo de la franja (lo marca el riel).
+  const [current, setCurrent] = useState(0);
   const measure = () => {
     const el = track.current;
-    if (el) setEnds({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
+    if (!el) return;
+    setEnds({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
+    const items = [...el.children] as HTMLElement[];
+    const first = items[0]?.offsetLeft ?? 0;
+    // Al final de la franja los últimos pasos no llegan al comienzo: se marca el último.
+    const at = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4
+      ? items.length - 1
+      : items.reduce((best, it, i) => (Math.abs(it.offsetLeft - first - el.scrollLeft) < Math.abs(items[best].offsetLeft - first - el.scrollLeft) ? i : best), 0);
+    setCurrent(at);
   };
   useEffect(measure, []);
   useSideArrows(track, 'start');
   const step = (dir: number) => track.current && stepTrack(track.current, dir, 'start');
+  const goTo = (n: number) => {
+    const el = track.current;
+    const items = el && ([...el.children] as HTMLElement[]);
+    if (el && items?.[n]) el.scrollTo({ left: items[n].offsetLeft - items[0].offsetLeft, behavior: 'smooth' });
+  };
   const photos = recipe.steps.flatMap((s) => s.photos);
   let at = 0;
   return (
     <>
-      <Backdrop photo={recipe.hero} tint="linear-gradient(90deg, rgba(6,14,11,.78), rgba(6,14,11,.45))" blur />
+      <Backdrop photo={recipe.hero} tint="linear-gradient(90deg, rgba(7,15,12,.86), rgba(7,15,12,.62))" blur />
       <div className="recipe reveal">
         <div className="recipe__text">
-          <p className="eyebrow">{recipe.eyebrow}</p>
           <h2>{recipe.title}</h2>
+          <p className="recipe__dek">{recipe.eyebrow}</p>
           <p className="recipe__intro">{recipe.intro}</p>
-          <p className="recipe__hint" aria-hidden="true">
-            {recipe.steps.length} pasos · <span className="recipe__hint-desk">flechas ← → del teclado</span><span className="recipe__hint-touch">deslizar →</span>
-          </p>
+          <nav className="recipe__rail" aria-label="Pasos de la receta">
+            {recipe.steps.map((_, n) => (
+              <button
+                key={n}
+                type="button"
+                className={n === current ? 'is-current' : undefined}
+                aria-current={n === current ? 'step' : undefined}
+                aria-label={`Paso ${n + 1} de ${recipe.steps.length}`}
+                onClick={() => goTo(n)}
+              />
+            ))}
+          </nav>
         </div>
         <div className="recipe__track">
         <ol className="recipe__steps" data-no-arrows="x" ref={track} onScroll={measure}>
@@ -611,8 +655,8 @@ export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']>
                     </button>
                   ))}
                 </div>
-                <p className="recipe__num">{n + 1} / {recipe.steps.length}</p>
-                <p className="recipe__body">{step.text}</p>
+                <p className="recipe__num" aria-label={`Paso ${n + 1}`}>{n + 1}</p>
+                <StepText text={step.text} />
               </li>
             );
           })}
