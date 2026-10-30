@@ -671,39 +671,42 @@ export function RecipePanel({ recipe }: { recipe: NonNullable<Station['recipe']>
   );
 }
 
-/** Los cantos de Chachita: al tocar la tarjeta suena el primero y aparece la lista; al terminar uno, sigue el otro. */
+/**
+ * Los cantos de Chachita, dentro de su tarjeta (30/10/2026): se ve el canto de turno con su botón; al terminar suena
+ * el siguiente, y con las flechas se pasa de uno a otro.
+ */
 function useSongs(list: { src?: string }[], active: boolean) {
   const audio = useRef<HTMLAudioElement | null>(null);
-  const [current, setCurrent] = useState<number | null>(null);
-  const [paused, setPaused] = useState(true);
-  const play = (i: number) => {
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const load = (i: number, autoplay: boolean) => {
     const src = list[i]?.src;
     if (!src) return;
     // Se crea dentro del toque: así el iPhone deja que suene.
     const a = (audio.current ??= new Audio());
-    if (current !== i) {
-      a.src = src;
-      a.onended = () => (i + 1 < list.length ? play(i + 1) : (setCurrent(null), setPaused(true)));
-      setCurrent(i);
-    }
-    void a.play().then(() => setPaused(false), () => setPaused(true));
+    a.ontimeupdate = () => setProgress(a.duration ? a.currentTime / a.duration : 0);
+    a.onplay = () => setPlaying(true);
+    a.onpause = () => setPlaying(false);
+    a.onended = () => (i + 1 < list.length ? load(i + 1, true) : (setIndex(0), setProgress(0)));
+    if (!a.src.endsWith(src)) a.src = src;
+    setIndex(i);
+    setProgress(0);
+    if (autoplay) void a.play().catch(() => setPlaying(false));
   };
-  const toggle = (i: number) => {
+  const toggle = () => {
     const a = audio.current;
-    if (current === i && a && !a.paused) {
-      a.pause();
-      setPaused(true);
-    } else play(i);
+    if (a && a.src && !a.paused) a.pause();
+    else if (a?.src) void a.play().catch(() => setPlaying(false));
+    else load(index, true);
   };
+  const go = (dir: number) => load((index + dir + list.length) % list.length, playing || !audio.current);
   // Al salir de la página, los cantos se callan.
   useEffect(() => {
-    if (!active && audio.current && !audio.current.paused) {
-      audio.current.pause();
-      setPaused(true);
-    }
+    if (!active) audio.current?.pause();
   }, [active]);
   useEffect(() => () => audio.current?.pause(), []);
-  return { current, paused, toggle };
+  return { index, playing, progress, toggle, go };
 }
 
 export function SongsPanel({ songs, active = false }: { songs: NonNullable<Station['songs']>; active?: boolean }) {
@@ -746,33 +749,35 @@ export function SongsPanel({ songs, active = false }: { songs: NonNullable<Stati
           )}
         </div>
         <div className="songs__item">
-          <button
-            type="button"
-            className="glass-card glass-card--song"
-            aria-pressed={player.current !== null && !player.paused}
-            onClick={() => (recorded ? player.toggle(player.current ?? 0) : setMsg('Los cantos se reproducirán cuando se entreguen las grabaciones.'))}
-          >
-            <span className="glass-card__icon" aria-hidden="true">♪</span>
-            <strong>Chachita canta</strong>
-            <span>{songs.songs.map((s) => s.title).join(' · ')}</span>
-          </button>
-          {player.current === null ? (
-            <PressHint desk="Presiona para escuchar la canción" touch="Toca para escuchar la canción" />
+          {recorded ? (
+            <div className={`glass-card glass-card--song song-card${player.playing ? ' is-playing' : ''}`}>
+              <span className="glass-card__icon" aria-hidden="true">♪</span>
+              <strong>Chachita canta</strong>
+              <p className="song-card__now" aria-live="polite">
+                <span className="song-card__count">{player.index + 1} de {songs.songs.length}</span>
+                {songs.songs[player.index].title}
+              </p>
+              <div className="song-card__bar" aria-hidden="true"><i style={{ transform: `scaleX(${player.progress})` }} /></div>
+              <div className="song-card__controls">
+                <button type="button" className="song-card__skip" onClick={() => player.go(-1)} aria-label="Canto anterior">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM14 3v10L6 8z" /></svg>
+                </button>
+                <button type="button" className="song-card__play" onClick={player.toggle} aria-label={`${player.playing ? 'Pausar' : 'Escuchar'} ${songs.songs[player.index].title}`}>
+                  <svg viewBox="0 0 16 16" aria-hidden="true">{player.playing ? <path d="M4 3h3v10H4zM9 3h3v10H9z" /> : <path d="M5 2.5v11l9-5.5z" />}</svg>
+                </button>
+                <button type="button" className="song-card__skip" onClick={() => player.go(1)} aria-label="Canto siguiente">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM2 3v10l8-5z" /></svg>
+                </button>
+              </div>
+            </div>
           ) : (
-            <ol className="songs__list">
-              {songs.songs.map((s, i) => {
-                const on = player.current === i && !player.paused;
-                return (
-                  <li key={s.title}>
-                    <button type="button" className={`songs__track${player.current === i ? ' is-current' : ''}`} onClick={() => player.toggle(i)} aria-label={`${on ? 'Pausar' : 'Escuchar'} ${s.title}`}>
-                      <svg viewBox="0 0 16 16" aria-hidden="true">{on ? <path d="M4 3h3v10H4zM9 3h3v10H9z" /> : <path d="M4 2.5v11l9-5.5z" />}</svg>
-                      {s.title}
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
+            <button type="button" className="glass-card glass-card--song" onClick={() => setMsg('Los cantos se reproducirán cuando se entreguen las grabaciones.')}>
+              <span className="glass-card__icon" aria-hidden="true">♪</span>
+              <strong>Chachita canta</strong>
+              <span>{songs.songs.map((s) => s.title).join(' · ')}</span>
+            </button>
           )}
+          <PressHint desk="Presiona para escuchar la canción" touch="Toca para escuchar la canción" />
         </div>
       </div>
       {msg && <p className="notice notice--float" role="status">{msg}</p>}
