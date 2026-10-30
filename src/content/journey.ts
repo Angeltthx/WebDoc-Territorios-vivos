@@ -239,7 +239,7 @@ export const stations: Station[] = [
       },
       songs: [
         { title: 'Llorilé', sub: 'Chachita canta' },
-        { title: 'morenitanuquiseña', sub: 'Chachita canta' },
+        { title: 'Morenita Nuquiseña', sub: 'Chachita canta' },
       ],
     },
     viche: {

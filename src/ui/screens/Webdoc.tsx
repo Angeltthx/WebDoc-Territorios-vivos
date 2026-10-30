@@ -197,7 +197,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
             {!t.video && <TransitionSymbol kind={t.symbol} />}
             {t.lines.map((line, i) => (
               <p key={i} className={i === 0 ? 'transition__quote' : 'transition__line'} style={{ animationDelay: `${0.4 + i * 0.9}s` }}>
-                {i === 0 ? `"${line}"` : line}
+                {i === 0 ? `“${line}”` : line}
               </p>
             ))}
             {t.hint && <p className="transition__hint">{t.hint}</p>}
