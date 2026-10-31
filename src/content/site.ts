@@ -83,9 +83,9 @@ export const menu: MenuItem[] = [
 
 export type SocialNetwork = 'youtube' | 'instagram' | 'tiktok';
 
-/** YouTube es el canal oficial (30/09/2026) y TikTok, la cuenta del cliente (27/10/2026); Instagram sigue siendo de prueba. */
+/** YouTube es el canal oficial (30/09/2026) y TikTok, la cuenta del cliente (27/10/2026); Instagram, la cuenta del cliente (30/10/2026). */
 export const social: { network: SocialNetwork; label: string; url?: string }[] = [
   { network: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/channel/UCOIVYoUtKmyV9HW7j-QgUfg' },
-  { network: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/territorios_vivos/' },
+  { network: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/territoriosvivoscol/' },
   { network: 'tiktok', label: 'TikTok', url: 'https://www.tiktok.com/@territoriosvivos' },
 ];
