@@ -130,7 +130,7 @@ export const SCHEMA = [
   `create table if not exists visitas_personas (dia date not null, huella text not null, movil boolean not null default false, primary key (dia, huella))`,
   // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
   `insert into productos (sku, nombre, precio, existencias)
-    values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 85000, 10)
+    values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 50000, 10)
     on conflict (sku) do nothing`,
 ];
 

@@ -43,7 +43,7 @@ export const SHOP_ITEMS: ShopItem[] = [
       { src: '/media/tienda/poster-rana.webp', alt: 'Detalle: la rana arlequín' },
     ],
     sizes: [
-      { id: 'pliego', sku: 'poster-mapa-pliego', label: 'Pliego', detail: '70 × 100 cm', price: 85000 },
+      { id: 'pliego', sku: 'poster-mapa-pliego', label: 'Pliego', detail: '70 × 100 cm', price: 50000 },
     ],
     description: [
       'El mismo mapa que acompaña el recorrido de Territorios Vivos, para tenerlo en la pared de la casa. La costa de Nuquí de norte a sur, con Jurubidá, Tribugá, Nuquí, Pangui y Coquí, y lo que vive en ella: la ballena jorobada, la tortuga golfina, el cangrejo fantasma, la pava del Baudó y la rana arlequín.',
