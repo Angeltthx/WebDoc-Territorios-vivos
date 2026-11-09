@@ -1,7 +1,8 @@
 // Mapa de ubicación de la estación (pedido del cliente, 19/10/2026): en línea blanca y fondo transparente, con un punto
 // por estación: la de la página, grande y con su nombre; las demás, pequeñas.
 // - Las estaciones de Nuquí (Chorí, Nuquí, Panguí): el mapa de Nuquí del cliente (30/10/2026, scripts/map-nuqui.mjs) y,
-//   en la esquina libre, el Chocó con Nuquí en dorado.
+//   en la esquina libre, Colombia con el Chocó en dorado y, debajo, el Chocó con Nuquí en dorado (09/11/2026: Colombia
+//   y el Chocó van en todas las estaciones).
 // - Quibdó (el Atrato) queda fuera de Nuquí: el Chocó grande con sus municipios y, en una esquina, Colombia
 //   (scripts/map-locator.mjs).
 
@@ -22,6 +23,9 @@ const inNuqui = (s: Station) => {
 
 /** El Chocó pequeño junto al mapa de Nuquí: escala sobre las unidades de LOCATOR. */
 const CHOCO_SCALE = 0.17;
+/** Colombia, encima del Chocó pequeño: escala sobre su caja (LOCATOR.inset) y dónde empieza el Chocó debajo de ella. */
+const COLOMBIA_SCALE = 0.7;
+const CHOCO_Y = LOCATOR.inset.height * COLOMBIA_SCALE + 22;
 
 export function StationLocator({ station }: { station: Station }) {
   return inNuqui(station) ? <NuquiLocator station={station} /> : <ChocoLocator station={station} />;
@@ -51,11 +55,17 @@ function NuquiLocator({ station }: { station: Station }) {
         {/* El nombre, debajo de la tierra: dentro chocaba con el de la estación. */}
         <text className="locator__name" x={NUQUI.width * 0.4} y={NUQUI.height + 22} textAnchor="middle">Nuquí</text>
 
-        <g transform={`translate(2 2) scale(${CHOCO_SCALE})`}>
+        <g transform={`scale(${COLOMBIA_SCALE})`}>
+          <path className="locator__colombia" d={LOCATOR.inset.colombia} />
+          <path className="locator__inset-choco" d={LOCATOR.inset.choco} />
+        </g>
+        <text className="locator__small" x={(LOCATOR.inset.width * COLOMBIA_SCALE) / 2} y={LOCATOR.inset.height * COLOMBIA_SCALE + 10} textAnchor="middle">Colombia</text>
+
+        <g transform={`translate(2 ${CHOCO_Y}) scale(${CHOCO_SCALE})`}>
           <path className="locator__inset-outline" d={LOCATOR.choco} />
           <path className="locator__inset-choco" d={LOCATOR.nuqui} />
         </g>
-        <text className="locator__small" x={2 + (LOCATOR.width * CHOCO_SCALE) / 2} y={LOCATOR.height * CHOCO_SCALE + 14} textAnchor="middle">Chocó</text>
+        <text className="locator__small" x={2 + (LOCATOR.width * CHOCO_SCALE) / 2} y={CHOCO_Y + LOCATOR.height * CHOCO_SCALE + 12} textAnchor="middle">Chocó</text>
 
         {stations.filter((s) => s.id !== station.id && inNuqui(s)).map((s) => {
           const [sx, sy] = NUQUI.at(s.where.lat, s.where.lon);

@@ -7,8 +7,9 @@ import { clearTrack, initAudioUnlock, isMuted, playTransition, preloadTrack, set
 import { Backdrop } from '../components/Media';
 import {
   Arrow, ChachitaTag, CreditMark, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
-  StationGuide, TopBar, TransitionSymbol, useJourneyNav,
+  TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
+import { AboutButton } from '../components/InfoDialog';
 import { FramedVideo, GalleryPanel, QuotePanel, RecipePanel, SongsPanel, VideoPanel } from '../components/Sections';
 import { ScrollCue } from '../components/ScrollCue';
 import { StationLocator } from '../components/StationLocator';
@@ -20,7 +21,6 @@ import { StationLocator } from '../components/StationLocator';
 export function Webdoc() {
   const scroller = useRef<HTMLDivElement>(null);
   const { active, scrollToIndex, scrollToPage } = useScrollJourney(scroller);
-  const [guideOpen, setGuideOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Páginas ya vistas: sus animaciones de entrada corren una vez, al llegar a ellas.
   const [seen, setSeen] = useState(() => new Set([active]));
@@ -50,7 +50,6 @@ export function Webdoc() {
   // Estables: al pasar de página solo se vuelven a dibujar las páginas que cambian (la que llega, la que se va y sus
   // vecinas), no las 24.
   const unmute = useCallback(() => muted && toggleSound(), [muted, toggleSound]);
-  const openGuide = useCallback(() => setGuideOpen(true), []);
 
   const nav = useMemo(() => ({ scrollToPage, scrollToIndex, inJourney: true }), [scrollToPage, scrollToIndex]);
 
@@ -75,13 +74,13 @@ export function Webdoc() {
                 near={Math.abs(i - active) <= 1}
                 muted={muted}
                 unmute={unmute}
-                openGuide={openGuide}
               />
             </section>
           );
         })}
       </main>
-      <ScrollCue page={active} off={pages[active].kind === 'closing'} onNext={() => scrollToIndex(active + 1)} />
+      {/* En la bienvenida la invitación es su propio botón, «Comenzar el viaje» (ver Welcome). */}
+      <ScrollCue page={active} off={pages[active].kind === 'closing' || pages[active].kind === 'welcome'} onNext={() => scrollToIndex(active + 1)} />
       <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} current={pages[active].id} />
       <div className="dock">
         <button
@@ -94,10 +93,10 @@ export function Webdoc() {
         >
           {muted ? <SoundOff /> : <SoundOn />}
         </button>
+        <AboutButton />
         <SocialLinks />
       </div>
       <CreditMark />
-      <StationGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </JourneyNav.Provider>
   );
 }
@@ -109,7 +108,7 @@ function voiceOf(spec: PageSpec): string | null {
 
 const StackPage = memo(PageView);
 
-function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
+function PageView({ spec, next, playing, near, muted, unmute }: {
   spec: PageSpec;
   /** Página siguiente del recorrido (para la invitación a seguir bajando). */
   next?: string;
@@ -119,21 +118,15 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
   muted: boolean;
   /** Activa el sonido del webdoc (si estaba silenciado): la persona pidió escuchar. */
   unmute: () => void;
-  openGuide: () => void;
 }) {
   const { scrollToIndex, scrollToPage } = useJourneyNav();
   switch (spec.kind) {
     case 'welcome':
       return (
         <div className="screen screen--welcome" aria-labelledby="wt">
-          <Welcome playing={playing} muted={muted} unmute={unmute} />
-          <TopBar plain label="Bienvenida" right={<GuideButton onOpen={() => scrollToPage('cierre')}>Ver mapa interactivo</GuideButton>} />
-          <div className="welcome__start">
-            <button type="button" className="start-btn" onClick={() => scrollToIndex(1)}>
-              Comenzar el viaje
-              <Arrow dir="down" />
-            </button>
-          </div>
+          <Welcome playing={playing} muted={muted} unmute={unmute} onStart={() => scrollToIndex(1)} />
+          {/* Sin el rótulo «Bienvenida» (pedido del cliente, 09/11/2026). */}
+          <TopBar right={<GuideButton onOpen={() => scrollToPage('cierre')} />} />
         </div>
       );
 
@@ -142,7 +135,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><QuotePanel station={getStation(spec.station)!} /></div>
           <StationLocator station={getStation(spec.station)!} />
-          <TopBar label={spec.label} right={<GuideButton onOpen={openGuide} />} />
+          <TopBar label={spec.label} right={<GuideButton onOpen={() => scrollToPage('cierre')} />} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
@@ -190,7 +183,7 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
           {t.video && <TransitionVideo id={t.video} playing={playing} near={near} shade={t.lines.length > 0} fit={t.fit} />}
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
-          <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={<ChachitaTag plain={onPhoto} />} />
+          <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={spec.index > 0 ? <ChachitaTag plain={onPhoto} /> : undefined} />
           <div className="transition">
             {!t.video && <TransitionSymbol kind={t.symbol} />}
             {t.lines.map((line, i) => (
@@ -225,14 +218,14 @@ function PageView({ spec, next, playing, near, muted, unmute, openGuide }: {
   }
 }
 
-/** Pie de las páginas de estación: invitación a seguir bajando y pestañas. */
+/** Pie de las páginas de estación: invitación a seguir navegando y pestañas. */
 function StationFoot({ tabs, next }: { tabs: Tabs; next?: string }) {
   const { scrollToPage } = useJourneyNav();
   return (
     <footer className="page-foot">
       {next && (
-        <button type="button" className="scroll-hint" onClick={() => scrollToPage(next)} aria-label="Seguir bajando">
-          Sigue bajando
+        <button type="button" className="scroll-hint" onClick={() => scrollToPage(next)} aria-label="Seguir navegando">
+          Sigue navegando
           <Arrow dir="down" />
         </button>
       )}
@@ -249,10 +242,20 @@ type Listen = 'idle' | 'listening' | 'heard';
  * arranca en silencio y en bucle, y un botón claro bajo el logo invita a escucharla: al tocarlo empieza desde el
  * principio, con sonido. Al terminar sigue en bucle, en silencio, y el botón ofrece escucharla otra vez.
  */
-function Welcome({ playing, muted, unmute }: { playing: boolean; muted: boolean; unmute: () => void }) {
+function Welcome({ playing, muted, unmute, onStart }: { playing: boolean; muted: boolean; unmute: () => void; onStart: () => void }) {
   const ref = useRef<HTMLVideoElement>(null);
   const small = useMemo(() => window.matchMedia('(max-width: 900px)').matches, []);
   const [listen, setListen] = useState<Listen>('idle');
+  // «Comenzar el viaje» aparece apenas Chachita deja de hablar (pedido del cliente, 09/11/2026): mientras se la escucha
+  // no está. Si nadie pide escucharla (el video corre en silencio), aparece a los pocos segundos, para no dejar la
+  // portada sin salida.
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    if (!playing) return;
+    const t = window.setTimeout(() => setWaited(true), START_WAIT_MS);
+    return () => window.clearTimeout(t);
+  }, [playing]);
+  const canStart = listen === 'heard' || (listen === 'idle' && waited);
   // De fondo: en silencio y en bucle.
   const quiet = (v: HTMLVideoElement) => {
     v.muted = true;
@@ -347,9 +350,18 @@ function Welcome({ playing, muted, unmute }: { playing: boolean; muted: boolean;
           </span>
         </button>
       </div>
+      <div className={`welcome__start${canStart ? ' is-ready' : ''}`}>
+        <button type="button" className="start-btn" onClick={onStart} tabIndex={canStart ? 0 : -1} aria-hidden={!canStart}>
+          Comenzar el viaje
+          <Arrow dir="down" />
+        </button>
+      </div>
     </>
   );
 }
+
+/** Lo que espera «Comenzar el viaje» en la portada cuando nadie pide escuchar la bienvenida. */
+const START_WAIT_MS = 6000;
 
 /** Versión de los videos de transición: los archivos conservan su nombre y /media se guarda en caché
  *  un año, así que al recibir videos nuevos se cambia este valor para que el navegador los vuelva a pedir. */
@@ -357,7 +369,8 @@ const TRANSITIONS_VERSION = '2026-10-13';
 
 /**
  * El mapa del recorrido en cada transición, para que la gente sepa dónde va: un río con las paradas (Inicio, Chorí,
- * Atrato, Nuquí, Panguí, Mar) y sus nombres. Por lo ya andado el agua corre sin parar; lo que falta queda punteado. Al
+ * Atrato, Nuquí, Panguí, Mar) y sus nombres. Se queda a la vista toda la transición (pedido del cliente, 09/11/2026; antes
+ * se desvanecía a los 6 s). Por lo ya andado el agua corre sin parar; lo que falta queda punteado. Al
  * llegar a la transición, el agua baja por el tramo nuevo con una gota al frente y, cuando llega, la parada siguiente
  * se ilumina y hace ondas (28/10/2026). Cada vez que se vuelve a la transición, el agua vuelve a correr.
  */

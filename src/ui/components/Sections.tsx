@@ -3,6 +3,7 @@ import type { Photo, Station, VideoAsset } from '../../domain/types';
 import { aspectOf, Backdrop, Img } from './Media';
 import { Arrow } from './Chrome';
 import { Portal } from './Portal';
+import { HowToArrive, Synopsis } from './InfoDialog';
 
 // La experiencia 360 (three.js + hls.js) solo se descarga cuando alguien la abre.
 const Panorama360 = lazy(() => import('./Panorama360'));
@@ -11,12 +12,17 @@ export function QuotePanel({ station }: { station: Station }) {
   const { quote } = station;
   return (
     <>
-      <Backdrop photo={quote.portrait} tint="linear-gradient(90deg, rgba(6,14,11,.7) 0%, rgba(6,14,11,.35) 55%, rgba(6,14,11,.15) 100%)" />
+      {/* Con filtro también del lado del mapa, para que se lea sobre cualquier retrato (pedido del cliente, 09/11/2026). */}
+      <Backdrop photo={quote.portrait} tint="linear-gradient(90deg, rgba(6,14,11,.72) 0%, rgba(6,14,11,.42) 50%, rgba(6,14,11,.66) 100%)" />
       <div className="quote reveal">
         <blockquote>
           <p>“{quote.text}”</p>
         </blockquote>
         <p className="quote__author">{quote.author}</p>
+        <ul className="tips" aria-label="Turismo sostenible">
+          {station.tips.map((tip) => <li key={tip}>{tip}</li>)}
+        </ul>
+        <HowToArrive station={station} />
       </div>
     </>
   );
@@ -25,7 +31,7 @@ export function QuotePanel({ station }: { station: Station }) {
 const toSeconds = (t: string) => t.split(':').reduce((acc, n) => acc * 60 + Number(n), 0);
 
 /** «Presiona para…»: debajo de lo que hay que presionar (un video, el 360, una canción), a los pocos segundos de
- * llegar a la página, con la flecha del recorrido apuntando arriba y el mismo palpitar de «Sigue bajando». */
+ * llegar a la página, con la flecha del recorrido apuntando arriba y el mismo palpitar de «Sigue navegando». */
 export function PressHint({ desk, touch }: { desk: string; touch: string }) {
   return (
     <p className="play-hint" aria-hidden="true">
@@ -53,8 +59,9 @@ export function FramedVideo({ video, background, note, active = false }: { video
   return (
     <>
       <Backdrop photo={background} tint="rgba(8,16,14,.55)" blur />
-      <div className="trailer reveal">
+      <div className={`trailer reveal${video.synopsis ? ' trailer--synopsis' : ''}`}>
         <div className="trailer__frame"><VideoPanel video={video} active={active} /></div>
+        {video.synopsis && <Synopsis title={video.title} text={video.synopsis} />}
         {note && <p className="trailer__note">{TRAILER_NOTE}</p>}
       </div>
     </>

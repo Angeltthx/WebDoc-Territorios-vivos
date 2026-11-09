@@ -1,4 +1,4 @@
-// Señal de seguir bajando: abajo, con la letra del webdoc, «Sigue bajando» (en el celular, «Desliza para seguir») y la
+// Señal de seguir bajando: abajo, con la letra del webdoc, «Sigue navegando» (en el celular, «Desliza para seguir») y la
 // flecha del recorrido, que se mece y palpita suave. Tocarla pasa de página.
 // Está en todas las páginas menos en la última, el mapa (pedido del cliente, 19/10/2026: antes solo aparecía al
 // terminar el video o tras un rato quieta, y la gente no sabía que había que seguir). Solo se aparta mientras corre el
@@ -9,11 +9,11 @@ import { Arrow } from './Chrome';
 
 /** Lo que tarda en aparecer al llegar a una página (que primero se vea la página). */
 const ENTER_MS = 1200;
-/** Cada cuánto se mira si hay un video corriendo o una ventana abierta, y dónde queda el «Sigue bajando» de la página. */
+/** Cada cuánto se mira si hay un video corriendo o una ventana abierta, y dónde queda el «Sigue navegando» de la página. */
 const CHECK_MS = 400;
 
-/** Lo que la página ya tiene para seguir («Sigue bajando», «Comenzar el viaje»): la señal toma su lugar y su texto. */
-const ANCHOR = '.stack-page.is-active .scroll-hint, .stack-page.is-active .start-btn';
+/** Lo que la página ya tiene para seguir («Sigue navegando»): la señal toma su lugar y su texto. */
+const ANCHOR = '.stack-page.is-active .scroll-hint';
 
 /** Aire entre la flecha y las pestañas de abajo (px). */
 const ABOVE_TABS = 6;
@@ -28,9 +28,9 @@ function busy() {
 export function ScrollCue({ page, off, onNext }: { page: number; off: boolean; onNext: () => void }) {
   const [shown, setShown] = useState(false);
   const self = useRef<HTMLButtonElement>(null);
-  /** Dónde va (sobre el «Sigue bajando» de la página, si lo tiene) y qué dice. Se ubica desde arriba: en el iPhone la
+  /** Dónde va (sobre el «Sigue navegando» de la página, si lo tiene) y qué dice. Se ubica desde arriba: en el iPhone la
    * barra de Safari cambia el alto de la ventana, y medida desde abajo la flecha caía sobre las pestañas (29/10/2026). */
-  const [place, setPlace] = useState<{ top: number | null; label: string }>({ top: null, label: 'Sigue bajando' });
+  const [place, setPlace] = useState<{ top: number | null; label: string }>({ top: null, label: 'Sigue navegando' });
 
   useEffect(() => {
     setShown(false);
@@ -39,7 +39,7 @@ export function ScrollCue({ page, off, onNext }: { page: number; off: boolean; o
       const a = document.querySelector<HTMLElement>(ANCHOR);
       const r = a?.getBoundingClientRect();
       const top = r && r.height ? Math.round(r.bottom - (self.current?.offsetHeight ?? 0) - ABOVE_TABS) : null;
-      const label = a?.textContent?.trim() || 'Sigue bajando';
+      const label = a?.textContent?.trim() || 'Sigue navegando';
       setPlace((p) => (p.top === top && p.label === label ? p : { top, label }));
       setShown(!busy());
     };

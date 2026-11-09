@@ -35,6 +35,8 @@ export interface VideoAsset {
    * espera es la de `stream`. */
   youtube?: string;
   tint?: string;
+  /** Sinopsis del documental, por párrafos (pedido del cliente, 09/11/2026). */
+  synopsis?: string[];
 }
 
 export interface Section {
@@ -53,6 +55,10 @@ export interface Station {
   illustration: string;
   background: Photo;
   quote: { text: string; author: string; portrait: Photo };
+  /** Frases sobre turismo sostenible, en el Pensamiento de la estación (pedido del cliente, 09/11/2026). */
+  tips: string[];
+  /** Infografía «Cómo llegar» (public/media/infografias, npm run media:infografias). El Atrato aún no tiene. */
+  howTo?: { image: string; place: string };
   sections: Section[];
   video?: VideoAsset;
   gallery?: { intro: string; background: Photo; photos: Photo[] };

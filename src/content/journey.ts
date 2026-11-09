@@ -43,8 +43,51 @@ const PLACES: Record<string, string> = {
   'estacion-1': 'Chorí', 'estacion-2': 'Atrato', 'estacion-3': 'Nuquí', 'estacion-4': 'Panguí',
 };
 
+// Descripción de cada fotografía, escrita por el cliente (09/11/2026), en el orden de la galería. Por ahora, la estación 1.
+const CAPTIONS: Partial<Record<keyof typeof galleries, string[]>> = {
+  'estacion-1': [
+    'Garza blanca a orillas del río Chorí.',
+    'Indígena Emberá en el tambo.',
+    'Lizandro Dumasa.',
+    'Vivienda Emberá.',
+    'Indígenas jóvenes pilando el arroz que cultivan allí.',
+    'Calle de tierra y casas de la comunidad Emberá.',
+    'Niña Emberá en casa Emberá.',
+    'Calles y casas del pueblo Emberá.',
+    'Indígena Emberá con mazo en el pilón.',
+    'Indígena Emberá sembrando cebolla en huerta casera.',
+    'Indígena Emberá sembrando cebolla en microhuerta.',
+    'Niña indígena Emberá en casa.',
+    'Niños de la comunidad Emberá.',
+    'Niños hermanos de la comunidad Emberá.',
+    'Indígena Emberá haciendo artesanías. Bisutería en chaquiras.',
+    'Jóvenes Emberá después de jugar un partido de fútbol.',
+    'Jóvenes Emberá sonriendo después de jugar un partido de fútbol.',
+    'Familias Emberá.',
+    'Indígenas Emberá pintando su cuerpo con pintura de jagua (Genipa americana) o kipará.',
+    'Las mujeres plasman en la piel (tanto propia como en la de los hombres) intrincados diseños geométricos temporales.',
+    'Estas figuras representan ciclos vitales, estados de ánimo, protección contra malas energías o conexión con la naturaleza.',
+    'Casa tradicional Emberá, conocida como tambo.',
+    'Padre e hijo Emberá caminando en la etnoaldea.',
+    'Indígena haciendo hoguera para la preparación de alimentos.',
+    'Indígena rallando plátano para su receta.',
+    'Danza tradicional Emberá en tambo ceremonial.',
+    'Músicos Emberá tocando para la danza tradicional.',
+    'Músicos con instrumentos de material reutilizable.',
+    'Músico y mujeres Emberá bailando en tambo.',
+    'Músicos con tambora y niños Emberá apreciando el baile.',
+    'Flauta y mujeres Emberá danzando.',
+    'Mujeres Emberá bailando y la comunidad apreciando.',
+    'Mujeres de la comunidad Emberá con atuendo de danza.',
+    'Río Chorí desde lo alto, comunidad Boca de Jagua.',
+    'Vegetación y entorno de la comunidad Boca de Jagua.',
+  ],
+};
+
 const gallery = (key: keyof typeof galleries): Photo[] =>
   galleries[key].map((id, i) => {
+    const text = CAPTIONS[key]?.[i];
+    if (text) return { id, alt: text, caption: text };
     const d = DESCRIBED[id.replace(/-\d{1,2}$/, '')];
     const drone = id.startsWith('dji-');
     return { id, alt: d?.alt ?? `${PLACES[key]} · fotografía ${i + 1}${drone ? ', vista desde el aire' : ''}`, caption: d?.caption };
@@ -65,6 +108,8 @@ export const stations: Station[] = [
       author: 'Lizandro Dumasa',
       portrait: p('6i3a3782', 'Retrato de Lizandro Dumasa', { focus: '62% 35%' }),
     },
+    tips: ['Más que conocer un destino, descubre las historias que lo hacen único.'],
+    howTo: { image: 'estacion-1', place: 'Kipará Té' },
     sections: [
       { kind: 'pensamiento', label: 'Pensamiento' },
       { kind: 'historia', label: 'Tráiler historia' },
@@ -139,6 +184,10 @@ export const stations: Station[] = [
       author: 'Harold Vergara',
       portrait: p('6i3a5673', 'Retrato de Harold Vergara junto a las canoas', { focus: '50% 35%' }),
     },
+    tips: [
+      'El mejor viaje es aquel que transforma nuestra manera de mirar el mundo.',
+      'Apoya lo local: consume, compra y contrata servicios de las comunidades.',
+    ],
     sections: [
       { kind: 'pensamiento', label: 'Pensamiento' },
       { kind: 'historia', label: 'Tráiler historia' },
@@ -169,6 +218,8 @@ export const stations: Station[] = [
       author: 'Orfelina Marmolejo',
       portrait: p('6i3a3478', 'Orfelina Marmolejo abraza a una niña', { focus: '45% 30%' }),
     },
+    tips: ['Las tradiciones se mantienen vivas cuando las conocemos y respetamos.'],
+    howTo: { image: 'estacion-3', place: 'Nuquí' },
     sections: [
       { kind: 'pensamiento', label: 'Pensamiento' },
       { kind: 'historia', label: 'Tráiler historia' },
@@ -209,6 +260,8 @@ export const stations: Station[] = [
       author: 'Ruth “Chachita” Martínez',
       portrait: p('6i3a4281', 'Una mujer toca las ramas del manglar', { focus: '55% 30%' }),
     },
+    tips: ['Valora los saberes locales: son parte de la riqueza del territorio.'],
+    howTo: { image: 'estacion-4', place: 'Panguí' },
     sections: [
       { kind: 'pensamiento', label: 'Pensamiento' },
       { kind: 'historia', label: 'Tráiler historia' },
