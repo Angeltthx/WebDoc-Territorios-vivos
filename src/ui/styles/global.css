@@ -183,13 +183,21 @@ html { -webkit-tap-highlight-color: transparent; }
   .listen__text strong { font-size: 14px; }
   .listen__text small { font-size: 10px; letter-spacing: 0.1em; }
 }
-.welcome__start { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 0; right: 0; display: grid; justify-items: center; animation: fade 1s ease 1.2s both; }
-.start-btn {
-  display: grid; justify-items: center; gap: 2px; border: 0; background: none; padding: 10px 18px; min-height: 44px;
-  font-size: 13px; letter-spacing: 0.26em; text-transform: uppercase;
+/* «Comenzar el viaje»: aparece apenas Chachita deja de hablar (ver Welcome), más grande y pasando del blanco al
+   amarillo y de vuelta, con la flecha meciéndose (pedido del cliente, 09/11/2026). */
+.welcome__start {
+  position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 0; right: 0; display: grid; justify-items: center;
+  opacity: 0; visibility: hidden; translate: 0 10px; transition: opacity 0.9s var(--ease), translate 1s var(--ease), visibility 0s 0.9s;
 }
-.start-btn svg { animation: bob 1.8s ease-in-out infinite; }
-.start-btn:hover { color: var(--gold); }
+.welcome__start.is-ready { opacity: 1; visibility: visible; translate: 0 0; transition-delay: 0s; }
+.start-btn {
+  display: grid; justify-items: center; gap: 4px; border: 0; background: none; padding: 10px 22px; min-height: 44px;
+  font-size: clamp(16px, 1.5vw, 19px); font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); animation: start-glow 2.4s ease-in-out infinite;
+}
+.start-btn svg { width: 26px; height: 26px; animation: bob 1.4s ease-in-out infinite; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
+.start-btn:hover { color: var(--gold); animation: none; }
+@keyframes start-glow { 0%, 100% { color: #fff; } 50% { color: var(--gold); } }
 /* «Una producción de Doinmedia»: marca de agua en la esquina inferior derecha de todas las páginas (28/10/2026). */
 .credit-mark {
   position: fixed; z-index: 50; right: 22px; bottom: max(18px, env(safe-area-inset-bottom)); margin: 0; pointer-events: none;
@@ -210,6 +218,48 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 .quote blockquote p { font: italic 400 clamp(22px, 2.8vw, 38px)/1.4 var(--sans); }
 .quote__author { margin-top: 16px; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; }
 .quote.reveal { animation-name: rise-y; }
+/* Frases de turismo sostenible, bajo el pensamiento (pedido del cliente, 09/11/2026): con una hoja dorada. */
+.tips { list-style: none; margin: clamp(18px, 3vh, 30px) 0 0; padding: 14px 0 0; display: grid; gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.28); max-width: 480px; }
+.tips li { position: relative; padding-left: 26px; font: 400 clamp(14px, 1.15vw, 16px)/1.5 var(--sans); text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55); }
+.tips li::before {
+  content: ''; position: absolute; left: 0; top: 0.28em; width: 16px; height: 16px; background: var(--gold);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M17.5 2.5c-8 0-13 3.6-13 9.3 0 1 .2 1.9.6 2.7C7 10.300 10 8 13.500 6.500 10.300 8.800 7.800 11.700 6.200 15.500l-1 2.400 1.500.600.800-2c.900.400 1.900.600 2.900.600 5.200 0 7.100-5.600 7.100-14.600Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* «Cómo llegar»: el círculo con el alfiler abre la infografía de la estación. */
+.howto {
+  margin-top: 16px; display: inline-flex; align-items: center; gap: 12px; padding: 0; min-height: 46px; border: 0; background: none; color: #fff;
+  text-align: left; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55); cursor: pointer;
+}
+.howto__icon {
+  position: relative; flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%;
+  border: 1.5px solid var(--gold); background: rgba(6, 18, 14, 0.45); color: var(--gold); transition: background 0.25s, color 0.25s;
+}
+.howto__icon::after { content: ''; position: absolute; inset: -1.5px; border-radius: 50%; border: 1.5px solid var(--gold); opacity: 0; animation: listen-ring 2.6s ease-out 2.4s infinite; }
+.howto:hover .howto__icon { background: var(--gold); color: var(--forest); }
+.howto__text { display: grid; font: 600 12px/1.3 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; }
+.howto__text small { font: italic 400 13px/1.3 var(--sans); letter-spacing: 0.02em; text-transform: none; opacity: 0.85; }
+
+/* ───────── Ventanas de información (ver InfoDialog) ─────────
+   Qué es Territorios Vivos, la sinopsis de un documental (tarjeta oscura) y la infografía «Cómo llegar» (la imagen
+   completa, que se recorre hacia abajo). */
+.info { padding: 0; border: 0; background: none; color: #fff; max-width: none; max-height: none; overflow: visible; }
+.info[open] { animation: rise 0.4s var(--ease) both; }
+.info::backdrop { background: rgba(4, 12, 10, 0.74); backdrop-filter: blur(5px); }
+.info__close { position: absolute; top: 10px; right: 10px; background: rgba(6, 18, 14, 0.7); color: #fff; }
+.info--card { width: min(620px, calc(100vw - 28px)); }
+.info--card .info__body {
+  max-height: calc(100dvh - 40px); overflow-y: auto; padding: clamp(24px, 4vw, 40px); padding-right: clamp(54px, 6vw, 64px);
+  border-radius: 18px; background: rgba(13, 30, 24, 0.96); border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+.info--card .eyebrow { color: var(--gold); margin: 0; }
+.info--card h2 { margin: 6px 0 14px; font: 600 italic clamp(24px, 3vw, 32px)/1.2 var(--serif); }
+.info--card h2 em { color: var(--gold); }
+.info--card p:not(.eyebrow) { margin: 0; font-size: clamp(15px, 1.3vw, 17px); line-height: 1.65; color: rgba(255, 255, 255, 0.92); }
+.info--card p + p:not(.eyebrow) { margin-top: 12px; }
+.info--poster { width: min(560px, calc(100vw - 20px)); }
+.info--poster .info__body { max-height: calc(100dvh - 24px); overflow-y: auto; border-radius: 14px; background: #f6f3ea; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55); overscroll-behavior: contain; }
+.info--poster img { display: block; width: 100%; height: auto; }
+.dock__about { cursor: pointer; }
 @keyframes rise-y { from { opacity: 0; transform: translateY(calc(-50% + 20px)); } to { opacity: 1; transform: translateY(-50%); } }
 
 /* ───────── Video ───────── */
@@ -250,6 +300,19 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
   border-radius: 10px; background: #000; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
 }
 .trailer__frame:fullscreen { border-radius: 0; }
+/* Con la sinopsis del documental debajo (09/11/2026): sus primeras líneas y un enlace que la abre completa. El recuadro
+   cede un poco de alto para que todo quepa sobre «Sigue navegando» y las pestañas. */
+.trailer--synopsis { gap: clamp(10px, 1.8vh, 18px); }
+.trailer--synopsis .trailer__frame { width: min(880px, 100%, calc((100vh - 425px) * 16 / 9)); }
+.synopsis { max-width: 720px; text-align: center; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
+.synopsis__lead { margin: 0; font-size: clamp(13px, 1.2vw, 15px); line-height: 1.55; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.synopsis__lead strong { font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.82em; color: var(--gold); }
+.synopsis__more {
+  margin-top: 2px; padding: 6px 8px; min-height: 32px; border: 0; background: none; color: var(--gold); cursor: pointer;
+  font: 600 11.5px var(--sans); letter-spacing: 0.16em; text-transform: uppercase; text-decoration: underline; text-underline-offset: 4px; text-shadow: inherit;
+}
+.synopsis__more:hover { color: #fff; }
+.trailer--synopsis .trailer__note { font-size: clamp(12px, 1.05vw, 14px); line-height: 1.5; opacity: 0.88; }
 .trailer__frame .story__title { font-size: 14px; }
 .trailer__frame .play-hint { display: none; }
 /* YouTube: su reproductor ocupa el recuadro al presionar el video; antes, nuestra imagen de espera. */
@@ -260,7 +323,10 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 .trailer__note { margin: 0; max-width: 680px; text-align: center; font-size: clamp(13px, 1.25vw, 15.5px); line-height: 1.6; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
 @media (max-width: 640px) {
   .trailer { padding: 70px 16px 140px; }
-  .trailer__frame { width: 100%; }
+  .trailer__frame, .trailer--synopsis .trailer__frame { width: 100%; }
+  .synopsis__lead { font-size: 13.5px; -webkit-line-clamp: 3; line-clamp: 3; }
+  .synopsis__more { min-height: 44px; }
+  .trailer--synopsis .trailer__note { font-size: 12.5px; line-height: 1.45; }
   .trailer__note { padding: 0 4px; font-size: 14px; line-height: 1.55; }
 }
 .story.is-idle .story__controls { opacity: 0; pointer-events: none; }
@@ -448,18 +514,14 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 /* Mapa del recorrido en las transiciones: abajo a la derecha, pequeño. En celular, arriba bajo la barra.
    Un río con las paradas: por lo andado el agua corre; el tramo nuevo se llena con una gota al frente y la parada a la
    que se llega se ilumina y hace ondas (28/10/2026). Tiempos: el agua baja de 0,8 s a 3,8 s.
-   No se queda (29/10/2026): aparece medio transparente, cuenta a dónde se va y a los 6 s se desvanece. */
+   Se queda toda la transición (pedido del cliente, 09/11/2026; antes se desvanecía a los 6 s). */
 .route {
   --water: #9fe3f2;
   position: absolute; z-index: 4; right: 16px; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 22px); margin: 0;
   padding: 8px 10px 4px; border-radius: 14px; background: radial-gradient(ellipse at center, rgba(6, 18, 14, 0.26), rgba(6, 18, 14, 0) 72%);
-  pointer-events: none; animation: route-glimpse 7.2s ease both;
+  pointer-events: none; animation: route-in 1s ease 0.35s both;
 }
-@keyframes route-glimpse {
-  0%, 5% { opacity: 0; visibility: visible; }
-  14%, 80% { opacity: 0.82; }
-  100% { opacity: 0; visibility: hidden; }
-}
+@keyframes route-in { from { opacity: 0; } to { opacity: 0.88; } }
 .route svg { display: block; overflow: visible; max-width: calc(100vw - 32px); height: auto; }
 .route path { fill: none; stroke-linecap: round; }
 /* El cauce: punteado fino por donde falta; firme y suave por donde ya se pasó. */
@@ -493,7 +555,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 /* Con movimiento reducido (p. ej. «Efectos de animación» apagados en Windows) el agua igual llega, una vez: es lo que
    cuenta a dónde se va. No sigue la corriente ni se repiten las ondas. Le gana a la regla general que acorta todo. */
 @media (prefers-reduced-motion: reduce) {
-  .route { animation-duration: 7.2s !important; }
   .route .route__seg.is-now .route__water, .route .route__drop { animation-duration: 3s !important; }
   .route .route__stop.is-next circle, .route .route__stop.is-next text { animation-duration: 0.7s !important; }
   .route .route__ripple { animation-duration: 2.4s !important; }
@@ -517,22 +578,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .btn:hover { transform: translateY(-1px); }
 .btn--dark { background: #3c3a37; color: #fff; border-color: rgba(255, 255, 255, 0.35); }
 .btn--light { background: #fff; color: #1d2320; font-weight: 600; }
-
-/* ───────── Guía de estaciones ───────── */
-.guide { width: min(880px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: 20px; background: var(--paper-2); color: var(--ink); overflow: auto; }
-.guide[open] { animation: rise 0.4s var(--ease) both; }
-.guide::backdrop { background: rgba(6, 16, 12, 0.72); backdrop-filter: blur(4px); }
-.guide__inner { padding: 24px; }
-.guide__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
-.guide__head h2 { font: 700 italic 28px var(--serif); margin-top: 4px; }
-.guide .icon-btn { background: #e8ede5; color: var(--ink); }
-.guide__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.guide__item { width: 100%; font: inherit; color: inherit; cursor: pointer; display: grid; justify-items: center; gap: 2px; padding: 16px 10px; border-radius: 14px; text-decoration: none; text-align: center; border: 1px solid var(--line); background: #fff; transition: transform 0.25s var(--ease), border-color 0.25s; }
-.guide__item:hover { transform: translateY(-3px); border-color: var(--accent); }
-.guide__art { width: 88px; height: 88px; object-fit: contain; margin-bottom: 8px; }
-.guide__num { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.guide__item strong { font-size: 16px; }
-.guide__place { font-size: 13px; color: var(--muted); font-style: italic; }
 
 /* ───────── Recorrido vertical ─────────
    Las páginas van una debajo de otra y la nueva empuja a la anterior hacia arriba, como en TikTok, en el celular y en
@@ -596,11 +641,9 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .cue__label--desk { display: none; }
   .cue__label--touch { display: block; }
 }
-/* El «Sigue bajando» de cada página ya no se muestra por su cuenta (salía de una, incluso sin haber visto el video o
+/* El «Sigue navegando» de cada página ya no se muestra por su cuenta (salía de una, incluso sin haber visto el video o
    la galería): la invitación toma su lugar cuando toca. Queda en su sitio, invisible, para saber dónde va. */
 .stack-page .scroll-hint { visibility: hidden; animation: none; }
-/* Igual con «Comenzar el viaje» de la portada: la invitación (animada) lo dice a los pocos segundos, en su lugar. */
-.stack-page .start-btn { visibility: hidden; animation: none; }
 
 /* «Presiona para ver el video»: debajo del botón de un video que no se ha puesto, a los pocos segundos de llegar, con
    la flecha del recorrido apuntando al botón y el mismo palpitar tenue de la invitación. */
@@ -813,7 +856,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 
 /* ───────── Móvil ───────── */
 @media (max-width: 900px) {
-  .guide__list { grid-template-columns: repeat(2, 1fr); }
   .recipe { grid-template-columns: 1fr; align-content: center; padding: 70px 0 130px 20px; gap: 14px; }
   .recipe__text { padding-right: 56px; }
   .recipe__text h2 { font-size: 32px; }
@@ -2536,12 +2578,16 @@ button.ap-kpi:hover { background: var(--ap-head); }
 @media (max-width: 640px) {
   /* Arriba a la derecha solo quedan el sonido y el menú; las redes están dentro del menú. Lo que iba a la derecha de
      la barra («Mapa · guía», «Chachita», «Ver mapa interactivo») también está en el menú. */
-  .dock { left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; }
+  .dock { left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; flex-direction: row-reverse; }
   .dock .social { display: none; }
   .dock__sound { width: 44px; height: 44px; }
-  .stack-page .topbar { padding-right: 120px; }
+  /* Sonido, información y menú: el rótulo de la página se recorta antes de llegar a ellos. */
+  .stack-page .topbar { padding-right: 172px; }
   .stack-page .topbar__right { display: none; }
   .stack-page .chip { max-width: 100%; }
+  .tips { margin-top: 14px; padding-top: 12px; gap: 6px; }
+  .tips li { font-size: 14px; line-height: 1.45; }
+  .howto { margin-top: 10px; }
   /* La pestaña activa a la vista y una sombra en el borde por donde hay más. */
   .tabs[data-more='right'] { mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
   .tabs[data-more='left'] { mask-image: linear-gradient(90deg, transparent, #000 36px); }
@@ -2583,17 +2629,18 @@ button.ap-kpi:hover { background: var(--ap-head); }
 /* Celular acostado: poca altura. Lo fijo se aprieta arriba (sonido y menú, como en vertical) para dejarle la pantalla
    a la página; «Desliza para seguir» se quita (chocaba con las pestañas) y la receta vuelve a dos columnas. */
 @media (max-height: 500px) and (orientation: landscape) {
-  .dock { left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; }
+  .dock { left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; flex-direction: row-reverse; }
   .dock .social, .chapter .dock { display: none; }
   .dock__sound { width: 44px; height: 44px; }
-  .stack-page .topbar { padding-right: 120px; }
+  .stack-page .topbar { padding-right: 172px; }
+  .tips { display: none; }
   .stack-page .topbar__right { display: none; }
   .cue, .scroll-hint { display: none; }
   .credit-mark { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 48px); right: 16px; }
   .route { top: 52px; bottom: auto; }
   .trailer { padding-top: 60px; padding-bottom: 70px; }
-  .trailer__frame { width: min(880px, 100%, calc((100vh - 140px) * 16 / 9)); }
-  .trailer__note { display: none; }
+  .trailer__frame, .trailer--synopsis .trailer__frame { width: min(880px, 100%, calc((100vh - 140px) * 16 / 9)); }
+  .trailer__note, .synopsis__lead { display: none; }
   .recipe { grid-template-columns: minmax(200px, 30vw) minmax(0, 1fr); align-content: center; gap: 20px; padding: 58px 0 64px 24px; }
   .recipe__text h2 { font-size: 28px; }
   .recipe__intro { margin-top: 10px; font-size: 13px; line-height: 1.5; }

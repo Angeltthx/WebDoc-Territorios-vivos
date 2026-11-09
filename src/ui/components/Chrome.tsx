@@ -5,7 +5,6 @@ import { stations } from '../../content/journey';
 import { pageIndex, type Tabs } from '../../content/pages';
 import { menu, social, type MenuItem, type SocialNetwork } from '../../content/site';
 import type { Transition } from '../../domain/types';
-import { Illustration } from './Media';
 
 /** Navegación del recorrido disponible para cualquier componente. Fuera del recorrido, `inJourney` es falso. */
 export const JourneyNav = createContext<{ scrollToPage: (id: string) => void; scrollToIndex: (i: number) => void; inJourney: boolean }>({
@@ -15,14 +14,6 @@ export const JourneyNav = createContext<{ scrollToPage: (id: string) => void; sc
 });
 export const useJourneyNav = () => useContext(JourneyNav);
 
-/** Primera página de cada estación. */
-export const STATION_PAGE: Record<string, string> = {
-  chori: 'chori-pensamiento',
-  atrato: 'atrato-pensamiento',
-  nuqui: 'nuqui-pensamiento',
-  pangui: 'pangui-pensamiento',
-};
-
 /** Dirección de una página del recorrido, para llegar a ella desde fuera. */
 export const pagePath = (id: string) => pathFor(pageIndex(id));
 
@@ -30,16 +21,18 @@ export function Chip({ children }: { children: ReactNode }) {
   return <span className="chip">{children}</span>;
 }
 
-export function TopBar({ label, right, plain }: { label: ReactNode; right?: ReactNode; plain?: boolean }) {
+/** Sin `label` la barra no lleva rótulo (la bienvenida, 09/11/2026). */
+export function TopBar({ label, right, plain }: { label?: ReactNode; right?: ReactNode; plain?: boolean }) {
   return (
     <div className="topbar">
-      {plain ? <span className="chip chip--plain">{label}</span> : <Chip>{label}</Chip>}
+      {!label ? <span /> : plain ? <span className="chip chip--plain">{label}</span> : <Chip>{label}</Chip>}
       <div className="topbar__right">{right}</div>
     </div>
   );
 }
 
-export function GuideButton({ onOpen, children = 'Mapa · guía' }: { onOpen: () => void; children?: ReactNode }) {
+/** Siempre «Ver mapa interactivo» (09/11/2026; en las estaciones decía «Mapa · guía» y abría la guía de estaciones). */
+export function GuideButton({ onOpen, children = 'Ver mapa interactivo' }: { onOpen: () => void; children?: ReactNode }) {
   return (
     <button type="button" className="ghost-link" onClick={onOpen}>
       <span aria-hidden="true">◇</span> {children}
@@ -144,42 +137,6 @@ function useDialog(open: boolean) {
     if (!open && d.open) d.close();
   }, [open]);
   return ref;
-}
-
-/** Guía de estaciones (reemplaza al mapa 3D durante esta entrega). */
-export function StationGuide({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const ref = useDialog(open);
-  const { scrollToPage } = useJourneyNav();
-  return (
-    <dialog ref={ref} className="guide" onClose={onClose} onClick={(e) => e.target === ref.current && onClose()} aria-labelledby="guide-title">
-      <div className="guide__inner">
-        <div className="guide__head">
-          <div>
-            <p className="eyebrow">Guía del recorrido</p>
-            <h2 id="guide-title">Del río al mar</h2>
-          </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar guía">✕</button>
-        </div>
-        <ol className="guide__list">
-          {stations.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                className="guide__item"
-                onClick={() => { onClose(); scrollToPage(STATION_PAGE[s.id]); }}
-                style={{ ['--accent' as string]: s.accent }}
-              >
-                <Illustration id={s.illustration} className="guide__art" />
-                <span className="guide__num">Estación {s.number}</span>
-                <strong>{s.name}</strong>
-                <span className="guide__place">{s.place}</span>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </dialog>
-  );
 }
 
 /** La estación de una página, por el comienzo de su id (`chori-galeria` → `chori`). */

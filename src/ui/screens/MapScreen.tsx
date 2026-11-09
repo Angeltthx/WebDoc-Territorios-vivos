@@ -337,7 +337,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
               </button>
             )}
             {onBack ? (
-              // La misma flecha de «Sigue bajando» del recorrido, hacia arriba.
+              // La misma flecha de «Sigue navegando» del recorrido, hacia arriba.
               <button type="button" className="ghost-link ghost-link--back" onClick={onBack}>
                 <Arrow dir="up" /> Volver al recorrido
               </button>

@@ -8,6 +8,7 @@
 // (19/10/2026): la portada y el intro son una sola página, y los nombres de la estación 4 son los del menú del cliente;
 // (20/10/2026): la estación 4 abre con un Pensamiento (sin las escenas Marea alta y Marea baja) y los Video canción vuelven a su estación;
 // (27/10/2026): los Video canción y el Viche se ven desde YouTube, en un recuadro como los tráileres.
+// (09/11/2026): cada tráiler y el Viche llevan la sinopsis de su documental, escrita por el cliente.
 // El recorrido es un desplazamiento vertical: cada página ocupa la pantalla y sube sobre la anterior.
 
 import type { StationId, VideoAsset } from '../domain/types';
@@ -91,7 +92,11 @@ export const pages: PageSpec[] = [
     kind: 'video',
     label: 'Estación 1 · Tráiler historia',
     // Tráileres en YouTube (pedido del cliente, 27 y 29/10/2026): las visitas cuentan en su canal.
-    video: { title: 'El latido', stream: 'estacion-1', youtube: 'IYu6xq8E0M8' },
+    video: { title: 'El latido', stream: 'estacion-1', youtube: 'IYu6xq8E0M8',
+      synopsis: [
+        'La comunidad indígena Emberá Bocas de Jagua se enfrenta a un desafío crucial al quedar excluida de las transferencias estatales tras trasladarse de su territorio ancestral. Para superar esta crisis, la comunidad decide emprender un proyecto etnoturístico con el apoyo de Fontur, construyendo la etnoaldea Kipara-té a orillas del río Chorí, que se convierte en una herramienta crucial para ofrecer alternativas a las economías ilegales y fortalecer el vínculo con su identidad cultural, brindando esperanza para un futuro sostenible en el Pacífico.',
+      ],
+    },
     tabs: chori('Tráiler historia'),
     frame: 'chori',
     note: true,
@@ -105,7 +110,11 @@ export const pages: PageSpec[] = [
     id: 'atrato-historia',
     kind: 'video',
     label: 'Estación 2 · Tráiler historia',
-    video: { title: 'Gente del Río', stream: 'estacion-2', youtube: 'etXkt8ilPug' },
+    video: { title: 'Gente del Río', stream: 'estacion-2', youtube: 'etXkt8ilPug',
+      synopsis: [
+        '¿Puede un pueblo existir sin su río? En el Gran Chocó, comunidades afrodescendientes e indígenas llevan siglos respondiendo esta pregunta cuidando el agua que les rodea, porque la identidad de un pueblo es inseparable del río que le da vida.',
+      ],
+    },
     tabs: atrato('Tráiler historia'),
     frame: 'atrato',
     note: true,
@@ -119,7 +128,11 @@ export const pages: PageSpec[] = [
     kind: 'video',
     label: 'Estación 3 · Tráiler historia',
     // Tráiler nuevo, con Orfelina (13/10/2026). Es también el scrollytelling: la página aparte sin video se quitó (13/10/2026).
-    video: { title: 'El baile de las olas', stream: 'nuqui-trailer', youtube: '9Fb2jTRxgQ4' },
+    video: { title: 'El baile de las olas', stream: 'nuqui-trailer', youtube: '9Fb2jTRxgQ4',
+      synopsis: [
+        'Orfelina Marmolejo Beltrán, profesora en Nuquí, ha dedicado los años recientes a transformar la realidad de niñas y niños. Como madre y desplazada por la violencia, Orfelina encontró en la enseñanza y el apoyo comunitario un propósito. Al ofrecerles a las niñas un lugar seguro, donde podían aprender y compartir alimentos, creó el grupo de danza Serranías del Porvenir, una compañía artística y escuela de valores a través de la danza tradicional. Hoy, con el apoyo de su esposo y financiando este proyecto con su propio salario, Orfelina lucha por rescatar la cultura ancestral mientras empodera a jóvenes para que se reconozcan como valiosas y capaces de cambiar su destino alejándose de las oportunidades ilegales que rodean la zona.',
+      ],
+    },
     tabs: nuqui('Tráiler historia'),
     frame: 'nuqui',
     note: true,
@@ -141,7 +154,11 @@ export const pages: PageSpec[] = [
     id: 'pangui-historia',
     kind: 'video',
     label: 'Estación 4 · Tráiler historia',
-    video: { title: 'Marea alta, marea baja', youtube: 'emQGjdx3UNE' },
+    video: { title: 'Marea alta, marea baja', youtube: 'emQGjdx3UNE',
+      synopsis: [
+        'Ruth Nibeth “Chachita” Martínez es una mujer del Pacífico colombiano que, tras años de vivir a la sombra de su esposo, encuentra en la espiritualidad y en el turismo sostenible un camino para transformar su vida y la de su comunidad. A lo largo de su vida, ha superado grandes dificultades personales, la violencia, el desplazamiento y la crítica de muchas voces que le decían que emprender en el Chocó era imposible. Gracias a sus ganas de estudiar, de progresar, su fe, liderazgo y resiliencia, ha convertido un terreno deteriorado en Panguí, en una posada ecoturística, recuperando manglares y empoderando a mujeres de Panguí para liderar proyectos de turismo comunitario y responsable.',
+      ],
+    },
     tabs: pangui('Tráiler historia'),
     frame: 'pangui',
     note: true,
@@ -161,7 +178,12 @@ export const pages: PageSpec[] = [
     id: 'pangui-viche',
     kind: 'video',
     label: 'Estación 4 · Un regalo de la selva',
-    video: { title: 'Viche curao, un regalo de la selva', stream: 'viche', youtube: 'y3h28Hk0uk8' },
+    video: { title: 'Viche curao, un regalo de la selva', stream: 'viche', youtube: 'y3h28Hk0uk8',
+      synopsis: [
+        'En lo profundo del Chocó colombiano, donde el mar se encuentra con la selva y la vida late al ritmo de la naturaleza, una tradición ha resistido por siglos: el viche curao.',
+        'A través de paisajes exuberantes de ríos, montañas, manglares y de rostros que guardan la memoria del territorio, este cortometraje revela cómo una bebida ancestral se convierte en identidad, sanación y economía para las comunidades del Pacífico.',
+      ],
+    },
     tabs: pangui('Un regalo de la selva'),
     frame: 'pangui',
     // Con el aviso del estreno debajo, como los tráileres (pedido del cliente, 27/10/2026).
