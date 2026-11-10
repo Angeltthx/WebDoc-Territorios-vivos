@@ -64,15 +64,37 @@ export function HowToArrive({ station }: { station: Station }) {
 const ABOUT =
   'Territorios Vivos, relatos del Pacífico, es una invitación del territorio para vivir un turismo consciente, responsable y comunitario a través de las historias de personas que por años han conservado sus tradiciones, cultura y biodiversidad en Nuquí, Chocó.';
 
-/** El ícono de información, en todas las páginas del recorrido: abre un cuadro que cuenta qué es Territorios Vivos. */
+const ABOUT_SEEN = 'tv-que-es-visto';
+
+/**
+ * El ícono de información, en todas las páginas del recorrido: abre un cuadro que cuenta qué es Territorios Vivos.
+ * Más llamativo (pedido del 09/11/2026), con el mismo botón: la «i» más gruesa y, hasta que se abra la
+ * primera vez, dorada y con un halo que palpita alrededor. Después queda como los demás (se recuerda en este navegador).
+ */
 export function AboutButton() {
   const [open, setOpen] = useState(false);
+  const [calling, setCalling] = useState(() => {
+    try {
+      return !localStorage.getItem(ABOUT_SEEN);
+    } catch {
+      return true;
+    }
+  });
+  const show = () => {
+    setOpen(true);
+    setCalling(false);
+    try {
+      localStorage.setItem(ABOUT_SEEN, '1');
+    } catch {
+      // Sin almacenamiento: el halo vuelve la próxima vez.
+    }
+  };
   return (
     <>
-      <button type="button" className="dock__sound dock__about" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="¿Qué es Territorios Vivos?" title="¿Qué es Territorios Vivos?">
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M10 9v5.5" />
-          <circle cx="10" cy="5.6" r="0.6" fill="currentColor" />
+      <button type="button" className={`dock__sound dock__about${calling ? ' is-calling' : ''}`} onClick={show} aria-haspopup="dialog" aria-label="¿Qué es Territorios Vivos?" title="¿Qué es Territorios Vivos?">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+          <path d="M10 9v5.8" />
+          <circle cx="10" cy="5.4" r="0.9" fill="currentColor" />
         </svg>
       </button>
       <InfoDialog open={open} onClose={() => setOpen(false)} label="¿Qué es Territorios Vivos?" className="info--card">
@@ -89,8 +111,12 @@ export function Synopsis({ title, text }: { title: string; text: string[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="synopsis">
-      <p className="synopsis__lead"><strong>Sinopsis.</strong> {text.join(' ')}</p>
-      <button type="button" className="synopsis__more" onClick={() => setOpen(true)} aria-haspopup="dialog">Leer la sinopsis completa</button>
+      <p className="synopsis__eyebrow">Sinopsis</p>
+      <h3 className="synopsis__title">{title}</h3>
+      <p className="synopsis__lead">{text.join(' ')}</p>
+      <button type="button" className="synopsis__more" onClick={() => setOpen(true)} aria-haspopup="dialog">
+        Leer la sinopsis completa <span aria-hidden="true">→</span>
+      </button>
       <InfoDialog open={open} onClose={() => setOpen(false)} label={`Sinopsis de ${title}`} className="info--card">
         <p className="eyebrow">Sinopsis</p>
         <h2>{title}</h2>

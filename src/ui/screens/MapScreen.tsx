@@ -12,6 +12,7 @@ import { LineIcon, type Origin } from '../components/Sheet';
 import Shop from './Shop';
 import StoryForm from './StoryForm';
 import StoryCard from '../components/StoryCard';
+import { Coach, type CoachStep } from '../components/Coach';
 import { createGlobe, type GlobeHandle } from '../components/map/GlobeScene';
 import { createFlatGlobe } from '../components/map/FlatGlobe';
 import { DIVE } from '../components/map/dive';
@@ -28,6 +29,34 @@ const ANIMAL_SOUND: Record<string, MapSound> = {
 };
 
 const INVITE_SEEN = 'mapa-invitacion-vista';
+/** El tutorial (ver Coach): el del planeta y el de la costa se ven una vez cada uno. */
+const COACH_GLOBE = 'mapa-tutorial-planeta';
+const COACH_COAST = 'mapa-tutorial-costa';
+const seen = (key: string) => {
+  try {
+    return !!localStorage.getItem(key);
+  } catch {
+    return false;
+  }
+};
+const markSeen = (key: string) => {
+  try {
+    localStorage.setItem(key, '1');
+  } catch {
+    // Sin almacenamiento: se volverá a ver la próxima vez.
+  }
+};
+const GLOBE_STEPS: CoachStep[] = [
+  { target: '.globe-choco', title: 'Empieza por el Chocó', text: 'Toca el Chocó y bajarás a la costa de Nuquí. Antes, si quieres, arrastra para girar el planeta.', waits: true },
+];
+const COAST_STEPS: CoachStep[] = [
+  { title: 'Llegaste a la costa de Nuquí', text: 'Arrastra para recorrerla, de Jurubidá a Coquí. Con la rueda del mouse, o pellizcando en el celular, te acercas o te alejas.' },
+  { title: 'Toca lo que veas', text: 'Cada punto, pueblo o animal del mapa cuenta algo: tócalo para saber qué es. Los puntos dorados son historias de la gente.' },
+  { target: '.map-filter', title: 'Escoge qué ver', text: 'Todos los puntos, solo los lugares o solo las historias que ha contado la gente.' },
+  { target: '.map-towns', title: 'Los pueblos', text: 'De norte a sur: toca uno y el mapa te lleva directo hasta él.' },
+  { target: '.map-tools', title: 'Ayuda, tu historia y la tienda', text: 'La ayuda te recuerda cómo moverte. En «Tu historia» puedes contar algo que viviste en el Chocó y aparecerá en el mapa. En la tienda, el afiche-mapa y más.' },
+  { target: '.map-planet', title: 'Volver al planeta', text: 'Cuando quieras, vuelve a ver el planeta. También puedes alejarte hasta salir de la costa.' },
+];
 const FILTER_KEY = 'mapa-filtro';
 const FILTERS: [SpotFilter, string][] = [['todo', 'Todo'], ['lugares', 'Lugares'], ['historias', 'Historias']];
 const SPOT_KIND: Record<ChocoPoint['kind'], string> = {
@@ -280,6 +309,32 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   };
 
   const onMap = phase === 'map';
+  const screen = useRef<HTMLDivElement>(null);
+  // El tutorial: en el planeta, cuando ya se asentó y su página es la visible; en la costa, al llegar. Una vez cada uno.
+  const [coach, setCoach] = useState<'planeta' | 'costa' | null>(null);
+  useEffect(() => {
+    if (phase !== 'globe' || !active || arriving || seen(COACH_GLOBE)) return;
+    const t = setTimeout(() => setCoach('planeta'), 700);
+    return () => clearTimeout(t);
+  }, [phase, active, arriving]);
+  useEffect(() => {
+    if (phase === 'diving') {
+      markSeen(COACH_GLOBE);
+      setCoach(null);
+    }
+    if (phase !== 'map' || seen(COACH_COAST)) return;
+    const t = setTimeout(() => setCoach('costa'), 900);
+    return () => clearTimeout(t);
+  }, [phase]);
+  useEffect(() => {
+    if (!active) setCoach(null);
+  }, [active]);
+  const endCoach = useCallback(() => {
+    setCoach((c) => {
+      if (c) markSeen(c === 'planeta' ? COACH_GLOBE : COACH_COAST);
+      return null;
+    });
+  }, []);
   const trackTale = useCallback((el: HTMLElement | null) => handle.current?.track(el), []);
   const closeSpot = useCallback(() => handle.current?.select(null), []);
   const closePanel = () => setPanel(null);
@@ -288,6 +343,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
     // En el recorrido, la costa usa las flechas del teclado (no pasan de página: ver `data-no-arrows`); en el planeta,
     // las flechas siguen moviendo el recorrido.
     <div
+      ref={screen}
       className={`map-screen is-${phase}${embedded ? ' map-screen--embedded' : ''}${engaged ? ' is-engaged' : ''}${arriving ? ' is-arriving' : ''}`}
       data-no-arrows={(embedded && phase !== 'globe' && phase !== 'loading') || undefined}
     >
@@ -318,7 +374,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
           <span className="poster-title__big">Nuquí</span>
           <span className="poster-title__script">Chocó</span>
         </p>
-        {invite && <p className="globe-title__hint">El sol se está poniendo sobre Nuquí. Toca el Chocó y baja a la costa.</p>}
+        {invite && coach !== 'planeta' && <p className="globe-title__hint">El sol se está poniendo sobre Nuquí. Toca el Chocó y baja a la costa.</p>}
         {embedded && (
           <p className="globe-title__gate">
             {engaged ? 'Acércate con la rueda o pellizca para bajar a Nuquí' : 'Toca el planeta para explorarlo · sube para volver a la historia'}
@@ -332,7 +388,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
         right={
           <>
             {onMap && (
-              <button type="button" className="ghost-link" onClick={() => leave.current()}>
+              <button type="button" className="ghost-link map-planet" onClick={() => leave.current()}>
                 <span aria-hidden="true">◍</span> Ver el planeta
               </button>
             )}
@@ -399,7 +455,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
             Sigue alejándote para ver el planeta
             <span className="map-pull__bar" style={{ transform: `scaleX(${pull})` }} />
           </p>
-          <p className={`map-hint${hint && !place ? '' : ' is-hidden'}`}>Arrastra para recorrer la costa · rueda o pellizca para acercarte · toca un lugar</p>
+          <p className={`map-hint${hint && !place && !coach ? '' : ' is-hidden'}`}>Arrastra para recorrer la costa · rueda o pellizca para acercarte · toca un lugar</p>
           {/* Ayuda, contar una historia y la tienda: en la barra de abajo, con la letra de los pueblos. */}
           <nav className="map-tools" aria-label="Más del mapa">
             {([
@@ -439,6 +495,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
                 <li><strong>Tu historia:</strong> cuéntanos algo que viviste en el Chocó y aparecerá en el mapa.</li>
                 <li><strong>Tienda:</strong> lleva un pedazo del Pacífico.</li>
               </ul>
+              <button type="button" className="map-help__tour" onClick={() => { closePanel(); setCoach('costa'); }}>Ver el tutorial otra vez</button>
               <button type="button" className="map-card__close" aria-label="Cerrar ayuda" onClick={closePanel}>×</button>
             </aside>
           )}
@@ -474,6 +531,8 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
           </nav>
         </>
       )}
+      {coach === 'planeta' && phase === 'globe' && <Coach key="planeta" steps={GLOBE_STEPS} host={screen} onDone={endCoach} />}
+      {coach === 'costa' && onMap && !panel && <Coach key="costa" steps={COAST_STEPS} host={screen} onDone={endCoach} finish="Explorar" />}
       {onMap && panel === 'historia' && <StoryForm onClose={closePanel} origin={origin} />}
       {onMap && panel === 'tienda' && <Shop onClose={closePanel} origin={origin} />}
     </div>

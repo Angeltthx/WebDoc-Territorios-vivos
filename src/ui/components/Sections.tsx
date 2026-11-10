@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject, type TouchEvent } from 'react';
 import type { Photo, Station, VideoAsset } from '../../domain/types';
-import { aspectOf, Backdrop, Img } from './Media';
+import { aspectOf, Backdrop, Img, mediaUrl } from './Media';
 import { Arrow } from './Chrome';
 import { Portal } from './Portal';
 import { HowToArrive, Synopsis } from './InfoDialog';
@@ -44,7 +44,12 @@ export function PressHint({ desk, touch }: { desk: string; touch: string }) {
 
 /** Pestañas Tráiler historia y Video canción: el video en streaming si ya existe; si no, el estado pendiente. */
 export function VideoPanel({ video, bar, active = false }: { video: VideoAsset; bar?: string; active?: boolean }) {
-  if (video.youtube) return <YouTubePlayer id={video.youtube} title={video.title} poster={video.stream && `/media/historias/${video.stream}/poster.webp`} active={active} />;
+  if (video.youtube) {
+    // La imagen de espera: la propia (`poster`, como la miniatura de YouTube del tráiler de Panguí, que ya trae el título)
+    // o la del streaming.
+    const poster = video.poster ? mediaUrl(video.poster.id) : video.stream && `/media/historias/${video.stream}/poster.webp`;
+    return <YouTubePlayer id={video.youtube} title={video.title} poster={poster} titled={!video.poster} active={active} />;
+  }
   if (video.stream) return <StoryPlayer id={video.stream} title={video.title} active={active} />;
   return <PendingVideo video={video} bar={bar} />;
 }
@@ -53,16 +58,41 @@ export function VideoPanel({ video, bar, active = false }: { video: VideoAsset; 
 const TRAILER_NOTE =
   'Muy pronto podrás disfrutar de la historia completa en cines, eventos especiales y televisión. Síguenos en nuestras redes sociales para conocer las próximas fechas, horarios y lugares de proyección. ¡Mantente conectado para no perderte ningún detalle!';
 
-/** El video en un recuadro (no a pantalla completa) sobre el fondo de la galería de la estación; en los tráileres, con
- * el aviso del estreno debajo. */
+/** El aviso del estreno, con un ícono de proyector de cine. */
+function TrailerNote() {
+  return (
+    <div className="trailer__note">
+      <svg className="trailer__note-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="7" width="13" height="11" rx="2" />
+        <path d="M16 11l5-3v9l-5-3" />
+        <circle cx="7" cy="4.5" r="2" />
+        <circle cx="12.5" cy="4.5" r="2" />
+      </svg>
+      <p>{TRAILER_NOTE}</p>
+    </div>
+  );
+}
+
+/**
+ * El video en un recuadro (no a pantalla completa) sobre el fondo de la galería de la estación; en los tráileres, con
+ * el aviso del estreno. Con sinopsis (09/11/2026, pedido de Carolina: el video más grande y la sinopsis bien puesta),
+ * en pantallas anchas el video ocupa casi todo el ancho y al lado va una columna con la sinopsis y el aviso; en
+ * pantallas angostas, todo uno debajo del otro.
+ */
 export function FramedVideo({ video, background, note, active = false }: { video: VideoAsset; background: Photo; note?: boolean; active?: boolean }) {
   return (
     <>
       <Backdrop photo={background} tint="rgba(8,16,14,.55)" blur />
       <div className={`trailer reveal${video.synopsis ? ' trailer--synopsis' : ''}`}>
         <div className="trailer__frame"><VideoPanel video={video} active={active} /></div>
-        {video.synopsis && <Synopsis title={video.title} text={video.synopsis} />}
-        {note && <p className="trailer__note">{TRAILER_NOTE}</p>}
+        {video.synopsis ? (
+          <aside className="trailer__about">
+            <Synopsis title={video.title} text={video.synopsis} />
+            {note && <TrailerNote />}
+          </aside>
+        ) : (
+          note && <TrailerNote />
+        )}
       </div>
     </>
   );
@@ -98,7 +128,12 @@ function loadYouTube(): Promise<YTNamespace> {
  * ve nuestra imagen de espera y el botón de siempre; al presionarlo aparece el reproductor de YouTube y arranca. Se pausa
  * al salir de la página. Si YouTube no carga (sin conexión, bloqueado), queda el enlace para verlo allá.
  */
-function YouTubePlayer({ id, title, poster, active }: { id: string; title: string; poster?: string; active: boolean }) {
+function YouTubePlayer({ id, title, poster, titled = true, active }: {
+  id: string; title: string; poster?: string;
+  /** Sin el título bajo el botón: la imagen de espera ya lo trae. */
+  titled?: boolean;
+  active: boolean;
+}) {
   const slot = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
   const [started, setStarted] = useState(false);
@@ -134,7 +169,7 @@ function YouTubePlayer({ id, title, poster, active }: { id: string; title: strin
           <button type="button" className="play play--on-image" onClick={start} aria-label={`Reproducir ${title}`}>
             <PlayGlyph />
           </button>
-          <p className="video__title story__title">{title}</p>
+          {titled && <p className="video__title story__title">{title}</p>}
         </div>
       )}
       {error && (
