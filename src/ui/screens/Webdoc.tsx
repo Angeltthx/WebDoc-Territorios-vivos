@@ -120,13 +120,15 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
   unmute: () => void;
 }) {
   const { scrollToIndex, scrollToPage } = useJourneyNav();
+  // «Ver mapa interactivo» va en la bienvenida y en todas las páginas de las estaciones (pedido del cliente, 09/11/2026).
+  const mapLink = <GuideButton onOpen={() => scrollToPage('cierre')} />;
   switch (spec.kind) {
     case 'welcome':
       return (
         <div className="screen screen--welcome" aria-labelledby="wt">
           <Welcome playing={playing} muted={muted} unmute={unmute} onStart={() => scrollToIndex(1)} />
           {/* Sin el rótulo «Bienvenida» (pedido del cliente, 09/11/2026). */}
-          <TopBar right={<GuideButton onOpen={() => scrollToPage('cierre')} />} />
+          <TopBar right={mapLink} />
         </div>
       );
 
@@ -135,7 +137,7 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><QuotePanel station={getStation(spec.station)!} /></div>
           <StationLocator station={getStation(spec.station)!} />
-          <TopBar label={spec.label} right={<GuideButton onOpen={() => scrollToPage('cierre')} />} />
+          <TopBar label={spec.label} right={mapLink} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
@@ -150,7 +152,7 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
               <VideoPanel video={spec.video} bar={spec.bar} active={playing} />
             )}
           </div>
-          <TopBar label={spec.label} />
+          <TopBar label={spec.label} right={mapLink} />
           {spec.tabs && <StationFoot tabs={spec.tabs} next={next} />}
         </div>
       );
@@ -160,7 +162,7 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
       return (
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><GalleryPanel gallery={gallery} /></div>
-          <TopBar plain label={spec.label} />
+          <TopBar plain label={spec.label} right={mapLink} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
@@ -170,7 +172,7 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
       return (
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><RecipePanel recipe={getStation('chori')!.recipe!} /></div>
-          <TopBar label={spec.label} />
+          <TopBar label={spec.label} right={mapLink} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );
@@ -207,7 +209,7 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
       return (
         <div className="screen" aria-label={spec.label}>
           <div className="screen__content"><SongsPanel songs={getStation('pangui')!.songs!} active={playing} /></div>
-          <TopBar plain label={spec.label} />
+          <TopBar plain label={spec.label} right={mapLink} />
           <StationFoot tabs={spec.tabs} next={next} />
         </div>
       );

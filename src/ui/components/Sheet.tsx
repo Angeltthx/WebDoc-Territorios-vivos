@@ -1,9 +1,11 @@
 // Hoja a pantalla completa sobre el mapa (la tienda, «Cuéntanos tu historia»): papel claro como la guía del webdoc.
-// Dentro del mapa se cierra y vuelve a la costa tal como estaba; abierta por su propia dirección, vuelve al recorrido.
+// Dentro del mapa se cierra y vuelve a la costa tal como estaba; abierta por su propia dirección (desde el menú, por
+// ejemplo), vuelve a la página del recorrido desde donde se llegó (09/11/2026: antes llevaba siempre al mapa y la gente
+// se perdía). Si se entró directo, a la bienvenida.
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Arrow, pagePath } from './Chrome';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Arrow } from './Chrome';
 
 /** Íconos de línea de la costa (mismo trazo que las flechas del recorrido). */
 export function LineIcon({ name, size = 20 }: { name: 'help' | 'story' | 'shop'; size?: number }) {
@@ -57,10 +59,13 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
   overlay?: ReactNode;
   /** Una clase más, para el estilo propio de cada hoja. */
   className?: string;
-  /** El enlace de arriba, si no es «Volver al mapa» (por ejemplo, el panel del equipo). */
+  /** El enlace de arriba, si no es volver (al mapa o a donde se estaba). */
   back?: { to: string; label: string };
 }) {
   const [leaving, setLeaving] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/'));
   const close = () => {
     if (leaving) return;
     setLeaving(true);
@@ -74,7 +79,7 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
   }, []);
   const backLabel = (
     <>
-      <Arrow dir="left" /> {back?.label ?? 'Volver al mapa'}
+      <Arrow dir="left" /> {back?.label ?? (onClose ? 'Volver al mapa' : 'Volver al recorrido')}
     </>
   );
   // A pantalla completa: a un lado el atardecer del mapa con el título (como la llegada a la costa), al otro el
@@ -91,8 +96,10 @@ export function Sheet({ eyebrow, title, intro, aside, onClose, children, origin,
       <header className="sheet__hero">
         {onClose ? (
           <button type="button" className="sheet__back" onClick={close}>{backLabel}</button>
+        ) : back ? (
+          <Link className="sheet__back" to={back.to}>{backLabel}</Link>
         ) : (
-          <Link className="sheet__back" to={back?.to ?? pagePath('cierre')}>{backLabel}</Link>
+          <button type="button" className="sheet__back" onClick={goBack}>{backLabel}</button>
         )}
         <div className="sheet__heading">
           <p className="eyebrow">{eyebrow}</p>
