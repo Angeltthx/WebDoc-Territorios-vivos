@@ -259,7 +259,21 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 .info--poster { width: min(560px, calc(100vw - 20px)); }
 .info--poster .info__body { max-height: calc(100dvh - 24px); overflow-y: auto; border-radius: 14px; background: #f6f3ea; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55); overscroll-behavior: contain; }
 .info--poster img { display: block; width: 100%; height: auto; }
-.dock__about { cursor: pointer; }
+/* Hasta que se abre la primera vez: la «i» dorada y un halo que sale del botón cada tanto (ver AboutButton). Después
+   vuelve a ser como los demás botones: el dorado ya no hace falta y desentonaba con el resto. */
+.dock__sound.dock__about { position: relative; cursor: pointer; }
+.dock__sound.dock__about.is-calling { color: var(--gold); border-color: rgba(232, 187, 82, 0.75); box-shadow: 0 0 12px rgba(232, 187, 82, 0.45); }
+.dock__about.is-calling::before, .dock__about.is-calling::after {
+  content: ''; position: absolute; inset: -1px; border-radius: 50%; border: 2px solid var(--gold); pointer-events: none;
+  animation: about-call 2.6s ease-out infinite;
+}
+.dock__about.is-calling::after { animation-delay: 0.5s; }
+@keyframes about-call { 0% { transform: scale(1); opacity: 0.85; } 60%, 100% { transform: scale(1.7); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .dock__about.is-calling::before { animation: about-glow 2.6s ease-in-out infinite !important; animation-duration: 2.6s !important; animation-iteration-count: infinite !important; }
+  .dock__about.is-calling::after { display: none; }
+}
+@keyframes about-glow { 50% { opacity: 0.15; } }
 @keyframes rise-y { from { opacity: 0; transform: translateY(calc(-50% + 20px)); } to { opacity: 1; transform: translateY(-50%); } }
 
 /* ───────── Video ───────── */
@@ -300,19 +314,47 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
   border-radius: 10px; background: #000; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
 }
 .trailer__frame:fullscreen { border-radius: 0; }
-/* Con la sinopsis del documental debajo (09/11/2026): sus primeras líneas y un enlace que la abre completa. El recuadro
-   cede un poco de alto para que todo quepa sobre «Sigue navegando» y las pestañas. */
-.trailer--synopsis { gap: clamp(10px, 1.8vh, 18px); }
-.trailer--synopsis .trailer__frame { width: min(880px, 100%, calc((100vh - 425px) * 16 / 9)); }
-.synopsis { max-width: 720px; text-align: center; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
-.synopsis__lead { margin: 0; font-size: clamp(13px, 1.2vw, 15px); line-height: 1.55; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
-.synopsis__lead strong { font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.82em; color: var(--gold); }
-.synopsis__more {
-  margin-top: 2px; padding: 6px 8px; min-height: 32px; border: 0; background: none; color: var(--gold); cursor: pointer;
-  font: 600 11.5px var(--sans); letter-spacing: 0.16em; text-transform: uppercase; text-decoration: underline; text-underline-offset: 4px; text-shadow: inherit;
+/* Con la sinopsis del documental (09/11/2026, rediseñado el mismo día a pedido de Carolina: el video más grande y la
+   sinopsis bien puesta). Angosto: el video y, debajo, la sinopsis y el aviso, centrados. Ancho: ver más abajo. */
+.trailer--synopsis { gap: clamp(12px, 2vh, 20px); }
+.trailer--synopsis .trailer__frame { width: min(920px, 100%, calc((100dvh - 440px) * 16 / 9)); }
+.trailer__about { max-width: 680px; display: grid; gap: clamp(12px, 2vh, 18px); text-align: center; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
+.synopsis { display: grid; justify-items: center; gap: 4px; }
+.synopsis__eyebrow { margin: 0; font: 600 11px var(--sans); letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+.synopsis__title {
+  margin: 0 0 4px; font: 400 clamp(20px, 2vw, 26px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100;
+  letter-spacing: -0.01em;
 }
+.synopsis__lead {
+  margin: 0; font-size: clamp(13.5px, 1.15vw, 15px); line-height: 1.6; color: rgba(255, 255, 255, 0.9);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.synopsis__more {
+  margin-top: 2px; padding: 6px 0; min-height: 36px; border: 0; background: none; color: var(--gold); cursor: pointer;
+  font: 600 11.5px var(--sans); letter-spacing: 0.16em; text-transform: uppercase; text-shadow: inherit; transition: color 0.2s;
+}
+.synopsis__more span { display: inline-block; margin-left: 4px; transition: transform 0.25s var(--ease); }
 .synopsis__more:hover { color: #fff; }
-.trailer--synopsis .trailer__note { font-size: clamp(12px, 1.05vw, 14px); line-height: 1.5; opacity: 0.88; }
+.synopsis__more:hover span { transform: translateX(4px); }
+/* El aviso del estreno: separado por una línea fina, con el proyector en dorado. */
+.trailer__about .trailer__note {
+  display: flex; align-items: flex-start; gap: 12px; max-width: none; padding-top: clamp(12px, 2vh, 16px);
+  border-top: 1px solid rgba(255, 255, 255, 0.2); text-align: left;
+}
+.trailer__about .trailer__note p { margin: 0; text-align: left; font-size: clamp(12.5px, 1vw, 13.5px); line-height: 1.55; color: rgba(255, 255, 255, 0.82); }
+.trailer__note-icon { flex: none; margin-top: 1px; color: var(--gold); }
+/* Ancho y acostado: el video grande a la izquierda y, a la derecha, una columna con la sinopsis y el aviso, con un
+   filo dorado. */
+@media (min-width: 1000px) and (min-aspect-ratio: 4 / 3) {
+  .trailer--synopsis {
+    grid-template-columns: auto minmax(260px, 340px); align-content: center; justify-content: center; align-items: center;
+    column-gap: clamp(28px, 3.4vw, 56px); padding: 84px clamp(24px, 3.4vw, 56px) 150px;
+  }
+  .trailer--synopsis .trailer__frame { width: min(calc(100vw - 520px), calc((100dvh - 250px) * 16 / 9)); }
+  .trailer__about { text-align: left; padding-left: clamp(20px, 2vw, 28px); border-left: 1px solid rgba(232, 187, 82, 0.55); }
+  .synopsis { justify-items: start; }
+  .synopsis__lead { -webkit-line-clamp: 6; line-clamp: 6; }
+}
 .trailer__frame .story__title { font-size: 14px; }
 .trailer__frame .play-hint { display: none; }
 /* YouTube: su reproductor ocupa el recuadro al presionar el video; antes, nuestra imagen de espera. */
@@ -320,14 +362,17 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 .yt:not(.is-started) .yt__slot { visibility: hidden; }
 .yt .notice a { color: inherit; }
 .trailer__frame .story .story__controls { width: calc(100% - 24px); bottom: 12px; }
-.trailer__note { margin: 0; max-width: 680px; text-align: center; font-size: clamp(13px, 1.25vw, 15.5px); line-height: 1.6; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
+.trailer__note { display: flex; align-items: flex-start; justify-content: center; gap: 12px; margin: 0; max-width: 680px; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); }
+.trailer__note p { margin: 0; text-align: center; font-size: clamp(13px, 1.25vw, 15.5px); line-height: 1.6; }
 @media (max-width: 640px) {
   .trailer { padding: 70px 16px 140px; }
   .trailer__frame, .trailer--synopsis .trailer__frame { width: 100%; }
   .synopsis__lead { font-size: 13.5px; -webkit-line-clamp: 3; line-clamp: 3; }
+  .synopsis__title { font-size: 19px; }
   .synopsis__more { min-height: 44px; }
-  .trailer--synopsis .trailer__note { font-size: 12.5px; line-height: 1.45; }
-  .trailer__note { padding: 0 4px; font-size: 14px; line-height: 1.55; }
+  .trailer__about .trailer__note p { font-size: 12.5px; line-height: 1.45; }
+  .trailer__note { padding: 0 4px; }
+  .trailer__note p { font-size: 14px; line-height: 1.55; }
 }
 .story.is-idle .story__controls { opacity: 0; pointer-events: none; }
 .screen .topbar, .screen .page-foot { transition: opacity 0.45s ease, transform 0.55s var(--ease); }
@@ -1279,6 +1324,51 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .map-help ul { margin: 6px 0 14px; padding-left: 18px; font-size: 14px; line-height: 1.45; }
 .map-help ul:last-of-type { margin-bottom: 0; }
 .map-help li + li { margin-top: 4px; }
+.map-help__tour {
+  margin-top: 14px; padding: 8px 0; min-height: 40px; border: 0; background: none; color: var(--ink);
+  font: 600 13px var(--sans); text-decoration: underline; text-underline-offset: 0.25em;
+}
+.map-help__tour:hover { color: #e2456f; }
+
+/* ───────── Paso a paso con luz: el mapa y «Cuenta tu historia» (ver Coach) ─────────
+   Todo oscuro menos lo que hay que tocar, que queda alumbrado con un borde que palpita; al lado, una tarjeta de papel
+   como la ayuda. La oscuridad no bloquea nada: se puede tocar el Chocó (o lo que sea) con el tutorial abierto. */
+.coach { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
+/* En la hoja de «Cuenta tu historia» la página se desplaza por debajo: el paso a paso queda fijo en la pantalla. */
+.sheet > .coach { position: fixed; }
+.coach__veil { position: absolute; inset: 0; background: rgba(4, 14, 11, 0.55); animation: fade 0.4s ease both; }
+.coach__light {
+  position: absolute; border-radius: 16px; border: 2px solid #fdf6e3;
+  box-shadow: 0 0 0 200vmax rgba(4, 14, 11, 0.55), 0 0 24px rgba(253, 246, 227, 0.45);
+  transition: left 0.35s var(--ease), top 0.35s var(--ease), width 0.35s var(--ease), height 0.35s var(--ease); animation: fade 0.4s ease both;
+}
+.coach__light.is-round { border-radius: 999px; }
+.coach__light::after {
+  content: ''; position: absolute; inset: -2px; border-radius: inherit; border: 2px solid #e8bb52;
+  animation: coach-pulse 1.8s ease-out infinite;
+}
+@keyframes coach-pulse { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.18); opacity: 0; } }
+.coach__card {
+  position: absolute; pointer-events: auto; padding: 18px 20px 14px; border-radius: 16px;
+  background: var(--paper-2); color: var(--ink); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4); animation: rise 0.4s var(--ease) both;
+}
+.coach__count { margin: 0 0 4px; font: 600 11px var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.coach__title { margin: 0 0 6px; font: 400 21px/1.2 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em; }
+.coach__text { margin: 0; font-size: 14.5px; line-height: 1.5; color: #2e4a40; }
+.coach__nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+.coach__buttons { display: flex; gap: 8px; }
+.coach__skip, .coach__back { min-height: 40px; padding: 8px 4px; border: 0; background: none; color: var(--muted); font: 500 13px var(--sans); }
+.coach__skip:hover, .coach__back:hover { color: var(--ink); }
+.coach__next {
+  min-height: 40px; padding: 8px 18px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font: 600 13px var(--sans);
+  transition: background 0.2s;
+}
+.coach__next:hover { background: #e2456f; }
+/* Con «reducir movimiento», el borde igual palpita (es lo que señala qué tocar), pero sin desplazarse. */
+@media (prefers-reduced-motion: reduce) {
+  .coach__light::after { animation: coach-glow 1.8s ease-in-out infinite !important; animation-duration: 1.8s !important; animation-iteration-count: infinite !important; }
+}
+@keyframes coach-glow { 50% { opacity: 0.2; } }
 
 /* Si no caben al lado de los pueblos, van en la línea de arriba. */
 @media (max-width: 1180px) {
@@ -1908,10 +1998,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .sheet--story .story-kind.is-on { background: #fdf3d8; color: var(--ink); font-weight: 600; box-shadow: inset 0 0 0 2px var(--ink); }
 .sheet--story .story-kind.is-on svg { transform: translateY(-2px) scale(1.06); }
 .sheet--story .story-sent__lead { font: 400 21px/1.55 var(--sans); }
-.sheet--story .tutorial__title { font: 600 clamp(32px, 4vw, 50px)/1.08 'Fraunces', var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; letter-spacing: -0.02em; }
-.sheet--story .tutorial__text { font-weight: 400; }
-.sheet--story .tutorial__count { font-size: 13px; letter-spacing: 0; }
-.sheet--story .tutorial__skip { font-size: 14px; letter-spacing: 0; text-transform: none; }
 
 /* La columna del atardecer con la vista previa: si no cabe en la pantalla (pantallas bajas o zoom alto), se puede
    desplazar en vez de cortarse; y en pantallas bajas todo se compacta para que quepa sin desplazar. */
@@ -1938,29 +2024,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 }
 .story-preview-mobile { display: none; }
 
-/* Tutorial: la primera vez, cuatro pasos sobre blanco, uno a la vez. */
-.tutorial {
-  position: absolute; inset: 0 0 0 max(320px, 38%); z-index: 10; display: grid; grid-template-rows: 1fr auto; padding: clamp(24px, 6vh, 64px) clamp(20px, 6vw, 96px);
-  background: var(--paper-2); color: var(--ink); animation: fade 0.5s ease both;
-}
-.tutorial__skip {
-  position: absolute; top: calc(var(--gutter) + 6px); right: clamp(20px, 5vw, 64px); padding: 6px 0; border: 0; background: none;
-  color: var(--muted); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
-}
-.tutorial__skip:hover { color: var(--ink); }
-.tutorial__slide { align-self: center; justify-self: center; display: grid; justify-items: center; text-align: center; max-width: 34rem; animation: sheet-up 0.6s var(--ease) both; }
-.tutorial__icon { width: clamp(72px, 10vw, 104px); height: auto; margin-bottom: 26px; color: var(--ink); }
-.tutorial__count { font-size: 11px; letter-spacing: 0.24em; color: var(--muted); }
-.tutorial__title { margin: 10px 0 0; font: italic 300 clamp(32px, 4vw, 52px)/1.1 var(--sans); }
-.tutorial__text { margin-top: 18px; font: 300 clamp(16px, 1.4vw, 19px)/1.6 var(--sans); color: #3a4d46; }
-.tutorial__nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; max-width: 34rem; width: 100%; justify-self: center; }
-.tutorial__dots { display: flex; gap: 8px; }
-.tutorial__dots button { width: 22px; height: 3px; padding: 0; border: 0; border-radius: 2px; background: var(--line); transition: background 0.3s, width 0.3s var(--ease); }
-.tutorial__dots button.is-on { width: 40px; background: var(--ink); }
-.tutorial__buttons { display: flex; gap: 10px; }
-.tutorial__back, .tutorial__next { padding: 12px 24px; border-radius: 999px; font-size: 13px; letter-spacing: 0.06em; border: 1px solid var(--ink); }
-.tutorial__back { background: none; color: var(--ink); }
-.tutorial__next { background: var(--ink); color: #fff; }
 
 @media (max-width: 860px) {
   .story-preview-mobile { display: block; padding: 22px 22px 26px; border-radius: 14px; background: linear-gradient(#5b68a2, #f19aa8 45%, #2f6f80 46%, #163a52); color: #fff; }
@@ -1968,8 +2031,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .story-preview-mobile .story-preview { margin-top: 0; }
   .sheet__hero .story-preview { display: none; }
   .story-progress { top: 0; }
-  .tutorial { inset: 0; position: fixed; }
-  .sheet.has-overlay { overflow: hidden; }
   .story-how { position: static; justify-self: end; margin-bottom: 8px; display: block; margin-left: auto; }
 }
 @media (max-width: 640px) {
@@ -1982,7 +2043,6 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
   .story-progress { font-size: 10px; gap: 14px; }
   .story-progress__label { display: none; }
   .story-progress li.is-done + li:not(.is-done) .story-progress__label, .story-progress li:first-child:not(.is-done) .story-progress__label { display: inline; }
-  .tutorial__nav { flex-direction: column-reverse; gap: 18px; }
 }
 
 /* Al pasar el mouse por Ayuda, Tu historia o Tienda en la costa: para qué es cada uno, en una tarjetita. */
@@ -2696,13 +2756,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   /* Toques de al menos 44 px. */
   .songs__yt, .reader__back, .sheet__back, .story-how { display: inline-flex; align-items: center; min-height: 44px; }
   .songs__yt { margin-top: 2px; }
-  .tutorial__dots { gap: 4px; }
-  .tutorial__dots button { height: 44px; background: linear-gradient(var(--line), var(--line)) center / 100% 3px no-repeat; border-radius: 0; }
-  .tutorial__dots button.is-on { background-image: linear-gradient(var(--ink), var(--ink)); }
   .credit-mark a { padding: 8px 4px; margin: -8px -4px; }
-  .tutorial__skip { min-height: 44px; min-width: 44px; }
-  .tutorial__dots button { width: 34px; background-size: 22px 3px; }
-  .tutorial__dots button.is-on { width: 48px; background-size: 40px 3px; }
   /* La receta empieza bajo la barra (en pantallas bajas, centrada, el título quedaba debajo de ella). */
   .recipe { align-content: start; padding-top: 72px; }
   /* El mapa de ubicación de la estación, más chico: en los retratos tapaba parte de la cara. */

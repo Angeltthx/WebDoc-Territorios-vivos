@@ -3,8 +3,8 @@
 // aprueba, aparece en el mapa en su lugar (ver application/stories-api y api/historias).
 //
 // No es una página que cuenta una historia: es el espacio para que alguien cuente la suya. Por eso es sobria (blanco,
-// líneas finas, la letra del webdoc) y deja el protagonismo a lo que se escribe. La primera vez, un tutorial corto
-// explica para qué es (ver StoryTutorial). Vivo sin ruido: pasos que se marcan, el tipo de historia con las figuritas
+// líneas finas, la letra del webdoc) y deja el protagonismo a lo que se escribe. La primera vez, un paso a paso con luz
+// (como el del mapa, ver Coach) explica para qué es y alumbra cada parte del formulario. Vivo sin ruido: pasos que se marcan, el tipo de historia con las figuritas
 // del mapa (se elige solo según lo que se cuenta, y se puede cambiar), grabar la voz ahí mismo y, al lado, cómo se
 // verá en el mapa.
 
@@ -13,7 +13,51 @@ import { CHOCO_MUNICIPALITIES, MAX_FILE_MB } from '../../content/stories';
 import { EMBLEM_LABEL, SUBREGION_OF, categorize, type Emblem } from '../../content/choco';
 import { Sheet, type Origin } from '../components/Sheet';
 import { EmblemIcon } from '../components/EmblemIcon';
-import { StoryTutorial, TUTORIAL_SEEN } from '../components/StoryTutorial';
+import { Coach, type CoachStep } from '../components/Coach';
+
+/** El paso a paso de la primera vez (09/11/2026: antes eran cuatro tarjetas sin señalar nada del formulario). */
+const TOUR_SEEN = 'historia-recorrido-visto';
+const TOUR: CoachStep[] = [
+  {
+    title: 'Este espacio es tuyo',
+    text: 'Aquí puedes contar algo que viviste en el Chocó: un recuerdo, la receta de la abuela, un canto. Cuando el equipo la revise, tu historia aparecerá en el mapa interactivo, en el lugar donde pasó. Te mostramos cómo, paso a paso.',
+  },
+  {
+    target: '.story-progress',
+    title: 'Son cuatro pasos',
+    text: 'Cuéntala, dónde pasó, tu voz o fotos y tus datos. Esta barra se va llenando a medida que completas cada uno.',
+  },
+  {
+    target: '.story-form .story-step:nth-of-type(1)',
+    title: '1 · Cuéntala',
+    text: 'Ponle un título y escribe tu historia. Escoge qué tipo de historia es (mar, selva, cocina…): esa figurita es la que la señalará en el mapa.',
+  },
+  {
+    target: '.story-form .story-step:nth-of-type(2)',
+    title: '2 · ¿Dónde pasó?',
+    text: 'Escoge el municipio y el lugar. Si estás allí, puedes usar tu ubicación para que quede en el punto exacto.',
+  },
+  {
+    target: '.story-form .story-step:nth-of-type(3)',
+    title: '3 · Tu voz, fotos o video',
+    text: 'Es opcional: graba la historia con tu voz o súmale fotos y videos.',
+  },
+  {
+    target: '.story-form .story-step:nth-of-type(4)',
+    title: '4 · Tú',
+    text: 'Tu nombre o cómo quieres aparecer. El correo o WhatsApp es opcional y no se publica: solo lo usamos para avisarte cuando esté en el mapa.',
+  },
+  {
+    target: '.sheet__hero .story-preview, .story-preview-mobile',
+    title: 'Así se verá',
+    text: 'Mientras escribes, aquí ves cómo quedará tu historia en el mapa y cómo se verá al abrirla.',
+  },
+  {
+    target: '.story-submit',
+    title: 'Envíala',
+    text: 'Cuando esté lista, envíala. El equipo la revisa y la aprueba, y entonces aparece en el mapa para que todos la vean.',
+  },
+];
 import { type StoryFile, sendStory, uploadFile } from '../../application/stories-api';
 
 interface Attachment {
@@ -103,7 +147,7 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
   // El tutorial: solo la primera vez (y cuando se pide con «¿Cómo funciona?»).
   const [tutorial, setTutorial] = useState(() => {
     try {
-      return !localStorage.getItem(TUTORIAL_SEEN);
+      return !localStorage.getItem(TOUR_SEEN);
     } catch {
       return true;
     }
@@ -294,7 +338,20 @@ export default function StoryForm({ onClose, origin }: { onClose?: () => void; o
       intro="Un recuerdo, una receta, un canto. Lo que viviste en el Chocó también tiene su lugar en el mapa."
       onClose={onClose}
       aside={preview}
-      overlay={tutorial && <StoryTutorial onDone={() => setTutorial(false)} />}
+      overlay={tutorial && (
+        <Coach
+          steps={TOUR}
+          follow
+          onDone={() => {
+            setTutorial(false);
+            try {
+              localStorage.setItem(TOUR_SEEN, '1');
+            } catch {
+              // Sin almacenamiento: se volverá a ver la próxima vez.
+            }
+          }}
+        />
+      )}
     >
       <button type="button" className="story-how" onClick={() => setTutorial(true)}>¿Cómo funciona?</button>
       {/* Cómo va: cuatro pasos que se llenan. */}

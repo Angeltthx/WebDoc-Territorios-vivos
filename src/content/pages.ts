@@ -154,7 +154,9 @@ export const pages: PageSpec[] = [
     id: 'pangui-historia',
     kind: 'video',
     label: 'Estación 4 · Tráiler historia',
+    // Portada: la miniatura del tráiler en YouTube (09/11/2026; original en Contenido/Portadas).
     video: { title: 'Marea alta, marea baja', youtube: 'emQGjdx3UNE',
+      poster: { id: 'trailer-pangui-portada', alt: 'Chachita en el mar al atardecer, con el título Marea alta, marea baja' },
       synopsis: [
         'Ruth Nibeth “Chachita” Martínez es una mujer del Pacífico colombiano que, tras años de vivir a la sombra de su esposo, encuentra en la espiritualidad y en el turismo sostenible un camino para transformar su vida y la de su comunidad. A lo largo de su vida, ha superado grandes dificultades personales, la violencia, el desplazamiento y la crítica de muchas voces que le decían que emprender en el Chocó era imposible. Gracias a sus ganas de estudiar, de progresar, su fe, liderazgo y resiliencia, ha convertido un terreno deteriorado en Panguí, en una posada ecoturística, recuperando manglares y empoderando a mujeres de Panguí para liderar proyectos de turismo comunitario y responsable.',
       ],
