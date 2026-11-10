@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { pathFor } from '../../application/journey';
 import { stations } from '../../content/journey';
 import { pageIndex, type Tabs } from '../../content/pages';
 import { menu, social, type MenuItem, type SocialNetwork } from '../../content/site';
 import type { Transition } from '../../domain/types';
+import { mediaUrl } from './Media';
 
 /** Navegación del recorrido disponible para cualquier componente. Fuera del recorrido, `inJourney` es falso. */
 export const JourneyNav = createContext<{ scrollToPage: (id: string) => void; scrollToIndex: (i: number) => void; inJourney: boolean }>({
@@ -139,17 +140,55 @@ function useDialog(open: boolean) {
   return ref;
 }
 
+/** La bolita de una parada, con su imagen (09/11/2026: se escogió esta versión frente a la de solo puntos). Si no hay
+ * imagen o no carga, queda el punto. */
+function Bubble({ image, badge, onClick }: { image?: string; badge?: ReactNode; onClick?: () => void }) {
+  const [broken, setBroken] = useState(false);
+  const src = image && (image.startsWith('/') ? image : mediaUrl(image, true));
+  const photo = !!src && !broken;
+  return (
+    <span className={`rio__node${photo ? ' has-photo' : ''}`} aria-hidden="true" onClick={onClick}>
+      {photo && <img src={src} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setBroken(true)} />}
+      {badge != null && <b className="rio__badge">{badge}</b>}
+    </span>
+  );
+}
+
+/**
+ * El cauce que une las paradas: pasa por el centro de cada bolita y entre una y otra se curva hacia un lado y luego
+ * hacia el otro, como un río que serpentea. Sigue un poco más abajo de la última, hacia el mar.
+ */
+function riverPath(points: { x: number; y: number }[], tail = true) {
+  if (!points.length) return '';
+  let d = `M ${points[0].x} 0 L ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    const [a, b] = [points[i - 1], points[i]];
+    const h = b.y - a.y;
+    const dx = Math.min(18, h * 0.22) * (i % 2 ? 1 : -1);
+    d += ` C ${a.x + dx} ${a.y + h * 0.35}, ${b.x + dx} ${b.y - h * 0.35}, ${b.x} ${b.y}`;
+  }
+  const end = points[points.length - 1];
+  if (!tail) return d;
+  return `${d} C ${end.x - 12} ${end.y + 30}, ${end.x + 12} ${end.y + 50}, ${end.x} ${end.y + 80}`;
+}
+
+const slug = (label: string) => label.normalize('NFD').replace(/[^\w]+/g, '-').toLowerCase();
+
 /** La estación de una página, por el comienzo de su id (`chori-galeria` → `chori`). */
 const stationOf = (page: string) => page.split('-')[0];
 
 /**
  * Menú principal: botón fijo arriba a la derecha y un panel que se despliega desde ese lado, sin tapar toda la página
- * (pedido del cliente, 19/10/2026). Todo a la vista, sin nada plegado (30/10/2026: «Making-of» y las secciones de cada
- * estación quedaban escondidas):
- * - El recorrido, como un río: cada estación con un punto de su color y sus secciones debajo, y entre una y otra el
- *   tramo de río que las une. La página que se está viendo queda marcada.
- * - Al lado, lo que está fuera del recorrido: El proyecto y Visita Nuquí con todas sus partes, el álbum, «Tu historia»
- *   y la tienda.
+ * (pedido del cliente, 19/10/2026).
+ *
+ * Desde el 09/11/2026 es un río que baja (en la prueba con usuarios el menú de dos columnas, con todo a la vista, se
+ * veía cargado: no encontraban el viche ni entendían «Tu historia»):
+ * - Una sola columna. El río pasa por todas las paradas: la bienvenida, cada estación con su color y, entre ellas, el
+ *   nombre del tramo de río (las transiciones); al final, el mapa y, ya en el mar, lo que está fuera del recorrido.
+ * - Lo que tiene partes (las estaciones, El proyecto, Visita Nuquí) se despliega al tocarlo, de a uno; la estación que se
+ *   está viendo llega abierta. Lo de fuera del recorrido lleva una línea que dice para qué sirve.
+ * - El agua corre siempre despacio y, al bajar o subir por el menú, se acelera: el río se mueve con uno. Al abrir, el
+ *   agua baja dibujando el cauce, como el mapa de las transiciones.
  */
 export function SiteMenu({ open, onOpen, onClose, current }: {
   open: boolean;
@@ -161,79 +200,257 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
   const ref = useDialog(open);
   const { scrollToPage, inJourney } = useJourneyNav();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const journey = menu.filter((item) => item.to);
   const beyond = menu.filter((item) => !item.to);
-  const isStation = (item: MenuItem) => !!item.children;
-  const here = (item: MenuItem) => !!item.to && !!current && (item.to === current || (isStation(item) && stationOf(item.to) === stationOf(current)));
+  const isStation = (item: MenuItem) => !!item.to && !!item.children;
+  const here = (item: MenuItem) =>
+    item.to
+      ? !!current && (item.to === current || (isStation(item) && stationOf(item.to) === stationOf(current)))
+      : !!item.href && (pathname === item.href || pathname.startsWith(`${item.href}/`));
   const go = (item: MenuItem) => {
     onClose();
     if (item.href) navigate(item.href);
     else if (item.to && inJourney) scrollToPage(item.to);
     else if (item.to) navigate(pagePath(item.to));
   };
-  const link = (item: MenuItem, className = 'menu__link') => (
-    <button type="button" className={className} aria-current={item.to && item.to === current ? 'page' : undefined} onClick={() => go(item)}>
-      {item.label}
-    </button>
+
+  // Lo desplegado: uno a la vez. Al abrir el menú, la estación (o la parte) donde se está.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  useEffect(() => {
+    if (open) setExpanded(menu.find((item) => item.children && here(item))?.label ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const toggle = (label: string) => setExpanded((now) => (now === label ? null : label));
+
+  // El cauce se dibuja por donde quedaron las bolitas y se vuelve a dibujar cuando algo se despliega o cambia de tamaño.
+  const rioRef = useRef<HTMLDivElement>(null);
+  const flowRef = useRef<SVGPathElement>(null);
+  const pointsRef = useRef<{ x: number; y: number }[]>([]);
+  const [path, setPath] = useState('');
+
+  /**
+   * Al escoger algo, el agua viaja por el río desde donde se está hasta esa parada (09/11/2026, pedido tras ver el menú):
+   * un chorro brillante con una gota al frente, que al llegar hace ondas; entonces se cierra el menú y se va allá.
+   * Fuera del recorrido y sin estar en ninguna parada, el agua sale desde arriba.
+   */
+  const stops = [...journey, ...beyond];
+  const measureRef = useRef<SVGPathElement>(null);
+  const trailRef = useRef<SVGPathElement>(null);
+  const dropRef = useRef<SVGCircleElement>(null);
+  const [arriving, setArriving] = useState<string | null>(null);
+  const travelling = useRef(false);
+  const pick = (item: MenuItem, stop: MenuItem) => {
+    if (travelling.current) return;
+    const points = pointsRef.current;
+    const [measure, trail, drop] = [measureRef.current, trailRef.current, dropRef.current];
+    const to = stops.indexOf(stop);
+    const from = stops.findIndex(here);
+    if (!measure || !trail || !drop || to < 0 || !points[to] || from === to) return go(item);
+    travelling.current = true;
+    const lengthTo = (i: number) => {
+      if (i < 0) return 0;
+      measure.setAttribute('d', riverPath(points.slice(0, i + 1), false));
+      return measure.getTotalLength();
+    };
+    const [a, b] = [lengthTo(from), lengthTo(to)];
+    const time = Math.min(1200, Math.max(550, Math.abs(b - a) * 0.9));
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / time);
+      const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+      const head = a + (b - a) * e;
+      trail.style.strokeDasharray = `${Math.abs(head - a)} 100000`;
+      trail.style.strokeDashoffset = `${-Math.min(a, head)}`;
+      const p = trail.getPointAtLength(head);
+      drop.setAttribute('cx', `${p.x}`);
+      drop.setAttribute('cy', `${p.y}`);
+      if (t < 1) return void requestAnimationFrame(step);
+      setArriving(stop.label);
+      setTimeout(() => {
+        travelling.current = false;
+        go(item);
+      }, 380);
+    };
+    trail.classList.add('is-on');
+    drop.classList.add('is-on');
+    requestAnimationFrame(step);
+  };
+  // Al cerrar, el viaje se borra para la próxima vez.
+  useEffect(() => {
+    if (open) return;
+    setArriving(null);
+    travelling.current = false;
+    trailRef.current?.classList.remove('is-on');
+    dropRef.current?.classList.remove('is-on');
+  }, [open]);
+  useLayoutEffect(() => {
+    const rio = rioRef.current;
+    if (!open || !rio) return;
+    // Por la posición en la página y no la de pantalla: al abrir, las filas entran desplazadas (animación) y el cauce
+    // quedaría corrido.
+    const draw = () => {
+      const points = [...rio.querySelectorAll<HTMLElement>('.rio__node')].map((n) => {
+        let [x, y] = [n.offsetWidth / 2, n.offsetHeight / 2];
+        for (let el: HTMLElement | null = n; el && el !== rio; el = el.offsetParent as HTMLElement | null) {
+          x += el.offsetLeft;
+          y += el.offsetTop;
+        }
+        return { x: Math.round(x), y: Math.round(y) };
+      });
+      pointsRef.current = points;
+      setPath(riverPath(points));
+    };
+    draw();
+    const observer = new ResizeObserver(draw);
+    observer.observe(rio);
+    return () => observer.disconnect();
+  }, [open]);
+
+  // La corriente: despacio siempre y más rápido mientras se recorre el menú (en cualquier sentido, el agua baja).
+  useEffect(() => {
+    const panel = ref.current;
+    if (!open || !panel) return;
+    let frame = 0;
+    let last = panel.scrollTop;
+    let before = performance.now();
+    let offset = 0;
+    const tick = (now: number) => {
+      const moved = Math.abs(panel.scrollTop - last);
+      last = panel.scrollTop;
+      offset -= Math.min(now - before, 100) * 0.02 + Math.min(moved, 80) * 0.9;
+      before = now;
+      flowRef.current?.style.setProperty('stroke-dashoffset', offset.toFixed(1));
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [open, ref]);
+
+  const parts = (item: MenuItem) => {
+    // Al desplegar una estación, la primera parte es su Pensamiento (adonde lleva la estación).
+    const list = isStation(item) ? [{ label: 'Pensamiento', to: item.to }, ...item.children!] : item.children!;
+    const shown = expanded === item.label;
+    return (
+      <div className="rio__more" id={`rio-${slug(item.label)}`} data-open={shown || undefined} inert={!shown}>
+        <ul className="rio__parts">
+          {list.map((sub) => (
+            <li key={sub.label}>
+              <button type="button" className="rio__part" aria-current={sub.to && sub.to === current ? 'page' : undefined} onClick={() => pick(sub, item)}>
+                {sub.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+  const text = (title: ReactNode, meta?: ReactNode) => (
+    <span className="rio__text">
+      <span className="rio__name">{title}</span>
+      {meta && <span className="rio__meta">{meta}</span>}
+    </span>
   );
+  // Tocar el nombre (o la bolita) lleva directo; la flecha de al lado despliega las partes (09/11/2026: antes tocar una
+  // estación solo la desplegaba y parecía que no hacía nada).
+  const row = (item: MenuItem, title: ReactNode, meta?: ReactNode) => (
+    <>
+      <button type="button" className="rio__row" aria-current={item.to && item.to === current ? 'page' : undefined} onClick={() => pick(item, item)}>
+        {text(title, meta)}
+      </button>
+      {item.children && (
+        <button
+          type="button"
+          className="rio__toggle"
+          aria-expanded={expanded === item.label}
+          aria-controls={`rio-${slug(item.label)}`}
+          aria-label={`${expanded === item.label ? 'Ocultar' : 'Ver'} las partes de ${typeof title === 'string' ? title : item.label}`}
+          onClick={() => toggle(item.label)}
+        >
+          <svg className="rio__chevron" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+    </>
+  );
+  let order = 0;
+  const itemProps = (kind: string, item: MenuItem, extra?: Record<string, string | undefined>) => ({
+    className: `rio__item rio__item--${kind}${here(item) ? ' is-here' : ''}${expanded === item.label ? ' is-open' : ''}${arriving === item.label ? ' is-arriving' : ''}`,
+    style: { ['--i' as string]: order++, ...extra },
+  });
+
   return (
     <>
       <button type="button" className="menu-btn" onClick={onOpen} aria-label="Abrir menú" aria-haspopup="dialog">
         <span /><span /><span />
       </button>
-      <dialog ref={ref} className="menu" onClose={onClose} onClick={(e) => e.target === ref.current && onClose()} aria-label="Menú">
+      <dialog
+        ref={ref}
+        className="menu"
+        onClose={onClose}
+        onClick={(e) => e.target === ref.current && onClose()}
+        aria-label="Menú"
+      >
         <div className="menu__panel">
           <div className="menu__head">
             <p className="menu__brand">Territorios <em>Vivos</em></p>
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar menú">✕</button>
           </div>
-          <div className="menu__cols">
-            <nav className="menu__journey" aria-labelledby="menu-recorrido">
-              <h2 id="menu-recorrido" className="menu__title">El recorrido</h2>
-              <ol className="menu__river">
-                {journey.map((item) => {
-                  if (!isStation(item)) {
-                    // El último, el mapa, es el final del recorrido: va como una estación.
-                    const end = item === journey[journey.length - 1];
-                    return <li key={item.label} className={`menu__stop${end ? ' menu__stop--end' : ''}${here(item) ? ' is-here' : ''}`}>{link(item)}</li>;
+          <div className="rio" ref={rioRef}>
+            {path && (
+              <svg className="rio__cauce" aria-hidden="true">
+                <path className="rio__bed" d={path} />
+                <path className="rio__water" d={path} pathLength={1} />
+                <path ref={flowRef} className="rio__flow" d={path} />
+                <path ref={trailRef} className="rio__trail" d={path} />
+                <path ref={measureRef} className="rio__measure" />
+                <circle ref={dropRef} className="rio__drop" r={5} />
+              </svg>
+            )}
+            <nav aria-label="El recorrido">
+              <ol className="rio__list">
+                {journey.map((item, i) => {
+                  if (isStation(item)) {
+                    const [number, name] = item.label.split(' · ');
+                    const station = stations.find((s) => s.id === stationOf(item.to!));
+                    return (
+                      <li key={item.label} {...itemProps('station', item, { ['--accent']: station?.accent })}>
+                        <Bubble image={station?.background.id} badge={station?.number} onClick={() => pick(item, item)} />
+                        {row(item, name ?? item.label, `${number}${station ? ` · ${station.place}` : ''}`)}
+                        {parts(item)}
+                      </li>
+                    );
                   }
-                  const [number, name] = item.label.split(' · ');
-                  const station = stations.find((s) => s.id === stationOf(item.to!));
+                  // La bienvenida y el mapa son las puntas del río; lo demás, los tramos entre estaciones.
+                  const end = i === 0 || i === journey.length - 1;
                   return (
-                    <li key={item.label} className={`menu__station${here(item) ? ' is-here' : ''}`} style={station ? { ['--accent' as string]: station.accent } : undefined}>
-                      <button type="button" className="menu__station-link" aria-current={item.to === current ? 'page' : undefined} onClick={() => go(item)}>
-                        <span className="menu__station-name">{name ?? item.label}</span>
-                        <span className="menu__station-meta">{number}{station ? ` · ${station.place}` : ''}</span>
-                      </button>
-                      <ul className="menu__sections">
-                        {item.children!.map((sub) => <li key={sub.label}>{link(sub, 'menu__section')}</li>)}
-                      </ul>
+                    <li key={item.label} {...itemProps(end ? 'stop' : 'reach', item)}>
+                      {end ? <Bubble image={item.image} onClick={() => pick(item, item)} /> : <span className="rio__node" aria-hidden="true" />}
+                      {row(item, item.label)}
                     </li>
                   );
                 })}
               </ol>
             </nav>
-            <nav className="menu__beyond" aria-labelledby="menu-mas">
-              <h2 id="menu-mas" className="menu__title">Más del documental</h2>
-              <ul className="menu__groups">
+            <nav aria-labelledby="menu-mas">
+              <h2 id="menu-mas" className="rio__sea" style={{ ['--i' as string]: order++ }}>Más del documental</h2>
+              <ul className="rio__list">
                 {beyond.map((item) => (
-                  <li key={item.label} className={`menu__group${item.children ? ' menu__group--parts' : ''}`}>
-                    {link(item, 'menu__group-link')}
-                    {item.children && (
-                      <ul className="menu__parts">
-                        {item.children.map((sub) => <li key={sub.label}>{link(sub, 'menu__section')}</li>)}
-                      </ul>
-                    )}
+                  <li key={item.label} {...itemProps('group', item)}>
+                    <Bubble image={item.image} onClick={() => pick(item, item)} />
+                    {row(item, item.label, item.hint)}
+                    {item.children && parts(item)}
                   </li>
                 ))}
               </ul>
-              <div className="menu__foot">
-                <SocialLinks className="menu__social" />
-                <p className="menu__credit">
-                  Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
-                </p>
-              </div>
             </nav>
+          </div>
+          <div className="menu__foot">
+            <SocialLinks className="menu__social" />
+            <p className="menu__credit">
+              Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
+            </p>
           </div>
         </div>
       </dialog>

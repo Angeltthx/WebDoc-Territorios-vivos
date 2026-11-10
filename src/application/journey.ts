@@ -63,6 +63,13 @@ const clamp = (i: number) => Math.max(0, Math.min(TOTAL_PAGES - 1, i));
 /** Un campo donde se escribe: ahí las teclas son del campo. */
 const editable = (t: Element | null) => !!t?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
 
+/**
+ * Alto de una página, exacto. `clientHeight` viene redondeado a un número entero y, con el zoom del navegador distinto
+ * de 100 %, las páginas miden fracciones (739,4 px): multiplicado por el número de página, el error se acumulaba y en
+ * las últimas se asomaba arriba una franja de la anterior (unos 8 px en la 18; visto el 09/11/2026).
+ */
+const pageHeight = (el: HTMLElement) => el.getBoundingClientRect().height || el.clientHeight;
+
 export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
   const [active, setActive] = useState(() => indexFromPath(window.location.pathname));
   const activeRef = useRef(active);
@@ -80,7 +87,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
     gliding.current = 0;
     const target = clamp(i);
     anchor.current = target;
-    const top = target * el.clientHeight;
+    const top = target * pageHeight(el);
     // Ya está ahí: no hay desplazamiento (ni su scrollend), así que no se espera ninguno.
     if (Math.abs(el.scrollTop - top) <= 1) {
       settling.current = false;
@@ -169,22 +176,22 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       // El navegador ya dejó la página en su sitio: solo se toma nota de dónde quedó.
       if (NATIVE_SNAP) {
         settling.current = false;
-        anchor.current = clamp(Math.round(el.scrollTop / el.clientHeight));
+        anchor.current = clamp(Math.round(el.scrollTop / pageHeight(el)));
         return;
       }
       if (settling.current) {
         // Sin scrollend, una pausa del navegador (p. ej. mientras carga el planeta) no es la llegada: se sigue esperando.
-        const away = Math.abs(el.scrollTop - goal.current * el.clientHeight) > 2;
+        const away = Math.abs(el.scrollTop - goal.current * pageHeight(el)) > 2;
         if (!HAS_SCROLLEND && away && performance.now() - goalSince.current < SETTLE_MAX_MS) {
           window.clearTimeout(idle);
           idle = window.setTimeout(settle, IDLE_MS);
           return;
         }
         settling.current = false;
-        anchor.current = Math.round(el.scrollTop / el.clientHeight);
+        anchor.current = Math.round(el.scrollTop / pageHeight(el));
         return;
       }
-      const pos = el.scrollTop / el.clientHeight;
+      const pos = el.scrollTop / pageHeight(el);
       const delta = pos - anchor.current;
       let target = anchor.current;
       if (Math.abs(delta) >= 1) target = Math.round(pos);
@@ -195,7 +202,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
 
     const onScroll = () => {
       if (resizing()) return;
-      const i = clamp(Math.round(el.scrollTop / el.clientHeight));
+      const i = clamp(Math.round(el.scrollTop / pageHeight(el)));
       if (i !== activeRef.current) {
         activeRef.current = i;
         // Sin prisa: el desplazamiento (el dedo) va primero; las páginas se actualizan cuando haya tiempo.
@@ -291,7 +298,7 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       const recent = now - t.t > 80 ? 0 : t.v;
       const whole = now - t.t0 < 300 ? dy / Math.max(16, now - t.t0) : 0;
       const v = Math.abs(recent) >= Math.abs(whole) ? recent : whole;
-      const h = el.clientHeight;
+      const h = pageHeight(el);
       const far = Math.abs(dy) >= SWIPE_DISTANCE * h;
       const flick = Math.abs(v) >= SWIPE_VELOCITY && Math.sign(v) === Math.sign(dy) && Math.abs(dy) >= SWIPE_FLICK_MIN * h;
       const target = clamp(anchor.current + (far || flick ? Math.sign(dy) : 0));
@@ -338,10 +345,10 @@ export function useScrollJourney(scroller: RefObject<HTMLElement | null>) {
       settling.current = false;
       // Con el dedo puesto (en el iPhone la barra del navegador cambia de tamaño mientras se desliza) no se salta la
       // página bajo el dedo: al soltar se acomoda.
-      if (!touching) el.scrollTop = anchor.current * el.clientHeight;
+      if (!touching) el.scrollTop = anchor.current * pageHeight(el);
       window.clearTimeout(realign);
       realign = window.setTimeout(() => {
-        if (!touching) el.scrollTop = anchor.current * el.clientHeight;
+        if (!touching) el.scrollTop = anchor.current * pageHeight(el);
         resizingUntil = 0;
       }, 360);
     };

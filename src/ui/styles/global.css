@@ -756,88 +756,177 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .menu-btn span { display: block; width: 18px; height: 1.6px; background: #fff; border-radius: 2px; transition: transform 0.3s var(--ease); }
 .menu-btn:hover span:nth-child(2) { transform: translateX(3px); }
 .topbar { padding-right: 70px; }
+/* En el recorrido, la barra queda a la altura del botón del menú: lo de la barra (el rótulo y «Ver mapa interactivo»)
+   centrado con sus tres rayas (pedido del cliente, 09/11/2026: «Ver mapa interactivo» quedaba más abajo). */
+.stack-page .topbar {
+  padding-top: max(14px, env(safe-area-inset-top)); padding-bottom: 0;
+  min-height: calc(max(14px, env(safe-area-inset-top)) + 44px);
+}
 
-/* Panel que se despliega desde la derecha: la página sigue a la vista detrás, oscurecida (30/10/2026: más ancho y con
-   todo a la vista, en dos columnas: el recorrido como un río y, al lado, lo que está fuera de él). */
+/* Panel que se despliega desde la derecha: la página sigue a la vista detrás, oscurecida. Desde el 09/11/2026, una sola
+   columna con el río que baja (ver SiteMenu en Chrome.tsx). */
 .menu {
-  width: min(940px, 100vw); height: 100dvh; max-width: none; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0;
+  --water: #9fe3f2; --col: 58px;
+  width: min(500px, 100vw); height: 100dvh; max-width: none; max-height: none; margin: 0 0 0 auto; padding: 0; border: 0;
   background: #0c1d17; color: #fff; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent; box-shadow: -24px 0 60px rgba(0, 0, 0, 0.4);
 }
-.menu[open] { animation: menu-in 0.45s var(--ease) both; }
+.menu[open] { animation: menu-in 0.45s var(--ease) both, menu-edge 6s linear infinite; }
 @keyframes menu-in { from { transform: translateX(48px); opacity: 0; } to { transform: none; opacity: 1; } }
-.menu::backdrop { background: rgba(4, 12, 10, 0.5); }
-.menu__panel { min-height: 100%; display: flex; flex-direction: column; gap: clamp(20px, 3vh, 32px); padding: max(14px, env(safe-area-inset-top)) clamp(20px, 3.4vw, 44px) max(24px, env(safe-area-inset-bottom)); }
+/* El borde izquierdo del panel es una orilla de agua que corre hacia abajo, y lo de detrás se tiñe del mismo verde del
+   panel (antes, un gris neutro sin relación con el menú): la página queda como vista a través del agua. */
+.menu {
+  --orilla: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 140' preserveAspectRatio='none'%3E%3Cpath d='M18 0H9C2 18 2 52 9 70C16 88 16 122 9 140H18Z'/%3E%3C/svg%3E");
+  -webkit-mask: var(--orilla) 0 0 / 18px 140px repeat-y, linear-gradient(#000, #000) 17px 0 / calc(100% - 17px) 100% no-repeat;
+  mask: var(--orilla) 0 0 / 18px 140px repeat-y, linear-gradient(#000, #000) 17px 0 / calc(100% - 17px) 100% no-repeat;
+  background:
+    radial-gradient(120% 60% at 0% 0%, rgba(159, 227, 242, 0.08), transparent 60%),
+    radial-gradient(90% 50% at 0% 100%, rgba(232, 187, 82, 0.06), transparent 60%),
+    #0c1d17;
+}
+@keyframes menu-edge { to { -webkit-mask-position: 0 140px, 17px 0; mask-position: 0 140px, 17px 0; } }
+.menu::backdrop {
+  background: linear-gradient(90deg, rgba(8, 24, 19, 0.35), rgba(8, 24, 19, 0.78) 70%);
+  -webkit-backdrop-filter: blur(3px) saturate(0.8); backdrop-filter: blur(3px) saturate(0.8);
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu[open] { animation: menu-in 0.45s ease both, menu-edge 10s linear infinite !important; animation-iteration-count: 1, infinite !important; }
+}
+.menu__panel { min-height: 100%; display: flex; flex-direction: column; gap: clamp(14px, 2.4vh, 24px); padding: max(14px, env(safe-area-inset-top)) clamp(16px, 3vw, 32px) max(24px, env(safe-area-inset-bottom)) calc(clamp(16px, 3vw, 32px) + 12px); }
 .menu__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
 .menu__brand { font: 400 22px/1 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em; }
 .menu__brand em { font-style: italic; }
-.menu__cols { flex: 1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
-.menu__title {
-  margin: 0 0 18px; font: 400 15px/1.2 var(--sans); color: rgba(255, 255, 255, 0.6);
-}
-.menu__journey, .menu__beyond { min-width: 0; }
-/* Lo de fuera del recorrido se queda a la vista mientras se baja por el río. */
-.menu__beyond { position: sticky; top: 0; display: flex; flex-direction: column; }
 
-/* El río: un cauce de agua que baja con las paradas encima. Las estaciones llevan un punto de su color; los tramos de
-   río y las puntas (la bienvenida, el mapa), uno pequeño. */
-.menu__river { position: relative; list-style: none; margin: 0; padding: 0 0 0 30px; display: grid; gap: 2px; }
-.menu__river::before {
-  content: ''; position: absolute; left: 7px; top: 18px; bottom: 18px; width: 3px; border-radius: 2px;
-  background: rgba(143, 196, 214, 0.32);
-}
-.menu__stop, .menu__station { position: relative; }
-.menu__stop::before, .menu__station::before {
-  content: ''; position: absolute; border-radius: 50%; transition: transform 0.25s var(--ease), background 0.25s;
-}
-.menu__stop::before { left: -27px; top: 15px; width: 9px; height: 9px; background: #0c1d17; box-shadow: 0 0 0 2px rgba(143, 196, 214, 0.75); }
-.menu__station::before { left: -30px; top: 16px; width: 15px; height: 15px; background: var(--accent, var(--gold)); box-shadow: 0 0 0 4px #0c1d17; }
-.menu__stop.is-here::before { background: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
-.menu__station.is-here::before { transform: scale(1.25); box-shadow: 0 0 0 4px #0c1d17, 0 0 0 6px var(--accent, var(--gold)); }
-.menu__link {
-  display: inline-flex; align-items: center; min-height: 40px; padding: 4px 0; border: 0; background: none; text-align: left;
-  font: italic 400 15px/1.3 var(--sans); color: rgba(255, 255, 255, 0.72); transition: color 0.2s;
-}
-.menu__station { padding: 4px 0 6px; }
-.menu__station-link {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 4px 0; border: 0; background: none; text-align: left; color: #fff;
-}
-.menu__station-name { font: 400 clamp(21px, 1.9vw, 25px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em; transition: color 0.2s; }
-.menu__station-meta { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
-.menu__station-link:hover .menu__station-name, .menu__station-link[aria-current='page'] .menu__station-name { color: var(--gold); }
-/* Las secciones de una estación, siempre a la vista, en una fila que se acomoda. */
-.menu__sections, .menu__parts { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 18px; }
-.menu__section {
-  display: inline-flex; align-items: center; min-height: 36px; padding: 2px 0; border: 0; background: none;
-  font: 400 15px/1.3 var(--sans); color: rgba(255, 255, 255, 0.82); transition: color 0.2s;
-}
-/* El final del recorrido, el mapa: como una estación, con el punto dorado. */
-.menu__stop--end::before { left: -30px; top: 16px; width: 15px; height: 15px; background: var(--gold); box-shadow: 0 0 0 4px #0c1d17; }
-.menu__stop--end .menu__link { font: 400 clamp(21px, 1.9vw, 25px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; color: #fff; }
-.menu__link:hover, .menu__section:hover, .menu__link[aria-current='page'], .menu__section[aria-current='page'] { color: var(--gold); }
+/* El río: el cauce (ancho y apagado), el agua que baja dibujándolo al abrir y la corriente, que mueve SiteMenu. */
+.rio { position: relative; flex: 1; }
+.rio__cauce { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.rio__cauce path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.rio__bed { stroke: rgba(143, 196, 214, 0.13); stroke-width: 14; }
+.rio__water { stroke: rgba(159, 227, 242, 0.5); stroke-width: 3; stroke-dasharray: 1; stroke-dashoffset: 1; filter: drop-shadow(0 0 3px rgba(159, 227, 242, 0.6)); }
+.menu[open] .rio__water { animation: rio-draw 1.8s var(--ease) 0.2s forwards; }
+.rio__flow { stroke: #fff; stroke-width: 2.2; stroke-dasharray: 2 20; opacity: 0; filter: drop-shadow(0 0 3px var(--water)); }
+.menu[open] .rio__flow { animation: rio-flow-in 0.8s ease 1.4s forwards; }
+@keyframes rio-draw { to { stroke-dashoffset: 0; } }
+@keyframes rio-flow-in { to { opacity: 0.85; } }
+/* El viaje al escoger algo: un chorro brillante desde donde se está hasta la parada, con una gota al frente. */
+.rio__measure { visibility: hidden; }
+.rio__trail { stroke: #fff; stroke-width: 4; opacity: 0; filter: drop-shadow(0 0 4px var(--water)) drop-shadow(0 0 10px rgba(159, 227, 242, 0.7)); }
+.rio__trail.is-on { opacity: 1; }
+.rio__drop { fill: #fff; opacity: 0; filter: drop-shadow(0 0 6px var(--water)) drop-shadow(0 0 2px #fff); }
+.rio__drop.is-on { opacity: 1; }
 
-/* Fuera del recorrido: cada parte con su nombre grande y, debajo, todas sus páginas. */
-.menu__groups { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
-.menu__group-link {
-  padding: 4px 0; border: 0; background: none; text-align: left; color: #fff;
-  font: 400 clamp(21px, 1.9vw, 25px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em;
-  transition: color 0.2s;
+.rio__list { list-style: none; margin: 0; padding: 0; position: relative; }
+.rio__item { position: relative; display: grid; grid-template-columns: var(--col) minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
+.rio__node.has-photo, .rio__item--stop .rio__node { cursor: pointer; }
+.menu[open] .rio__item, .menu[open] .rio__sea { animation: rise 0.5s var(--ease) calc(0.12s + var(--i, 0) * 30ms) both; }
+.rio__item--station, .rio__item--group { padding: 6px 0; }
+
+/* Las bolitas. Sin foto: un punto (las estaciones, de su color y con su número). Con foto: la imagen en un círculo. */
+.rio__node { grid-column: 1; grid-row: 1; justify-self: center; position: relative; z-index: 1; display: grid; place-items: center; border-radius: 50%; }
+/* La imagen llena el círculo sin salirse, sea cual sea su forma (el afiche de la tienda es alto). */
+.rio__node img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; border-radius: 50%; }
+.rio__item--reach .rio__node { width: 9px; height: 9px; background: #0c1d17; box-shadow: 0 0 0 2px rgba(159, 227, 242, 0.7); }
+.rio__item--stop .rio__node { width: 14px; height: 14px; background: var(--gold); box-shadow: 0 0 0 4px #0c1d17; }
+.rio__item--group .rio__node { width: 13px; height: 13px; background: #0c1d17; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75), 0 0 0 5px #0c1d17; }
+.rio__item--station .rio__node { width: 28px; height: 28px; background: var(--accent); box-shadow: 0 0 0 5px #0c1d17; }
+.rio__badge { font: 700 13px/1 var(--sans); color: #0c1d17; }
+.rio__node.has-photo { background: #0c1d17; box-shadow: 0 0 0 2.5px var(--accent, rgba(255, 255, 255, 0.85)), 0 0 0 6px #0c1d17; }
+.rio__item--stop .rio__node.has-photo { width: 42px; height: 42px; --accent: var(--gold); }
+.rio__item--group .rio__node.has-photo { width: 44px; height: 44px; }
+.rio__item--station .rio__node.has-photo { width: 56px; height: 56px; box-shadow: 0 0 0 3px var(--accent), 0 0 0 7px #0c1d17; }
+.rio__node.has-photo .rio__badge {
+  position: absolute; right: -5px; bottom: -3px; width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); font-size: 11px; box-shadow: 0 0 0 2px #0c1d17;
 }
-.menu__group-link:hover { color: var(--gold); }
-/* Las partes van en un recuadro apenas más claro, para leerse como un grupo. */
-.menu__group--parts { padding: 14px 18px 10px; margin: 0 -18px; border-radius: 6px; background: rgba(255, 255, 255, 0.045); }
-.menu__foot { padding-top: 28px; display: grid; gap: 12px; }
+/* Donde se está: la bolita hace ondas, como la parada a la que se llega en el mapa de las transiciones. */
+.rio__item.is-here > .rio__node::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--accent, var(--water));
+  animation: rio-ripple 2.4s ease-out 1s infinite; opacity: 0;
+}
+@keyframes rio-ripple { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.9); opacity: 0; } }
+/* Al llegar el agua: la bolita crece un poco y suelta una onda grande. */
+.rio__item.is-arriving > .rio__node { animation: rio-arrive 0.45s var(--ease) both; }
+.rio__item.is-arriving > .rio__node::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 3px solid var(--water);
+  animation: rio-ripple 0.7s ease-out both;
+}
+.rio__item.is-arriving > .rio__row .rio__name { color: var(--gold); }
+@keyframes rio-arrive { 50% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) {
+  .rio__item.is-arriving > .rio__node { animation-duration: 0.45s !important; }
+  .menu[open] .rio__water { animation-duration: 1.8s !important; }
+  .menu[open] .rio__flow { animation-duration: 0.8s !important; }
+  .rio__item.is-arriving > .rio__node::before { animation-duration: 0.7s !important; }
+  .rio__item.is-here > .rio__node::after { animation-duration: 2.4s !important; animation-iteration-count: infinite !important; }
+}
+
+/* Cada parada: su nombre, una línea debajo (dónde queda o para qué sirve) y, si tiene partes, la flecha para abrirlas. */
+.rio__row {
+  grid-column: 2; grid-row: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;
+  min-height: 48px; padding: 6px 0; border: 0; background: none; text-align: left; color: #fff;
+}
+.rio__text { display: grid; gap: 2px; min-width: 0; }
+.rio__name { font: 400 clamp(20px, 1.8vw, 23px)/1.15 'Fraunces', var(--serif); font-variation-settings: 'opsz' 72, 'SOFT' 100; letter-spacing: -0.01em; transition: color 0.2s; }
+.rio__meta { font-size: 13px; line-height: 1.35; color: rgba(255, 255, 255, 0.62); }
+.rio__item--reach .rio__row { min-height: 38px; padding: 2px 0; }
+.rio__item--reach .rio__name { font: italic 400 14.5px/1.3 var(--sans); color: rgba(159, 227, 242, 0.85); }
+.rio__row:hover .rio__name, .rio__row[aria-current='page'] .rio__name, .rio__item.is-here > .rio__row .rio__name { color: var(--gold); }
+.rio__chevron {
+  flex: none; box-sizing: content-box; padding: 7px; border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent, #9fe3f2) 45%, transparent);
+  background: color-mix(in srgb, var(--accent, #9fe3f2) 10%, transparent);
+  color: var(--accent, #9fe3f2); transition: transform 0.3s var(--ease), border-color 0.2s, color 0.2s, background 0.2s;
+}
+.rio__toggle { grid-column: 3; grid-row: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: none; color: inherit; }
+.rio__toggle:hover .rio__chevron { border-color: var(--accent, var(--water)); background: color-mix(in srgb, var(--accent, #9fe3f2) 22%, transparent); }
+.rio__item.is-open > .rio__toggle .rio__chevron { transform: rotate(180deg); border-color: var(--accent, var(--water)); background: var(--accent, var(--water)); color: #0c1d17; }
+
+/* Las partes se despliegan (de a una parada) como un afluente: un brazo de agua sale del río junto a la bolita y baja
+   por la lista, con un punto en cada parte, como las paradas del río (09/11/2026: antes eran pastillas, que no
+   cuadraban con el resto del menú). */
+.rio__more {
+  --arroyo: color-mix(in srgb, var(--accent, #9fe3f2) 60%, transparent);
+  position: relative; grid-column: 2 / -1; display: grid; grid-template-rows: 0fr; opacity: 0;
+  transition: grid-template-rows 0.35s var(--ease), opacity 0.3s;
+}
+.rio__more[data-open] { grid-template-rows: 1fr; opacity: 1; }
+/* El brazo que sale del río (en el centro de la columna de las bolitas) y dobla hacia la lista. */
+.rio__more::before {
+  content: ''; position: absolute; top: -14px; left: calc(-12px - var(--col) / 2); width: calc(12px + var(--col) / 2 + 8px); height: 30px;
+  border-left: 2px solid var(--arroyo); border-bottom: 2px solid var(--arroyo); border-bottom-left-radius: 18px;
+}
+.rio__parts { position: relative; min-height: 0; overflow: hidden; list-style: none; margin: 0; padding: 0; display: grid; }
+.rio__more[data-open] .rio__parts { padding: 0 0 8px; }
+/* Y sigue bajando por la lista hasta la última parte. */
+.rio__parts::before { content: ''; position: absolute; left: 7px; top: 14px; bottom: 27px; width: 2px; border-radius: 2px; background: var(--arroyo); }
+.rio__part {
+  position: relative; display: flex; align-items: center; width: 100%; min-height: 38px; padding: 4px 0 4px 28px;
+  border: 0; background: none; color: rgba(255, 255, 255, 0.8); font: 400 15px/1.3 var(--sans); text-align: left; transition: color 0.2s;
+}
+.rio__part::before {
+  content: ''; position: absolute; left: 3px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%;
+  background: #0c1d17; box-shadow: 0 0 0 2px var(--arroyo); transition: background 0.2s, transform 0.2s var(--ease);
+}
+.rio__part:hover { color: #fff; }
+.rio__part:hover::before { background: var(--accent, var(--water)); transform: scale(1.2); }
+.rio__part[aria-current='page'] { color: var(--gold); font-weight: 600; }
+.rio__part[aria-current='page']::before { background: var(--accent, var(--water)); box-shadow: 0 0 0 2px var(--accent, var(--water)), 0 0 8px var(--accent, var(--water)); }
+
+/* Donde el río llega al mar empieza lo que está fuera del recorrido. */
+.rio__sea {
+  margin: 22px 0 6px calc(var(--col) + 12px); font: 600 12px/1.2 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.menu__foot { padding: 20px 0 0 calc(var(--col) + 12px); display: grid; gap: 12px; }
 .menu__social { padding: 0; }
 .menu__credit { margin: 0; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 .menu__credit a { color: #fff; font-weight: 600; text-decoration: none; }
 .menu__credit a:hover { color: var(--gold); }
-/* Al abrir, las dos columnas entran una tras otra. */
-.menu[open] .menu__journey { animation: rise 0.5s var(--ease) 0.08s both; }
-.menu[open] .menu__beyond { animation: rise 0.5s var(--ease) 0.16s both; }
-@media (max-width: 760px) {
-  .menu__cols { grid-template-columns: minmax(0, 1fr); gap: 36px; }
-  .menu__beyond { position: static; }
-  .menu__group--parts { margin: 0 -8px; padding: 12px 14px 8px; }
+@media (max-width: 420px) {
+  .menu { --col: 50px; }
+  .rio__item--station .rio__node.has-photo { width: 48px; height: 48px; }
+  .rio__item--group .rio__node.has-photo { width: 40px; height: 40px; }
+  .rio__item--stop .rio__node.has-photo { width: 38px; height: 38px; }
 }
 
 .social { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }

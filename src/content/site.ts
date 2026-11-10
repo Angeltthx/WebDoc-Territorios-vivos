@@ -6,12 +6,16 @@ export interface MenuItem {
   label: string;
   to?: string;
   href?: string;
-  /** Secciones de una estación: se despliegan debajo de ella. */
+  /** Secciones de una estación o partes de un grupo: se despliegan debajo de él. */
   children?: MenuItem[];
+  /** Una línea que dice para qué sirve (fuera del recorrido): en la prueba con usuarios no se entendía qué era «Tu historia». */
+  hint?: string;
+  /** Imagen de la bolita en la versión con fotos: id de public/media o una dirección que empieza por «/». Las estaciones usan su fondo. */
+  image?: string;
 }
 
 export const menu: MenuItem[] = [
-  { label: 'Bienvenida', to: 'inicio' },
+  { label: 'Bienvenida', to: 'inicio', image: '6i3a4308' },
   { label: 'Río Chorí', to: 'transicion-inicio' },
   {
     label: 'Estación 1 · El latido',
@@ -50,15 +54,17 @@ export const menu: MenuItem[] = [
       { label: 'Galería', to: 'pangui-galeria' },
       { label: 'Manglar - Cantos', to: 'pangui-cantos' },
       { label: 'Video canción', to: 'pangui-video-cancion' },
-      { label: 'Un regalo de la selva', to: 'pangui-viche' },
+      { label: 'El viche · un regalo de la selva', to: 'pangui-viche' },
     ],
   },
   { label: 'Volver a las raíces', to: 'transicion-4' },
-  { label: 'Mapa interactivo', to: 'cierre' },
+  { label: 'Mapa interactivo', to: 'cierre', image: 'proyecto-rio-aereo' },
   // Las páginas del Canva del cliente (27/10/2026), fuera del recorrido.
   {
     label: 'El proyecto',
     href: '/el-proyecto',
+    hint: 'Quiénes lo hicimos y cómo',
+    image: 'proyecto-camara',
     children: [
       { label: 'Historia', href: '/el-proyecto' },
       { label: 'Equipo', href: '/el-proyecto/equipo' },
@@ -69,6 +75,8 @@ export const menu: MenuItem[] = [
   {
     label: 'Visita Nuquí',
     href: '/visita-nuqui',
+    hint: 'El viche, el afiche y dónde reservar',
+    image: 'proyecto-nuqui-aereo',
     children: [
       { label: 'Llévate Nuquí', href: '/visita-nuqui' },
       { label: 'El viche', href: '/visita-nuqui/el-viche' },
@@ -76,9 +84,10 @@ export const menu: MenuItem[] = [
     ],
   },
   // El disco (pedido del cliente, 27/10/2026).
-  { label: 'Álbum musical', href: '/album-musical' },
-  { label: 'Tu historia', href: '/cuenta-tu-historia' },
-  { label: 'Tienda', href: '/tienda' },
+  { label: 'Álbum musical', href: '/album-musical', hint: 'Las canciones del documental', image: '/media/album/portada-640.webp' },
+  // «Tu historia» no se entendía en la prueba con usuarios (09/11/2026).
+  { label: 'Cuenta tu historia', href: '/cuenta-tu-historia', hint: 'Comparte tu propio relato del territorio', image: 'orfelina-y-familia-con-grupo-de-danza' },
+  { label: 'Tienda', href: '/tienda', hint: 'El afiche-mapa con realidad aumentada', image: '/media/tienda/poster-mapa-sm.webp' },
 ];
 
 export type SocialNetwork = 'youtube' | 'instagram' | 'tiktok';
