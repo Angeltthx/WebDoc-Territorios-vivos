@@ -2505,7 +2505,8 @@ button.ap-kpi:hover { background: var(--ap-head); }
    Línea blanca sobre fondo transparente, a la derecha de la cita (en el celular, arriba a la izquierda). Nuquí y el
    Chocó en Colombia, resaltados en dorado; la estación de la página, con un punto que palpita y su nombre. */
 .locator {
-  position: absolute; z-index: 4; right: clamp(70px, 7vw, 120px); top: 50%; translate: 0 -50%;
+  /* Pegado al borde derecho (pedido del 12/11/2026): más adentro quedaba encima de la cara en los retratos. */
+  position: absolute; z-index: 4; right: clamp(16px, 1.5vw, 28px); top: 50%; translate: 0 -50%;
   height: min(68vh, 620px); aspect-ratio: 208 / 497; pointer-events: none;
   filter: drop-shadow(0 0 3px rgba(4, 12, 10, 0.75)) drop-shadow(0 1px 10px rgba(4, 12, 10, 0.45)); animation: fade 1.2s ease 0.8s both;
 }
