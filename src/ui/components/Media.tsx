@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useCallback, useState, type CSSProperties } from 'react';
 import type { Photo } from '../../domain/types';
 import manifest from '../../content/media-manifest.json';
 
@@ -28,9 +28,18 @@ interface ImgProps {
 
 export function Img({ photo, className, priority, sizes = '100vw', style }: ImgProps) {
   const single = SINGLE_SIZE.test(photo.id);
+  // Precarga (12/11/2026): la foto entra fundiéndose cuando termina de bajar; mientras tanto se ve el esqueleto de su
+  // marco (o, en los fondos, la versión pequeña). Si ya estaba en la caché, entra sin fundido.
+  const [loaded, setLoaded] = useState(false);
+  const ref = useCallback((el: HTMLImageElement | null) => {
+    if (el?.complete && el.naturalWidth > 0) setLoaded(true);
+  }, []);
   return (
     <img
-      className={className}
+      ref={ref}
+      onLoad={() => setLoaded(true)}
+      onError={() => setLoaded(true)}
+      className={`media-img${loaded ? ' is-loaded' : ''}${className ? ` ${className}` : ''}`}
       src={mediaUrl(photo.id, !priority)}
       srcSet={single ? undefined : `${mediaUrl(photo.id, true)} 900w, ${mediaUrl(photo.id)} 2200w`}
       sizes={single ? undefined : sizes}
