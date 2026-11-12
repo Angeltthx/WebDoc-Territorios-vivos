@@ -2508,7 +2508,16 @@ button.ap-kpi:hover { background: var(--ap-head); }
   /* Pegado al borde derecho (pedido del 12/11/2026): más adentro quedaba encima de la cara en los retratos. */
   position: absolute; z-index: 4; right: clamp(16px, 1.5vw, 28px); top: 50%; translate: 0 -50%;
   height: min(68vh, 620px); aspect-ratio: 208 / 497; pointer-events: none;
-  filter: drop-shadow(0 0 3px rgba(4, 12, 10, 0.75)) drop-shadow(0 1px 10px rgba(4, 12, 10, 0.45)); animation: fade 1.2s ease 0.8s both;
+  filter: drop-shadow(0 0 3px rgba(4, 12, 10, 0.75)) drop-shadow(0 1px 10px rgba(4, 12, 10, 0.45));
+  /* Esqueleto (pedido del 12/11/2026): mientras la página entra, el mapa ya está ahí, tenue; al llegar se ilumina.
+     Antes aparecía de golpe: las animaciones de las páginas ocultas están en pausa y el fundido esperaba 0,8 s. */
+  opacity: 0.18;
+}
+.stack-page.is-active .locator { animation: locator-in 1.1s var(--ease) 0.15s both; }
+@keyframes locator-in { from { opacity: 0.18; } to { opacity: 1; } }
+/* Es un fundido, no movimiento: se queda también con «reducir movimiento». */
+@media (prefers-reduced-motion: reduce) {
+  .stack-page.is-active .locator { animation-duration: 1.1s !important; }
 }
 .locator svg { width: 100%; height: 100%; overflow: visible; }
 .locator path { fill: none; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
