@@ -6,7 +6,7 @@ import { useScrollJourney } from '../../application/journey';
 import { clearTrack, initAudioUnlock, isMuted, playTransition, preloadTrack, setMuted, setTrack, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
-  Arrow, ChachitaTag, CreditMark, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
+  Arrow, CreditMark, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
   TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
 import { AboutButton } from '../components/InfoDialog';
@@ -121,7 +121,7 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
 }) {
   const { scrollToIndex, scrollToPage } = useJourneyNav();
   // «Ver mapa interactivo» va en la bienvenida y en todas las páginas de las estaciones (pedido del cliente, 09/11/2026),
-  // y también en las transiciones, junto a «Chachita» (12/11/2026).
+  // y también en las transiciones, en lugar de «Chachita» (12/11/2026).
   const mapLink = <GuideButton onOpen={() => scrollToPage('cierre')} />;
   switch (spec.kind) {
     case 'welcome':
@@ -186,7 +186,7 @@ function PageView({ spec, next, playing, near, muted, unmute }: {
           {t.video && <TransitionVideo id={t.video} playing={playing} near={near} shade={t.lines.length > 0} fit={t.fit} />}
           {t.background && <Backdrop photo={t.background} tint={t.tint} />}
           {t.color && <div className="rain" aria-hidden="true" />}
-          <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={<>{spec.index > 0 && <ChachitaTag plain={onPhoto} />}{mapLink}</>} />
+          <TopBar plain={onPhoto} label={t.label ?? <>Transición {t.number} · {t.from} → {t.to}</>} right={mapLink} />
           <div className="transition">
             {!t.video && <TransitionSymbol kind={t.symbol} />}
             {t.lines.map((line, i) => (
