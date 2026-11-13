@@ -184,7 +184,7 @@ html { -webkit-tap-highlight-color: transparent; }
   .listen__text small { font-size: 10px; letter-spacing: 0.1em; }
 }
 /* «Comenzar el viaje»: aparece apenas Chachita deja de hablar (ver Welcome), más grande y pasando del blanco al
-   amarillo y de vuelta, con la flecha meciéndose (pedido del cliente, 09/11/2026). */
+   amarillo y de vuelta, con la flecha meciéndose (pedido del cliente, 09/11/2026). Un poco más pequeño el 12/11/2026. */
 .welcome__start {
   position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 0; right: 0; display: grid; justify-items: center;
   opacity: 0; visibility: hidden; translate: 0 10px; transition: opacity 0.9s var(--ease), translate 1s var(--ease), visibility 0s 0.9s;
@@ -192,10 +192,10 @@ html { -webkit-tap-highlight-color: transparent; }
 .welcome__start.is-ready { opacity: 1; visibility: visible; translate: 0 0; transition-delay: 0s; }
 .start-btn {
   display: grid; justify-items: center; gap: 4px; border: 0; background: none; padding: 10px 22px; min-height: 44px;
-  font-size: clamp(16px, 1.5vw, 19px); font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase;
+  font-size: clamp(14px, 1.3vw, 16px); font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase;
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); animation: start-glow 2.4s ease-in-out infinite;
 }
-.start-btn svg { width: 26px; height: 26px; animation: bob 1.4s ease-in-out infinite; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
+.start-btn svg { width: 22px; height: 22px; animation: bob 1.4s ease-in-out infinite; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
 .start-btn:hover { color: var(--gold); animation: none; }
 @keyframes start-glow { 0%, 100% { color: #fff; } 50% { color: var(--gold); } }
 /* «Una producción de Doinmedia»: marca de agua en la esquina inferior derecha de todas las páginas (28/10/2026). */
@@ -653,6 +653,10 @@ body:has(.stack-page.is-active .story.is-idle) .credit-mark { opacity: 0; pointe
 .stack-page .t-symbol, .stack-page .transition__quote, .stack-page .transition__line { animation-name: page-rise; }
 .stack-page .transition__hint { animation-name: page-fade; }
 @keyframes page-rise { from { opacity: 0.16; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+/* La cita se centra con translateY(-50%): su entrada lo conserva (con page-rise quedaba corrida hacia abajo, debajo de
+   las pestañas, en las citas largas; fix del 12/11/2026). En el celular va abajo, sin ese desplazamiento (ver más abajo). */
+.stack-page .quote.reveal { animation-name: page-rise-y; }
+@keyframes page-rise-y { from { opacity: 0.16; transform: translateY(calc(-50% + 14px)); } to { opacity: 1; transform: translateY(-50%); } }
 @keyframes page-fade { from { opacity: 0.16; } to { opacity: 1; } }
 /* Las tarjetas van dentro de un bloque que ya se ilumina: solo suben, sin otro fundido encima. */
 .stack-page .gallery__card, .stack-page .recipe__step { animation-name: page-lift; }
@@ -1075,6 +1079,7 @@ img.media-img:not(.is-loaded) { opacity: 0; }
   .tab { font-size: 12px; }
   .quote { left: 20px; right: 20px; top: auto; bottom: 130px; transform: none; max-width: none; }
   .quote.reveal { animation-name: rise; }
+  .stack-page .quote.reveal { animation-name: page-rise; }
   .video__bar { left: 20px; right: 20px; bottom: 120px; }
   .story .story__controls { width: calc(100vw - 24px); gap: 4px; padding: 4px 6px; }
   .gallery { padding-bottom: 140px; }
@@ -2852,6 +2857,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .gallery { padding: 56px 0 70px; }
   .gallery__card { height: min(52vh, 420px); }
   .quote { bottom: 70px; top: auto; transform: none; }
+  .stack-page .quote.reveal { animation-name: page-rise; }
   .songs__yt { display: inline-flex; align-items: center; min-height: 44px; }
 }
 /* Celular de pie: el mapa va abajo, sobre «Desliza para seguir» (arriba puede ir la marca de agua); como solo aparece

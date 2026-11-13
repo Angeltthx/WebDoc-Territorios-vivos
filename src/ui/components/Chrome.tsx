@@ -41,18 +41,6 @@ export function GuideButton({ onOpen, children = 'Ver mapa interactivo' }: { onO
   );
 }
 
-export function ChachitaTag({ plain }: { plain?: boolean }) {
-  if (plain) return <span className="ghost-link">Chachita</span>;
-  return (
-    <span className="pill">
-      <svg width="14" height="8" viewBox="0 0 14 8" aria-hidden="true">
-        <path d="M1 2c2 3 4 3 6 0s4-3 6 0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-      Chachita
-    </span>
-  );
-}
-
 /**
  * Una fila de pestañas que no cabe (en celular, la estación 4 tiene seis): la activa se trae a la vista y la fila dice
  * hacia qué lado hay más (`data-more`, que pone una sombra en ese borde).
