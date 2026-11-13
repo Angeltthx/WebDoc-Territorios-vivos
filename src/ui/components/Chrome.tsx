@@ -143,21 +143,23 @@ function Bubble({ image, badge, onClick }: { image?: string; badge?: ReactNode; 
 }
 
 /**
- * El cauce que une las paradas: pasa por el centro de cada bolita y entre una y otra se curva hacia un lado y luego
- * hacia el otro, como un río que serpentea. Sigue un poco más abajo de la última, hacia el mar.
+ * El cauce que une las paradas: pasa por el centro de cada bolita y sigue un poco más abajo de la última, hacia el mar.
+ * Con `MEANDER` > 0, entre una y otra se curva hacia un lado y luego hacia el otro, como un río que serpentea; en el
+ * menú minimalista (prueba del 12/11/2026) va recto.
  */
+const MEANDER = 0;
 function riverPath(points: { x: number; y: number }[], tail = true) {
   if (!points.length) return '';
   let d = `M ${points[0].x} 0 L ${points[0].x} ${points[0].y}`;
   for (let i = 1; i < points.length; i++) {
     const [a, b] = [points[i - 1], points[i]];
     const h = b.y - a.y;
-    const dx = Math.min(18, h * 0.22) * (i % 2 ? 1 : -1);
+    const dx = Math.min(18, h * 0.22) * (i % 2 ? 1 : -1) * MEANDER;
     d += ` C ${a.x + dx} ${a.y + h * 0.35}, ${b.x + dx} ${b.y - h * 0.35}, ${b.x} ${b.y}`;
   }
   const end = points[points.length - 1];
   if (!tail) return d;
-  return `${d} C ${end.x - 12} ${end.y + 30}, ${end.x + 12} ${end.y + 50}, ${end.x} ${end.y + 80}`;
+  return `${d} C ${end.x - 12 * MEANDER} ${end.y + 30}, ${end.x + 12 * MEANDER} ${end.y + 50}, ${end.x} ${end.y + 80}`;
 }
 
 const slug = (label: string) => label.normalize('NFD').replace(/[^\w]+/g, '-').toLowerCase();

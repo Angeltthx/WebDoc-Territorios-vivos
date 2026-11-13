@@ -1024,6 +1024,73 @@ img.media-img:not(.is-loaded) { opacity: 0; }
   .rio__item--stop .rio__node.has-photo { width: 38px; height: 38px; }
 }
 
+/* ───────── Menú minimalista (prueba, 12/11/2026) ─────────
+   A la clienta le gusta el menú pero lo siente de otro diseño que el resto de la página. Se deja la misma estructura y
+   el río, pero con el lenguaje del webdoc: IBM Plex Sans, rótulos en mayúsculas espaciadas (como «Estación 1 · El
+   latido»), blanco con transparencias, dorado solo para donde se está, y líneas finas. Sin fotos en burbujas, sin un
+   color por estación, sin brillos ni orilla de agua. Si se aprueba, este bloque reemplaza las reglas de arriba. */
+.menu {
+  --col: 22px;
+  -webkit-mask: none; mask: none;
+  background: #0c1d17; border-left: 1px solid rgba(255, 255, 255, 0.1); box-shadow: -24px 0 60px rgba(0, 0, 0, 0.35);
+}
+.menu[open] { animation: menu-in 0.45s var(--ease) both; }
+@media (prefers-reduced-motion: reduce) {
+  .menu[open] { animation: menu-in 0.45s ease both !important; animation-iteration-count: 1 !important; }
+}
+.menu::backdrop { background: rgba(6, 14, 11, 0.6); }
+.menu__panel { padding-left: clamp(24px, 3vw, 36px); padding-right: clamp(16px, 2.4vw, 28px); gap: clamp(18px, 3vh, 30px); }
+.menu__brand { font: 500 11.5px/1 var(--sans); letter-spacing: 0.26em; text-transform: uppercase; font-variation-settings: normal; }
+.menu__brand em { font-style: normal; }
+
+/* El río: una sola línea fina. Al escoger algo, un hilo dorado recorre el camino (sin gota ni resplandor). */
+.rio__bed { stroke: rgba(255, 255, 255, 0.18); stroke-width: 1; }
+.rio__water, .rio__flow { display: none; }
+.rio__trail { stroke: var(--gold); stroke-width: 1.5; filter: none; }
+.rio__drop { fill: var(--gold); r: 3px; filter: none; }
+
+/* Las paradas: puntos pequeños, iguales; sin fotos ni números (la línea de abajo ya dice qué estación es). */
+.rio__node, .rio__node.has-photo,
+.rio__item--stop .rio__node, .rio__item--stop .rio__node.has-photo,
+.rio__item--group .rio__node, .rio__item--group .rio__node.has-photo,
+.rio__item--station .rio__node, .rio__item--station .rio__node.has-photo {
+  width: 9px; height: 9px; background: #0c1d17; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55), 0 0 0 5px #0c1d17;
+}
+.rio__item--reach .rio__node { width: 5px; height: 5px; background: rgba(255, 255, 255, 0.35); box-shadow: 0 0 0 4px #0c1d17; }
+.rio__node img, .rio__node .rio__badge, .rio__node.has-photo .rio__badge { display: none; }
+.rio__item.is-here > .rio__node { background: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 0 5px #0c1d17; }
+.rio__item.is-here > .rio__node::after { display: none; }
+.rio__item.is-arriving > .rio__node { animation: none; background: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 0 5px #0c1d17; }
+.rio__item.is-arriving > .rio__node::before { display: none; }
+
+/* Los nombres, en la letra del webdoc; la línea de abajo, como los rótulos de la página. */
+.rio__item--station, .rio__item--group { padding: 4px 0; }
+.rio__name { font: 300 clamp(19px, 1.6vw, 21px)/1.2 var(--sans); letter-spacing: 0; font-variation-settings: normal; }
+.rio__meta { font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); }
+.rio__item--group .rio__meta { font-size: 12.5px; letter-spacing: 0; text-transform: none; }
+.rio__item--reach .rio__name { font: italic 300 13.5px/1.3 var(--sans); color: rgba(255, 255, 255, 0.45); }
+.rio__item--reach .rio__row { min-height: 34px; }
+
+/* La flecha de las partes: sola, fina, sin círculo ni color. */
+.rio__chevron, .rio__toggle:hover .rio__chevron, .rio__item.is-open > .rio__toggle .rio__chevron {
+  padding: 0; border: 0; background: none; color: rgba(255, 255, 255, 0.6);
+}
+.rio__toggle:hover .rio__chevron { color: #fff; }
+.rio__item.is-open > .rio__toggle .rio__chevron { color: #fff; }
+
+/* Las partes: una lista sencilla con una raya fina a la izquierda, sin el brazo de agua ni los puntos. */
+.rio__more::before { display: none; }
+.rio__parts::before { left: 0; top: 6px; bottom: 14px; width: 1px; background: rgba(255, 255, 255, 0.16); }
+.rio__part { padding-left: 16px; min-height: 36px; font: 400 14px/1.3 var(--sans); color: rgba(255, 255, 255, 0.68); }
+.rio__part::before { display: none; }
+.rio__part[aria-current='page'] { font-weight: 500; }
+
+.rio__sea { margin-top: 28px; font: 500 11px/1.2 var(--sans); letter-spacing: 0.24em; color: rgba(255, 255, 255, 0.45); }
+.menu__credit { font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); }
+@media (max-width: 420px) {
+  .menu { --col: 18px; }
+}
+
 .social { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
 .social a, .social span {
   width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff;
