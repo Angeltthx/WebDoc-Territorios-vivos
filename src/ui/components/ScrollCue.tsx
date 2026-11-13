@@ -14,6 +14,8 @@ const CHECK_MS = 400;
 
 /** Lo que la página ya tiene para seguir («Sigue navegando»): la señal toma su lugar y su texto. */
 const ANCHOR = '.stack-page.is-active .scroll-hint';
+/** Las pestañas de la página: el respaldo cuando ese «Sigue navegando» está quitado. */
+const TABS = '.stack-page.is-active .page-foot .tabs';
 
 /** Aire entre la flecha y las pestañas de abajo (px). */
 const ABOVE_TABS = 6;
@@ -38,7 +40,13 @@ export function ScrollCue({ page, off, onNext }: { page: number; off: boolean; o
     const check = () => {
       const a = document.querySelector<HTMLElement>(ANCHOR);
       const r = a?.getBoundingClientRect();
-      const top = r && r.height ? Math.round(r.bottom - (self.current?.offsetHeight ?? 0) - ABOVE_TABS) : null;
+      const h = self.current?.offsetHeight ?? 0;
+      // Si el «Sigue navegando» no se ve (se quita al darle play al tráiler), va justo encima de las pestañas: sin
+      // esto caía al borde de abajo, encima de ellas (pedido de la clienta, 12/11/2026).
+      const tabs = r && r.height ? null : document.querySelector<HTMLElement>(TABS)?.getBoundingClientRect();
+      const top = r && r.height
+        ? Math.round(r.bottom - h - ABOVE_TABS)
+        : tabs && tabs.height ? Math.round(tabs.top - h - ABOVE_TABS) : null;
       const label = a?.textContent?.trim() || 'Sigue navegando';
       setPlace((p) => (p.top === top && p.label === label ? p : { top, label }));
       setShown(!busy());
