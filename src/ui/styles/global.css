@@ -184,7 +184,7 @@ html { -webkit-tap-highlight-color: transparent; }
   .listen__text small { font-size: 10px; letter-spacing: 0.1em; }
 }
 /* «Comenzar el viaje»: aparece apenas Chachita deja de hablar (ver Welcome), más grande y pasando del blanco al
-   amarillo y de vuelta, con la flecha meciéndose (pedido del cliente, 09/11/2026). */
+   amarillo y de vuelta, con la flecha meciéndose (pedido del cliente, 09/11/2026). Un poco más pequeño el 12/11/2026. */
 .welcome__start {
   position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 0; right: 0; display: grid; justify-items: center;
   opacity: 0; visibility: hidden; translate: 0 10px; transition: opacity 0.9s var(--ease), translate 1s var(--ease), visibility 0s 0.9s;
@@ -192,10 +192,10 @@ html { -webkit-tap-highlight-color: transparent; }
 .welcome__start.is-ready { opacity: 1; visibility: visible; translate: 0 0; transition-delay: 0s; }
 .start-btn {
   display: grid; justify-items: center; gap: 4px; border: 0; background: none; padding: 10px 22px; min-height: 44px;
-  font-size: clamp(16px, 1.5vw, 19px); font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase;
+  font-size: clamp(14px, 1.3vw, 16px); font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase;
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.6); animation: start-glow 2.4s ease-in-out infinite;
 }
-.start-btn svg { width: 26px; height: 26px; animation: bob 1.4s ease-in-out infinite; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
+.start-btn svg { width: 22px; height: 22px; animation: bob 1.4s ease-in-out infinite; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
 .start-btn:hover { color: var(--gold); animation: none; }
 @keyframes start-glow { 0%, 100% { color: #fff; } 50% { color: var(--gold); } }
 /* «Una producción de Doinmedia»: marca de agua en la esquina inferior derecha de todas las páginas (28/10/2026). */
