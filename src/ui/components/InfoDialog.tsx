@@ -2,7 +2,7 @@
 // documental y la infografía «Cómo llegar» de cada estación. Se montan en <body> (ver Portal) y se cierran con la ✕,
 // con Escape o tocando fuera.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { Station } from '../../domain/types';
 import { Portal } from './Portal';
 
@@ -71,9 +71,43 @@ const ABOUT =
 const ABOUT_SEEN = 'tv-que-es-visto';
 
 /**
+ * El ícono del botón: un globo de diálogo con tres personas recortadas (el que mandó la clienta el 14/11/2026, en lugar
+ * de la «i»), dibujado aquí para que se vea nítido y tome el color del botón (blanco, o dorado mientras llama).
+ * Cada botón lleva su propia máscara: el botón se repite en todas las páginas.
+ */
+function PeopleIcon() {
+  const mask = `tv-people-${useId().replace(/:/g, '')}`;
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <mask id={mask} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+          <rect width="24" height="24" fill="#fff" />
+          <g fill="#000">
+            <circle cx="8.3" cy="10.1" r="2.1" />
+            <circle cx="16.7" cy="10.1" r="2.1" />
+            <path d="M4.9 16.3a3.4 3.4 0 0 1 6.8 0z" />
+            <path d="M12.3 16.3a3.4 3.4 0 0 1 6.8 0z" />
+          </g>
+          {/* La del medio, delante: un filo la separa de las de los lados. */}
+          <g fill="#000" stroke="#fff" strokeWidth="0.7">
+            <circle cx="12.5" cy="8.9" r="2.5" />
+            <path d="M8.4 16.3a4.1 4.1 0 0 1 8.2 0z" />
+          </g>
+        </mask>
+      </defs>
+      <g fill="currentColor" mask={`url(#${mask})`}>
+        <circle cx="12.5" cy="11.5" r="10" />
+        <path d="M2.5 13.2V22l7-2.2z" />
+      </g>
+    </svg>
+  );
+}
+
+/**
  * El ícono de información, en todas las páginas del recorrido: abre un cuadro que cuenta qué es Territorios Vivos.
- * Más llamativo (pedido del 09/11/2026), con el mismo botón: la «i» más gruesa y, hasta que se abra la
- * primera vez, dorada y con un halo que palpita alrededor. Después queda como los demás (se recuerda en este navegador).
+ * Más llamativo (pedido del 09/11/2026): hasta que se abra la primera vez, dorado y con un halo que palpita
+ * alrededor; después queda como los demás (se recuerda en este navegador). El ícono es el globo con personas de la
+ * clienta (14/11/2026; antes una «i»).
  */
 export function AboutButton() {
   const [open, setOpen] = useState(false);
@@ -96,10 +130,7 @@ export function AboutButton() {
   return (
     <>
       <button type="button" className={`dock__sound dock__about${calling ? ' is-calling' : ''}`} onClick={show} aria-haspopup="dialog" aria-label="¿Qué es Territorios Vivos?" title="¿Qué es Territorios Vivos?">
-        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-          <path d="M10 9v5.8" />
-          <circle cx="10" cy="5.4" r="0.9" fill="currentColor" />
-        </svg>
+        <PeopleIcon />
       </button>
       <InfoDialog open={open} onClose={() => setOpen(false)} label="¿Qué es Territorios Vivos?" className="info--card">
         <p className="eyebrow">¿Qué es?</p>
