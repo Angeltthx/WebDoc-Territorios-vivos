@@ -1,5 +1,5 @@
 // Infografías «Cómo llegar» de cada estación (pedido del cliente, 09/11/2026). Lee ../Contenido/Infografias/estacion-N.png
-// (1080 × 4169, del Drive del cliente) y escribe public/media/infografias/estacion-N.webp.
+// (1080 × 5480, sacados de los PDF del Drive del cliente; rediseño del 13/11/2026) y escribe public/media/infografias/estacion-N.webp.
 // Uso: npm run media:infografias
 import { mkdirSync, readdirSync } from 'node:fs';
 import sharp from 'sharp';

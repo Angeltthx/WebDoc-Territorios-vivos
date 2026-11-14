@@ -54,7 +54,7 @@ export function HowToArrive({ station }: { station: Station }) {
         <span className="howto__text">Cómo llegar <small>a {station.howTo.place}</small></span>
       </button>
       <InfoDialog open={open} onClose={() => setOpen(false)} label={title} className="info--poster">
-        <img src={`/media/infografias/${station.howTo.image}.webp`} alt={`Infografía: ${title}, Nuquí, Chocó`} width={1080} height={4169} />
+        <img src={`/media/infografias/${station.howTo.image}.webp`} alt={`Infografía: ${title}, Nuquí, Chocó`} width={1080} height={5480} />
       </InfoDialog>
     </>
   );
