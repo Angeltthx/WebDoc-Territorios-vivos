@@ -42,6 +42,10 @@ function PinIcon() {
   );
 }
 
+/** Versión de las infografías: /media se guarda un año en el navegador, así que al cambiarlas se sube este número
+ * para que se pidan de nuevo (13/11/2026: rediseño de la clienta). */
+const HOWTO_VERSION = 2;
+
 /** «Cómo llegar»: un círculo con el alfiler que abre la infografía de la estación. */
 export function HowToArrive({ station }: { station: Station }) {
   const [open, setOpen] = useState(false);
@@ -54,7 +58,7 @@ export function HowToArrive({ station }: { station: Station }) {
         <span className="howto__text">Cómo llegar <small>a {station.howTo.place}</small></span>
       </button>
       <InfoDialog open={open} onClose={() => setOpen(false)} label={title} className="info--poster">
-        <img src={`/media/infografias/${station.howTo.image}.webp`} alt={`Infografía: ${title}, Nuquí, Chocó`} width={1080} height={5480} />
+        <img src={`/media/infografias/${station.howTo.image}.webp?v=${HOWTO_VERSION}`} alt={`Infografía: ${title}, Nuquí, Chocó`} width={1080} height={5480} />
       </InfoDialog>
     </>
   );

@@ -3008,3 +3008,20 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .recipe__photos { aspect-ratio: 16 / 6; }
   .recipe__num { margin: 6px 0 2px; font-size: 22px; }
 }
+/* Celular: «Ver mapa interactivo» también (pedido de la clienta, 13/11/2026). Va debajo del rótulo de la página, a la
+   izquierda (a la derecha están el sonido, la información, el menú y la marca), pequeño y sin caja. */
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .stack-page .topbar__right {
+    display: flex; position: absolute; left: calc(var(--gutter) - 4px); top: calc(max(var(--gutter), env(safe-area-inset-top)) + 30px);
+  }
+  .stack-page .topbar__right .ghost-link { min-height: 36px; padding: 6px 4px; font-size: 10.5px; letter-spacing: 0.16em; }
+}
+/* El mapa de ubicación de la estación baja un poco para dejarle lugar a «Ver mapa interactivo». */
+@media (max-width: 640px) {
+  .locator { top: 96px; }
+}
+/* Celular acostado: el aviso del estreno ya se quitaba, pero la regla de la sinopsis lo volvía a mostrar y quedaba
+   debajo del video. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .trailer__about .trailer__note { display: none; }
+}

@@ -134,12 +134,14 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
   filterRef.current = filter;
   /** La costa se arma cuando la página es la visible (ver `active`). */
   const wantMap = useRef<(() => void) | null>(null);
-  // La selva suena mientras se ve la costa (no en el planeta) y la página es la visible.
+  // La selva suena mientras se ve la costa (no en el planeta) y la página es la visible. Se calla al abrir una
+  // historia, el formulario para contar una o la tienda (pedido del cliente, 13/11/2026: las aves seguían sonando).
   const hearing = useRef(false);
+  const reading = panel === 'historia' || panel === 'tienda' || !!spot?.tale;
   useEffect(() => {
-    hearing.current = active && (phase === 'landing' || phase === 'map');
+    hearing.current = active && (phase === 'landing' || phase === 'map') && !reading;
     setMapAmbience(hearing.current);
-  }, [active, phase]);
+  }, [active, phase, reading]);
   useEffect(() => () => setMapAmbience(false), []);
   // Fuera del recorrido (la dirección del mapa sola), el audio se desbloquea aquí con el primer toque.
   useEffect(() => {
