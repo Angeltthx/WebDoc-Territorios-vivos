@@ -1,18 +1,12 @@
 // La ficha de una historia del mapa: flota encima de su figurita (sigue al punto en pantalla, ver `track` en
 // MapScene). Arriba lo que se ve (video o foto), debajo el papel blanco con quién la cuenta, la historia, su voz, más
-// fotos y los comentarios. En el celular sube desde abajo, como una hoja.
-// Los comentarios todavía son solo la interfaz: no se envían ni se guardan.
+// fotos. En el celular sube desde abajo, como una hoja.
+// Sin comentarios (pedido de la clienta, 13/11/2026): eran solo de ejemplo, no se enviaban ni se guardaban.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { EMBLEM_LABEL, type ChocoPoint } from '../../content/choco';
 
 type Tale = NonNullable<ChocoPoint['tale']>;
-
-/** Comentarios de ejemplo, para ver cómo se verá la sección (todavía no hay comentarios de verdad). */
-const SAMPLE_COMMENTS = [
-  { author: 'Yuliana M.', when: 'hace 2 días', text: 'Yo también las vi desde la playa en septiembre. Es algo que no se olvida.' },
-  { author: 'Don Arcesio', when: 'hace 1 semana', text: 'Así eran las noches cuando yo era pelao. Gracias por contarla.' },
-];
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '·';
@@ -24,7 +18,6 @@ export default function StoryCard({ spot, track, onClose }: {
   onClose: () => void;
 }) {
   const root = useRef<HTMLElement>(null);
-  const [draft, setDraft] = useState('');
   useEffect(() => {
     track(root.current);
     return () => track(null);
@@ -96,34 +89,6 @@ export default function StoryCard({ spot, track, onClose }: {
             </section>
           )}
 
-          <section className="tale__section tale__comments">
-            <h3 className="tale__label">
-              Comentarios <span className="tale__count">{SAMPLE_COMMENTS.length}</span>
-              <em className="tale__soon">Próximamente</em>
-            </h3>
-            <ul className="tale__thread">
-              {SAMPLE_COMMENTS.map((c) => (
-                <li key={c.author} className="tale__comment">
-                  <span className="tale__avatar tale__avatar--sm" aria-hidden="true">{initials(c.author)}</span>
-                  <div>
-                    <p className="tale__comment-head"><strong>{c.author}</strong> · {c.when}</p>
-                    <p className="tale__comment-text">{c.text}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <form className="tale__compose" onSubmit={(e) => e.preventDefault()}>
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Escribe un comentario…"
-                aria-label="Escribe un comentario"
-                maxLength={400}
-              />
-              <button type="submit" disabled title="Muy pronto podrás comentar">Enviar</button>
-            </form>
-            <p className="tale__note">Muy pronto podrás comentar las historias. Estos comentarios son de ejemplo.</p>
-          </section>
         </div>
       </div>
       <span className="tale__tail" aria-hidden="true" />
