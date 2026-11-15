@@ -113,6 +113,10 @@ export const chapters: Chapter[] = [
             { name: 'Heydi Barbosa', role: 'Editora' },
             { name: 'José Hernando Guerrero', role: 'Director Financiero' },
             { name: 'Rosalba Durán', role: 'Asistente Contable' },
+            // Los que faltaban (pedido de la clienta, 15/11/2026).
+            { name: 'Pazifican Beats', role: 'Agrupación musical' },
+            { name: 'Andrés Carvajal', role: 'Grabación Música' },
+            { name: 'Wilson Giraldo', role: 'Asesor' },
           ],
           thanks: {
             eyebrow: 'Quienes hicieron posible este proyecto',
