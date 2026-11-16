@@ -87,7 +87,7 @@ export const menu: MenuItem[] = [
   { label: 'Álbum musical', href: '/album-musical', hint: 'Las canciones del documental', image: '/media/album/portada-640.webp' },
   // «Tu historia» no se entendía en la prueba con usuarios (09/11/2026).
   { label: 'Cuenta tu historia', href: '/cuenta-tu-historia', hint: 'Comparte tu propio relato del territorio', image: 'orfelina-y-familia-con-grupo-de-danza' },
-  { label: 'Tienda', href: '/tienda', hint: 'El afiche-mapa con realidad aumentada', image: '/media/tienda/poster-mapa-sm.webp' },
+  { label: 'Tienda', href: '/tienda', hint: 'El afiche-mapa con realidad aumentada', image: '/media/tienda/cuadro-mapa-sm.webp' },
 ];
 
 export type SocialNetwork = 'youtube' | 'instagram' | 'tiktok';

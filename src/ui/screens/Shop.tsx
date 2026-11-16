@@ -156,8 +156,8 @@ function Product({ item, catalog, inBag, onBack, onAdd, onBuy }: {
 
           <ul className="shop-perks">
             <li><PerkIcon name="truck" />Envío a toda Colombia por {pesos(catalog?.envio ?? ENVIO_RESPALDO)}</li>
-            <li><PerkIcon name="tube" />Llega enrollado en un tubo, sin dobleces</li>
-            <li><PerkIcon name="leaf" />La ilustración original del mapa del recorrido</li>
+            <li><PerkIcon name="leaf" />Papel ecológico de caña de azúcar, sin impacto forestal</li>
+            <li><PerkIcon name="frame" />Enmarcado en pino natural y sin vidrio: ligero y fácil de colgar</li>
           </ul>
         </div>
       </div>
@@ -180,12 +180,12 @@ function Product({ item, catalog, inBag, onBack, onAdd, onBuy }: {
   );
 }
 
-function PerkIcon({ name }: { name: 'truck' | 'tube' | 'leaf' | 'lock' }) {
+function PerkIcon({ name }: { name: 'truck' | 'frame' | 'leaf' | 'lock' }) {
   const c = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
       {name === 'truck' && <><path {...c} d="M3 7h11v9H3zM14 10h4l3 3v3h-7" /><circle {...c} cx="7" cy="17.5" r="1.8" /><circle {...c} cx="17" cy="17.5" r="1.8" /></>}
-      {name === 'tube' && <><ellipse {...c} cx="6" cy="12" rx="2.5" ry="5" /><path {...c} d="M6 7h12M6 17h12M18 7c1.4 0 2.5 2.2 2.5 5s-1.1 5-2.5 5" /></>}
+      {name === 'frame' && <><rect {...c} x="4" y="3" width="16" height="18" rx="1" /><rect {...c} x="7.5" y="6.5" width="9" height="11" /></>}
       {name === 'leaf' && <><path {...c} d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z" /><path {...c} d="M5 19l7-7" /></>}
       {name === 'lock' && <><rect {...c} x="5" y="10.5" width="14" height="10" rx="2" /><path {...c} d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></>}
     </svg>
@@ -392,9 +392,9 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
           : 'Cosas del recorrido para tener en la casa. Por ahora la tienda está en modo de prueba.'}
       onClose={onClose}
       aside={
-        // En el atardecer, el póster colgado, un poco ladeado.
+        // En el atardecer, el cuadro colgado, un poco ladeado.
         <figure className="shop-hang" aria-hidden="true">
-          <img src="/media/tienda/poster-mapa-sm.webp" alt="" />
+          <img src="/media/tienda/cuadro-mapa-sm.webp" alt="" />
         </figure>
       }
     >
