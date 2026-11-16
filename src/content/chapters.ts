@@ -172,7 +172,7 @@ export const chapters: Chapter[] = [
             {
               title: 'El afiche-mapa con AR',
               text: 'Un objeto que cobra vida: apunta el móvil y aparece el video, la voz de Chachita, el 360.',
-              image: { src: '/media/tienda/poster-mapa-sm.webp', alt: 'El afiche-mapa ilustrado de Nuquí' },
+              image: { src: '/media/tienda/cuadro-mapa-sm.webp', alt: 'El cuadro del mapa ilustrado de Nuquí' },
               action: { label: 'Comprar el afiche', href: '/tienda', primary: true },
             },
             {

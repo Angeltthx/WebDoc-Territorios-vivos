@@ -1,24 +1,14 @@
-// Fotos de la tienda: el póster completo y sus detalles (para la galería de la ficha del producto, como en una tienda
-// en línea). Lee ../Contenido/Tienda/poster-mapa-nuqui.jpg y escribe public/media/tienda/*.webp.
+// Fotos de la tienda: el cuadro del mapa, enmarcado (lo mandó la clienta el 15/11/2026, en lugar del póster suelto y sus
+// recortes de detalle). Lee ../Contenido/Tienda/cuadro-mapa-nuqui.png y escribe public/media/tienda/cuadro-mapa*.webp.
+// Con nombre nuevo, no poster-mapa: /media se guarda un año en el navegador y se seguiría viendo el póster viejo.
 // Uso: npm run media:tienda
 import { mkdirSync } from 'node:fs';
 import sharp from 'sharp';
 
-const SRC = '../Contenido/Tienda/poster-mapa-nuqui.jpg';
+const SRC = '../Contenido/Tienda/cuadro-mapa-nuqui.png';
 const OUT = 'public/media/tienda';
 mkdirSync(OUT, { recursive: true });
 
-/** Recortes del afiche (en píxeles del original, 1000 × 1432). */
-const DETAILS = {
-  'poster-ballena': { left: 120, top: 40, width: 350, height: 280 },
-  'poster-titulo': { left: 60, top: 295, width: 470, height: 215 },
-  'poster-chachita': { left: 410, top: 975, width: 290, height: 250 },
-  'poster-rana': { left: 690, top: 1035, width: 290, height: 230 },
-};
-
-await sharp(SRC).resize({ width: 1000 }).webp({ quality: 84 }).toFile(`${OUT}/poster-mapa.webp`);
-await sharp(SRC).resize({ width: 420 }).webp({ quality: 80 }).toFile(`${OUT}/poster-mapa-sm.webp`);
-for (const [name, box] of Object.entries(DETAILS)) {
-  await sharp(SRC).extract(box).resize({ width: 800, withoutEnlargement: false }).webp({ quality: 84 }).toFile(`${OUT}/${name}.webp`);
-}
+await sharp(SRC).resize({ width: 1000, withoutEnlargement: true }).webp({ quality: 88 }).toFile(`${OUT}/cuadro-mapa.webp`);
+await sharp(SRC).resize({ width: 420 }).webp({ quality: 82 }).toFile(`${OUT}/cuadro-mapa-sm.webp`);
 console.log('Listo: public/media/tienda');
