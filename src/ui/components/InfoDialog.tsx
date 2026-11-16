@@ -134,7 +134,10 @@ export function AboutButton() {
       </button>
       <InfoDialog open={open} onClose={() => setOpen(false)} label="¿Qué es Territorios Vivos?" className="info--card">
         <p className="eyebrow">¿Qué es?</p>
-        <h2>Territorios <em>Vivos</em></h2>
+        {/* El logo del sitio en lugar del título escrito (pedido de la clienta, 15/11/2026). */}
+        <h2 className="info__logo">
+          <img src="/media/logo-territorios-vivos.webp" alt="Territorios Vivos · Relatos del Pacífico" width={1200} height={675} />
+        </h2>
         <p>{ABOUT}</p>
       </InfoDialog>
     </>

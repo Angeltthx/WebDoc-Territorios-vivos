@@ -254,6 +254,10 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 .info--card .eyebrow { color: var(--gold); margin: 0; }
 .info--card h2 { margin: 6px 0 14px; font: 600 italic clamp(24px, 3vw, 32px)/1.2 var(--serif); }
 .info--card h2 em { color: var(--gold); }
+/* El logo del sitio (letras oscuras sobre transparente, con mucho aire alrededor): se recorta a las letras y se pinta
+   de blanco para que se lea sobre el fondo oscuro de la ventana. */
+.info--card .info__logo { width: min(300px, 74%); aspect-ratio: 1096 / 346; overflow: hidden; margin: 14px 0 18px; }
+.info--card .info__logo img { display: block; width: 109.5%; max-width: none; height: auto; margin: -16.6% 0 0 -4.75%; filter: brightness(0) invert(1); }
 .info--card p:not(.eyebrow) { margin: 0; font-size: clamp(15px, 1.3vw, 17px); line-height: 1.65; color: rgba(255, 255, 255, 0.92); }
 .info--card p + p:not(.eyebrow) { margin-top: 12px; }
 .info--poster { width: min(560px, calc(100vw - 20px)); }
