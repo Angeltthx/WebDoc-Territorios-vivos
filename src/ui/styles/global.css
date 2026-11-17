@@ -263,6 +263,13 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 .info--poster { width: min(560px, calc(100vw - 20px)); }
 .info--poster .info__body { max-height: calc(100dvh - 24px); overflow-y: auto; border-radius: 14px; background: #f6f3ea; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55); overscroll-behavior: contain; }
 .info--poster img { display: block; width: 100%; height: auto; }
+/* Barra propia siempre visible (17/11/2026): la del sistema se esconde y parecía que no se podía bajar. */
+.info--poster .info__body { scrollbar-width: none; }
+.info--poster .info__body::-webkit-scrollbar { display: none; }
+.info__rail { position: absolute; top: 58px; bottom: 14px; right: 2px; width: 22px; cursor: pointer; touch-action: none; }
+.info__rail::before { content: ''; position: absolute; top: 0; bottom: 0; left: 8px; width: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); }
+.info__rail-thumb { position: absolute; left: 6px; width: 10px; min-height: 36px; border-radius: 5px; background: var(--gold);
+  box-shadow: 0 0 0 1.5px rgba(6, 18, 14, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35); }
 /* Hasta que se abre la primera vez: la «i» dorada y un halo que sale del botón cada tanto (ver AboutButton). Después
    vuelve a ser como los demás botones: el dorado ya no hace falta y desentonaba con el resto. */
 .dock__sound.dock__about { position: relative; cursor: pointer; }
