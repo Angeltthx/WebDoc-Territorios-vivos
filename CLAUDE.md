@@ -29,7 +29,7 @@ Guía para Claude Code en el webdoc **Territorios Vivos · Relatos del Pacífico
 
 ## Probar sin teléfono
 
-- El sitio pide clave (`src/ui/screens/Gate.tsx`); se salta con `localStorage['tv-acceso']` = el `HASH` de ese archivo.
+- Desde el lanzamiento (17/11/2026) el sitio no pide clave; solo `/admin` tiene la suya.
 - La dirección refleja la página: `/` es la bienvenida y `/N` la página N (por ejemplo, `/18` es el tráiler de la
   estación 4 y `/24` el mapa). `/costa-k7q4x` abre el mapa suelto; `/cuenta-tu-historia` y `/tienda`, sus hojas.
 - No hay Playwright ni Puppeteer: las capturas se toman con Chrome sin ventana por CDP con un script propio (Node 22 trae

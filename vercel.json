@@ -13,34 +13,22 @@
       "source": "/video",
       "destination": "https://youtu.be/Glh_bb9vrDM",
       "permanent": false
+    },
+    {
+      "source": "/prueba",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/prueba/:path*",
+      "destination": "/:path*",
+      "permanent": false
     }
   ],
   "rewrites": [
     {
       "source": "/((?!media/|assets/|api/|@)[^.]*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "(?:relatos-c9t4\\.territoriosvivos\\.com\\.co|localhost|lvh\\.me)"
-        }
-      ],
       "destination": "/app.html"
-    },
-    {
-      "source": "/guia",
-      "destination": "/app.html"
-    },
-    {
-      "source": "/prueba",
-      "destination": "/app.html"
-    },
-    {
-      "source": "/prueba/((?!media/|assets/|api/|@)[^.]*)",
-      "destination": "/app.html"
-    },
-    {
-      "source": "/((?!media/|assets/|api/|@)[^.]*)",
-      "destination": "/proximamente.html"
     }
   ],
   "headers": [
