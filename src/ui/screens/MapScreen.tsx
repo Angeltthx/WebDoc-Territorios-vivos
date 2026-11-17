@@ -386,7 +386,7 @@ export default function MapScreen({ embedded = false, active = true, onBack }: {
 
       <TopBar
         plain
-        label={onMap ? 'Mapa · Nuquí, Chocó' : 'Mapa · Pacífico colombiano'}
+        label={onMap ? 'Mapa interactivo - Nuquí, Chocó' : 'Mapa interactivo - Pacífico colombiano'}
         right={
           <>
             {onMap && (
