@@ -263,6 +263,13 @@ body:has(.stack-page--closing.is-active) .credit-mark { bottom: calc(max(14px, e
 .info--poster { width: min(560px, calc(100vw - 20px)); }
 .info--poster .info__body { max-height: calc(100dvh - 24px); overflow-y: auto; border-radius: 14px; background: #f6f3ea; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55); overscroll-behavior: contain; }
 .info--poster img { display: block; width: 100%; height: auto; }
+/* Barra propia siempre visible (17/11/2026): la del sistema se esconde y parecía que no se podía bajar. */
+.info--poster .info__body { scrollbar-width: none; }
+.info--poster .info__body::-webkit-scrollbar { display: none; }
+.info__rail { position: absolute; top: 58px; bottom: 14px; right: 2px; width: 22px; cursor: pointer; touch-action: none; }
+.info__rail::before { content: ''; position: absolute; top: 0; bottom: 0; left: 8px; width: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); }
+.info__rail-thumb { position: absolute; left: 6px; width: 10px; min-height: 36px; border-radius: 5px; background: var(--gold);
+  box-shadow: 0 0 0 1.5px rgba(6, 18, 14, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35); }
 /* Hasta que se abre la primera vez: la «i» dorada y un halo que sale del botón cada tanto (ver AboutButton). Después
    vuelve a ser como los demás botones: el dorado ya no hace falta y desentonaba con el resto. */
 .dock__sound.dock__about { position: relative; cursor: pointer; }
@@ -2674,17 +2681,6 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .locator__small { font-size: 12px; }
   .locator__label { font-size: 17px; }
 }
-
-/* ───────── Clave de acceso (antes del lanzamiento) ───────── */
-.gate { height: 100vh; height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; padding: 24px 16px;
-  background: radial-gradient(120% 90% at 50% 110%, #1d4a3a 0%, var(--forest) 62%); text-align: center; }
-.gate__form { display: flex; flex-direction: column; align-items: center; gap: 12px; width: min(100%, 300px); }
-.gate__form input { width: 100%; padding: 12px 16px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 999px; background: rgba(255, 255, 255, 0.08);
-  color: #fff; font: 16px var(--sans); text-align: center; }
-.gate__form input::placeholder { color: rgba(255, 255, 255, 0.5); }
-.gate__form input[aria-invalid='true'] { border-color: #f08a7a; }
-.gate__form button { padding: 10px 28px; border: 0; border-radius: 999px; background: var(--gold); color: var(--forest); font-weight: 600; letter-spacing: 0.08em; }
-.gate__error { min-height: 1.5em; font-size: 14px; color: #f6b3a8; }
 
 /* ───────── Guía pedagógica (/guia) ───────── */
 .reader { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--forest);

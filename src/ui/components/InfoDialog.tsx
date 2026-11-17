@@ -2,19 +2,22 @@
 // documental y la infografía «Cómo llegar» de cada estación. Se montan en <body> (ver Portal) y se cierran con la ✕,
 // con Escape o tocando fuera.
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 import type { Station } from '../../domain/types';
 import { Portal } from './Portal';
 
-export function InfoDialog({ open, onClose, label, className = '', children }: {
+export function InfoDialog({ open, onClose, label, className = '', rail = false, children }: {
   open: boolean;
   onClose: () => void;
   /** Nombre de la ventana para los lectores de pantalla. */
   label: string;
   className?: string;
+  /** Barra de desplazamiento siempre visible (para contenidos largos como las infografías). */
+  rail?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -25,10 +28,71 @@ export function InfoDialog({ open, onClose, label, className = '', children }: {
     <Portal>
       <dialog ref={ref} className={`info ${className}`} aria-label={label} onClose={onClose} onClick={(e) => e.target === ref.current && onClose()}>
         {/* Solo con la ventana abierta: la infografía no se descarga hasta que alguien la pide. */}
-        {open && <div className="info__body">{children}</div>}
+        {open && <div ref={body} className="info__body">{children}</div>}
+        {open && rail && <ScrollRail target={body} />}
         <button type="button" className="icon-btn info__close" onClick={onClose} aria-label="Cerrar">✕</button>
       </dialog>
     </Portal>
+  );
+}
+
+/**
+ * Barra de desplazamiento propia, siempre a la vista (pedido de la clienta, 17/11/2026: con la barra del sistema,
+ * que en celulares y Mac se esconde, la gente creía que la infografía no se podía bajar). Se arrastra o se toca.
+ */
+function ScrollRail({ target }: { target: RefObject<HTMLDivElement | null> }) {
+  const track = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState({ top: 0, size: 1 });
+
+  useEffect(() => {
+    const el = target.current;
+    if (!el) return;
+    const update = () => {
+      const size = el.scrollHeight > 0 ? Math.min(1, el.clientHeight / el.scrollHeight) : 1;
+      const room = el.scrollHeight - el.clientHeight;
+      setThumb({ size, top: room > 0 ? (el.scrollTop / room) * (1 - size) : 0 });
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    // La infografía llega después: el alto cambia cuando carga la imagen.
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    Array.from(el.children).forEach((c) => ro.observe(c));
+    return () => { el.removeEventListener('scroll', update); ro.disconnect(); };
+  }, [target]);
+
+  /** Lleva el contenido a la posición del puntero sobre la barra (centrando el indicador ahí). */
+  const scrollTo = (clientY: number, grabOffset: number) => {
+    const el = target.current, t = track.current;
+    if (!el || !t) return;
+    const r = t.getBoundingClientRect();
+    const thumbPx = thumb.size * r.height;
+    const ratio = (clientY - r.top - grabOffset) / Math.max(1, r.height - thumbPx);
+    el.scrollTop = Math.max(0, Math.min(1, ratio)) * (el.scrollHeight - el.clientHeight);
+  };
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const t = track.current;
+    if (!t) return;
+    e.preventDefault();
+    const r = t.getBoundingClientRect();
+    const thumbTop = r.top + thumb.top * r.height, thumbPx = thumb.size * r.height;
+    const onThumb = e.clientY >= thumbTop && e.clientY <= thumbTop + thumbPx;
+    const grab = onThumb ? e.clientY - thumbTop : thumbPx / 2;
+    scrollTo(e.clientY, grab);
+    t.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => scrollTo(ev.clientY, grab);
+    const up = () => { t.removeEventListener('pointermove', move); t.removeEventListener('pointerup', up); t.removeEventListener('pointercancel', up); };
+    t.addEventListener('pointermove', move);
+    t.addEventListener('pointerup', up);
+    t.addEventListener('pointercancel', up);
+  };
+
+  if (thumb.size >= 1) return null;
+  return (
+    <div ref={track} className="info__rail" onPointerDown={onPointerDown} aria-hidden="true">
+      <span className="info__rail-thumb" style={{ top: `${thumb.top * 100}%`, height: `${thumb.size * 100}%` }} />
+    </div>
   );
 }
 
@@ -57,7 +121,7 @@ export function HowToArrive({ station }: { station: Station }) {
         <span className="howto__icon"><PinIcon /></span>
         <span className="howto__text">Cómo llegar <small>a {station.howTo.place}</small></span>
       </button>
-      <InfoDialog open={open} onClose={() => setOpen(false)} label={title} className="info--poster">
+      <InfoDialog open={open} onClose={() => setOpen(false)} label={title} className="info--poster" rail>
         <img src={`/media/infografias/${station.howTo.image}.webp?v=${HOWTO_VERSION}`} alt={`Infografía: ${title}, Nuquí, Chocó`} width={1080} height={5480} />
       </InfoDialog>
     </>
