@@ -8,8 +8,16 @@
 import { createHash } from 'node:crypto';
 import { sql } from './db.js';
 
-/** Envío a cualquier parte de Colombia (pesos). */
-export const ENVIO = 15000;
+/** Envío (pesos): a Bogotá y al resto de Colombia (pedido de la clienta, 17/11/2026; antes $ 15.000 a todo el país). */
+export const ENVIO_BOGOTA = 9500;
+export const ENVIO_RESTO = 18500;
+
+/** Lo que cuesta el envío a esa dirección. Bogotá: el departamento «Bogotá D. C.» o una ciudad que se llame Bogotá.
+ * La tienda hace la misma cuenta para mostrarla (`envioPara` en src/application/shop-api.ts). */
+export function envioPara(ciudad: string, departamento: string) {
+  const plano = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+  return plano(departamento).startsWith('bogota') || plano(ciudad).startsWith('bogota') ? ENVIO_BOGOTA : ENVIO_RESTO;
+}
 /** Minutos que tiene la persona para pagar. */
 export const PLAZO_MIN = 60;
 

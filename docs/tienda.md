@@ -28,7 +28,7 @@ Navegador                                   Servidor (api/tienda)               
 | Qué | Cómo |
 |-----|------|
 | Precio y existencias | Los manda la tabla `productos` (las fotos y los textos están en `src/content/stories.ts`, unidos por el SKU). |
-| Envío | $ 15.000 a todo el país (`ENVIO` en `api/_lib/tienda.ts`). |
+| Envío | $ 9.500 a Bogotá y $ 18.500 al resto del país (`ENVIO_BOGOTA`, `ENVIO_RESTO` y `envioPara` en `api/_lib/tienda.ts`). Es Bogotá si el departamento es «Bogotá D. C.» o la ciudad empieza por «Bogotá». |
 | Existencias | Se apartan al crear el pedido. Si se rechaza o vence, vuelven. Pagado no las toca (ya estaban apartadas). |
 | Vencimiento | 1 hora (`PLAZO_MIN`). Wompi no deja pagar después: la fecha va en la firma. |
 | Pagado | Solo si Wompi dice `APPROVED` **y** el valor es exactamente el del pedido. Si no, queda rechazado con una nota. |
@@ -56,7 +56,7 @@ update pedidos set estado = 'enviado', transportadora = 'Servientrega', guia = '
 update pedidos set estado = 'entregado' where referencia = 'TV-…';
 
 -- Cambiar las existencias o el precio
-update productos set existencias = 20, precio = 90000 where sku = 'poster-mapa-pliego';
+update productos set existencias = 20, precio = 169000 where sku = 'poster-mapa-pliego';
 ```
 
 ## Seguimiento («Consultar mi pedido»)

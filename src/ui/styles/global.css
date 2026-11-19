@@ -1748,6 +1748,9 @@ img.media-img:not(.is-loaded) { opacity: 0; }
 .shop-buy__summary { margin: 12px 0 0; font: 300 15px/1.6 var(--sans); color: #3a4d46; }
 .shop-buy__price { margin: 26px 0 0; font: 300 34px/1 'Fraunces', var(--serif); font-variation-settings: 'opsz' 144; letter-spacing: -0.01em; font-variant-numeric: lining-nums; }
 .shop-buy__sample { margin: 6px 0 0; font-size: 12px; font-style: italic; color: var(--muted); }
+.shop-buy__ar { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.shop-buy__ar svg { flex: none; color: #a8661a; }
+.shop-summary__note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
 .shop-buy__block { margin-top: 26px; }
 .shop-buy__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
 .shop-buy__block + .shop-buy__row { margin-top: 0; }
@@ -1823,6 +1826,7 @@ img.media-img:not(.is-loaded) { opacity: 0; }
 .shop-summary__sums .is-total { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line); align-items: baseline; }
 .shop-summary__sums .is-total dt { color: var(--ink); font-weight: 500; }
 .shop-summary__sums .is-total dd { font: 400 26px 'Fraunces', var(--serif); }
+.shop-summary__sums .is-total dd small { font: 400 13px var(--sans); color: var(--muted); }
 .shop-summary__secure { display: flex; gap: 10px; align-items: flex-start; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .shop-summary__secure svg { flex: none; width: 16px; height: 16px; margin-top: 1px; }
 .shop-summary__test { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(232, 187, 82, 0.18); color: #6b4f10; font-size: 12px; }
