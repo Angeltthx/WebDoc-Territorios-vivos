@@ -438,66 +438,83 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
   );
 }
 
-/** Lo de fuera del recorrido: El proyecto, Visita Nuquí, el álbum, «Cuenta tu historia» y la tienda. */
-export const beyondJourney = menu.filter((item) => !item.to && item.href);
+/** Lo de fuera del recorrido. El orden es el del abanico, desde el lado de arriba (o de abajo) hasta el del costado:
+ * los nombres cortos quedan en las puntas, donde hay menos espacio. */
+const BEYOND_ORDER = ['/el-proyecto', '/visita-nuqui', '/cuenta-tu-historia', '/album-musical', '/tienda'];
+export const beyondJourney = menu
+  .filter((item) => !item.to && item.href)
+  .sort((a, b) => BEYOND_ORDER.indexOf(a.href!) - BEYOND_ORDER.indexOf(b.href!));
 
 /**
- * «Más del documental» (pedido de la clienta, 19/11/2026): un botón justo encima del sonido. Al tocarlo, el botón
- * viaja al centro de la pantalla y las opciones salen de él y lo rodean en círculo, cada una con su foto, su nombre y
- * (en pantallas anchas) la línea que dice para qué sirve. Antes estaban al final del menú y casi nadie las veía.
+ * «Más del documental» (pedido de la clienta, 19/11/2026): un botón dorado justo encima del sonido que, al tocarlo, se
+ * vuelve una ✕ y despliega a su alrededor, en abanico, un botón por cada cosa de fuera del recorrido (como el botón
+ * flotante de Adobe Acrobat). Antes estaban al final del menú y casi nadie las veía.
+ *
+ * El abanico se abre hacia donde hay pantalla: en el computador el botón está abajo a la izquierda y las opciones suben
+ * y van hacia la derecha; en el celular está arriba a la derecha y bajan hacia la izquierda. El nombre de cada opción
+ * va por fuera, en la dirección en que salió, para que no choquen entre sí.
+ * (Primero se hizo como un círculo en el centro de la pantalla, con el fondo oscurecido; a la clienta no le gustó.)
  */
 export function MoreButton() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [shown, setShown] = useState(false);
-  const ref = useDialog(open);
-  // Desde dónde salen las opciones (el botón, respecto al centro de la pantalla) y qué tan lejos quedan.
-  const [geo, setGeo] = useState({ sx: 0, sy: 0, r: 180 });
-  const timer = useRef(0);
+  // Hacia dónde se abre (1: derecha / abajo; -1: izquierda / arriba) y qué tan lejos quedan las opciones.
+  const [fan, setFan] = useState({ hx: 1, vy: -1, r: 210 });
 
-  const show = () => {
-    window.clearTimeout(timer.current);
+  const toggle = () => {
+    if (open) return setOpen(false);
     const b = trigger.current?.getBoundingClientRect();
     const [w, h] = [window.innerWidth, window.innerHeight];
-    setGeo({
-      sx: b ? b.left + b.width / 2 - w / 2 : 0,
-      sy: b ? b.top + b.height / 2 - h / 2 : 0,
-      r: Math.round(Math.max(108, Math.min(210, Math.min(w, h) * 0.33))),
-    });
+    if (b) {
+      const vy = b.top + b.height / 2 < h / 2 ? 1 : -1;
+      setFan({ hx: b.left + b.width / 2 < w / 2 ? 1 : -1, vy, r: vy > 0 ? 176 : 210 });
+    }
     setOpen(true);
-    requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
   };
-  // Al cerrar, las opciones vuelven al botón y luego se cierra.
-  const hide = () => {
-    setShown(false);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setOpen(false), 320);
-  };
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  const go = (href: string) => {
-    window.clearTimeout(timer.current);
-    setShown(false);
-    setOpen(false);
-    navigate(href);
-  };
+  // Se cierra al tocar fuera, con Esc o al cambiar de página.
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  useEffect(() => setOpen(false), [pathname]);
+
   const here = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const n = beyondJourney.length;
+  // Abajo a la izquierda (computador): de 10° junto a la vertical (para no salirse por el borde) hasta la horizontal.
+  // Arriba (celular): el botón está en fila con el sonido y la información, así que va de la vertical a 70°, sin tapar
+  // esa fila.
+  const [from, span] = fan.vy > 0 ? [0, 70] : [10, 80];
+  const angle = (i: number) => ((from + (span * i) / (n - 1)) * Math.PI) / 180;
 
   return (
-    <>
+    <div className={`fab${open ? ' is-open' : ''}`} ref={box}>
       <button
         ref={trigger}
         type="button"
-        className={`dock__sound dock__more${open ? ' is-open' : ''}`}
-        onClick={show}
-        aria-haspopup="dialog"
+        className="dock__sound dock__more"
+        onClick={toggle}
         aria-expanded={open}
-        aria-label="Más del documental"
-        title="Más del documental"
+        aria-controls="fab-opciones"
+        aria-label={open ? 'Cerrar «Más del documental»' : 'Más del documental'}
+        title={open ? 'Cerrar' : 'Más del documental'}
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor">
+        <svg className="fab__dots" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor">
           <circle cx="10" cy="10" r="2.6" />
           <circle cx="10" cy="3.2" r="1.6" />
           <circle cx="16.5" cy="7.9" r="1.6" />
@@ -505,52 +522,34 @@ export function MoreButton() {
           <circle cx="6" cy="15.6" r="1.6" />
           <circle cx="3.5" cy="7.9" r="1.6" />
         </svg>
+        <svg className="fab__close" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <path d="M4 4l10 10M14 4 4 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
       </button>
-      <dialog
-        ref={ref}
-        className={`more${shown ? ' is-shown' : ''}`}
-        aria-label="Más del documental"
-        onCancel={(e) => {
-          e.preventDefault();
-          hide();
-        }}
-        onClick={(e) => e.target === ref.current && hide()}
-        style={{ ['--sx' as string]: `${geo.sx}px`, ['--sy' as string]: `${geo.sy}px` }}
-      >
-        <div className="more__ring">
-          <button type="button" className="more__hub" onClick={hide} aria-label="Cerrar">
-            <span aria-hidden="true">✕</span>
-          </button>
-          <p className="more__title" aria-hidden="true">Más del documental</p>
-          <ul className="more__list">
-            {beyondJourney.map((item, i) => {
-              // En círculo, empezando arriba.
-              const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-              const style = {
-                ['--x' as string]: `${Math.round(Math.cos(a) * geo.r)}px`,
-                ['--y' as string]: `${Math.round(Math.sin(a) * geo.r)}px`,
-                ['--i' as string]: i,
-              };
-              const src = item.image && (item.image.startsWith('/') ? item.image : mediaUrl(item.image, true));
-              return (
-                <li key={item.label} className="more__item" style={style}>
-                  <button
-                    type="button"
-                    className={`more__opt${here(item.href!) ? ' is-here' : ''}`}
-                    onClick={() => go(item.href!)}
-                    aria-current={here(item.href!) ? 'page' : undefined}
-                  >
-                    <span className="more__photo" aria-hidden="true">{src && <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />}</span>
-                    <span className="more__name">{item.label}</span>
-                    {item.hint && <span className="more__hint">{item.hint}</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </dialog>
-    </>
+      <ul className="fab__list" id="fab-opciones" aria-label="Más del documental" inert={!open}>
+        {beyondJourney.map((item, i) => {
+          const a = angle(i);
+          const [cx, cy] = [Math.sin(a) * fan.hx, Math.cos(a) * fan.vy];
+          const style = {
+            ['--x' as string]: `${Math.round(cx * fan.r)}px`,
+            ['--y' as string]: `${Math.round(cy * fan.r)}px`,
+            ['--lx' as string]: cx.toFixed(3),
+            ['--ly' as string]: cy.toFixed(3),
+            ['--i' as string]: i,
+          };
+          const src = item.image && (item.image.startsWith('/') ? item.image : mediaUrl(item.image, true));
+          const on = here(item.href!);
+          return (
+            <li key={item.label} className="fab__item" style={style}>
+              <button type="button" className={`fab__opt${on ? ' is-here' : ''}`} onClick={() => { setOpen(false); navigate(item.href!); }} aria-current={on ? 'page' : undefined} title={item.hint}>
+                <span className="fab__photo" aria-hidden="true">{src && <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />}</span>
+                <span className="fab__name">{item.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
