@@ -202,8 +202,10 @@ function PerkIcon({ name }: { name: 'truck' | 'frame' | 'leaf' | 'lock' | 'ar' }
 const EMPTY_BUYER: Buyer = { nombre: '', correo: '', celular: '', direccion: '', ciudad: '', departamento: '', notas: '' };
 
 /** El pago: datos de envío a la izquierda, resumen a la derecha; al confirmar, el pedido se crea y se va a Wompi. */
-function Checkout({ lines, rates, onBack, onStock }: {
+function Checkout({ lines, rates, test, onBack, onStock }: {
   lines: Line[];
+  /** Wompi en modo de prueba: se avisa que no se cobra dinero real. */
+  test: boolean;
   /** Las tarifas de envío: el valor depende de la ciudad que se escriba. */
   rates: { bogota: number; resto: number };
   onBack: () => void;
@@ -316,7 +318,7 @@ function Checkout({ lines, rates, onBack, onStock }: {
             {busy ? 'Preparando el pago…' : known ? `Pagar ${pesos(subtotal + envio)}` : 'Pagar'}
           </button>
           <p className="shop-summary__secure"><PerkIcon name="lock" />Pagas en Wompi, de Bancolombia: tarjeta, PSE o Nequi. Nosotros no vemos los datos de tu tarjeta.</p>
-          <p className="shop-summary__test">Tienda en modo de prueba: no se cobra dinero real.</p>
+          {test && <p className="shop-summary__test">Tienda en modo de prueba: no se cobra dinero real.</p>}
         </aside>
       </div>
     </form>
@@ -401,7 +403,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
       title={view === 'pago' ? 'Ya casi es tuyo' : view === 'consulta' ? '¿Cómo va tu pedido?' : 'Lleva un pedazo del Pacífico'}
       intro={view === 'pago' ? 'Déjanos tus datos de envío y paga seguro con Wompi.'
         : view === 'consulta' ? 'Escribe el código de tu pedido y te contamos en qué va: pago, empaque, en camino o entregado.'
-          : 'Cosas del recorrido para tener en la casa. Por ahora la tienda está en modo de prueba.'}
+          : `Cosas del recorrido para tener en la casa.${catalog?.prueba === false ? '' : ' Por ahora la tienda está en modo de prueba.'}`}
       onClose={onClose}
       aside={
         // En el atardecer, el cuadro colgado, un poco ladeado.
@@ -464,6 +466,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
         <Checkout
           lines={lines}
           rates={rates}
+          test={catalog?.prueba !== false}
           onBack={() => setView('lista')}
           onStock={(sku, quedan) => {
             setBag((b) => {
