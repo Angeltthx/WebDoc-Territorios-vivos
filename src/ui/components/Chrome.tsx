@@ -513,7 +513,7 @@ export function MoreButton() {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   // Hacia dónde se abre (1: derecha / abajo; -1: izquierda / arriba) y qué tan lejos quedan las opciones.
-  const [fan, setFan] = useState({ hx: 1, vy: -1, r: 210 });
+  const [fan, setFan] = useState({ hx: 1, vy: -1, r: 210, bx: 0, by: 0 });
 
   const toggle = () => {
     if (open) return setOpen(false);
@@ -521,7 +521,8 @@ export function MoreButton() {
     const [w, h] = [window.innerWidth, window.innerHeight];
     if (b) {
       const vy = b.top + b.height / 2 < h / 2 ? 1 : -1;
-      setFan({ hx: b.left + b.width / 2 < w / 2 ? 1 : -1, vy, r: vy > 0 ? 158 : 132 });
+      const [bx, by] = [Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2)];
+      setFan({ hx: bx < w / 2 ? 1 : -1, vy, r: vy > 0 ? 158 : 132, bx, by });
     }
     setOpen(true);
   };
@@ -588,6 +589,9 @@ export function MoreButton() {
           <path d="M4 4l10 10M14 4 4 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
+      {/* Un difuminado oscuro detrás de las opciones, más fuerte junto al botón (pedido de la clienta, 19/11/2026): las
+          opciones caen sobre los textos de cada página y, sin él, se mezclaban. Tocarlo cierra. */}
+      <div className="fab__scrim" aria-hidden="true" onClick={() => setOpen(false)} style={{ ['--bx' as string]: `${fan.bx}px`, ['--by' as string]: `${fan.by}px` }} />
       <ul className="fab__list" id="fab-opciones" aria-label="Más del documental" inert={!open}>
         {(fan.vy > 0 ? [...beyondJourney].reverse() : beyondJourney).map((item, i) => {
           const a = angle(i);

@@ -3031,14 +3031,20 @@ button.ap-kpi:hover { background: var(--ap-head); }
    por cada opción (como el botón flotante de Acrobat; ver MoreButton). --x/--y: dónde queda cada opción respecto al
    botón; --lx/--ly: hacia dónde salió (el nombre va por fuera, en esa dirección). */
 .fab { position: relative; display: grid; }
-.dock__sound.dock__more { position: relative; z-index: 2; transition: transform 0.25s var(--ease), background 0.25s, color 0.25s; }
+.dock__sound.dock__more { position: relative; z-index: 4; transition: transform 0.25s var(--ease), background 0.25s, color 0.25s; }
 .dock__sound.dock__more:hover { transform: scale(1.08); }
 .fab.is-open .dock__more { background: #fff; color: var(--forest); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 .dock__more svg { grid-area: 1 / 1; transition: transform 0.3s var(--ease), opacity 0.2s; }
 .dock__more .fab__close { opacity: 0; transform: rotate(-90deg) scale(0.5); }
 .fab.is-open .fab__dots { opacity: 0; transform: rotate(90deg) scale(0.5); }
 .fab.is-open .fab__close { opacity: 1; transform: none; }
-.fab__list { list-style: none; margin: 0; padding: 0; position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 1; }
+.fab__scrim {
+  position: fixed; inset: 0; z-index: 1; opacity: 0; pointer-events: none; transition: opacity 0.35s ease;
+  background: radial-gradient(circle at var(--bx) var(--by), rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.7) 240px, rgba(0, 0, 0, 0.35) 70%, rgba(0, 0, 0, 0.2));
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.fab.is-open .fab__scrim { opacity: 1; pointer-events: auto; }
+.fab__list { list-style: none; margin: 0; padding: 0; position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 3; }
 .fab__item {
   position: absolute; left: 0; top: 0; width: 0; height: 0;
   transform: scale(0.3); opacity: 0; pointer-events: none;
