@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { album } from '../../content/album';
-import { CreditMark, SiteMenu, SocialLinks } from '../components/Chrome';
+import { CreditMark, MoreButton, SiteMenu, SocialLinks } from '../components/Chrome';
 
 export default function AlbumScreen() {
   const navigate = useNavigate();
@@ -121,7 +121,7 @@ export default function AlbumScreen() {
 
       {notice && <p className="notice notice--float" role="status">Muy pronto en Spotify.</p>}
       <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} />
-      <div className="dock"><SocialLinks /></div>
+      <div className="dock"><MoreButton /><SocialLinks /></div>
       <CreditMark />
     </div>
   );

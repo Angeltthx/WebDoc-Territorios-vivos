@@ -177,6 +177,9 @@ const stationOf = (page: string) => page.split('-')[0];
  *   nombre del tramo de río (las transiciones); al final, el mapa y, ya en el mar, lo que está fuera del recorrido.
  * - Lo que tiene partes (las estaciones, El proyecto, Visita Nuquí) se despliega al tocarlo, de a uno; la estación que se
  *   está viendo llega abierta. Lo de fuera del recorrido lleva una línea que dice para qué sirve.
+ * - Desde el 19/11/2026 lo de fuera del recorrido (El proyecto, Visita Nuquí, el álbum, «Cuenta tu historia», la
+ *   tienda) ya no está aquí: quedaba al final, aparte y poco a la vista. Ahora tiene su propio botón junto al sonido
+ *   (`MoreButton`), que despliega esas opciones alrededor (pedido de la clienta). El río termina en el mapa.
  * - El agua corre siempre despacio y, al bajar o subir por el menú, se acelera: el río se mueve con uno. Al abrir, el
  *   agua baja dibujando el cauce, como el mapa de las transiciones.
  */
@@ -192,7 +195,6 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const journey = menu.filter((item) => item.to);
-  const beyond = menu.filter((item) => !item.to);
   const isStation = (item: MenuItem) => !!item.to && !!item.children;
   const here = (item: MenuItem) =>
     item.to
@@ -224,7 +226,7 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
    * un chorro brillante con una gota al frente, que al llegar hace ondas; entonces se cierra el menú y se va allá.
    * Fuera del recorrido y sin estar en ninguna parada, el agua sale desde arriba.
    */
-  const stops = [...journey, ...beyond];
+  const stops = journey;
   const measureRef = useRef<SVGPathElement>(null);
   const trailRef = useRef<SVGPathElement>(null);
   const dropRef = useRef<SVGCircleElement>(null);
@@ -423,18 +425,6 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
                 })}
               </ol>
             </nav>
-            <nav aria-labelledby="menu-mas">
-              <h2 id="menu-mas" className="rio__sea" style={{ ['--i' as string]: order++ }}>Más del documental</h2>
-              <ul className="rio__list">
-                {beyond.map((item) => (
-                  <li key={item.label} {...itemProps('group', item)}>
-                    <Bubble image={item.image} onClick={() => pick(item, item)} />
-                    {row(item, item.label, item.hint)}
-                    {item.children && parts(item)}
-                  </li>
-                ))}
-              </ul>
-            </nav>
           </div>
           <div className="menu__foot">
             <SocialLinks className="menu__social" />
@@ -442,6 +432,122 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
               Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
             </p>
           </div>
+        </div>
+      </dialog>
+    </>
+  );
+}
+
+/** Lo de fuera del recorrido: El proyecto, Visita Nuquí, el álbum, «Cuenta tu historia» y la tienda. */
+export const beyondJourney = menu.filter((item) => !item.to && item.href);
+
+/**
+ * «Más del documental» (pedido de la clienta, 19/11/2026): un botón justo encima del sonido. Al tocarlo, el botón
+ * viaja al centro de la pantalla y las opciones salen de él y lo rodean en círculo, cada una con su foto, su nombre y
+ * (en pantallas anchas) la línea que dice para qué sirve. Antes estaban al final del menú y casi nadie las veía.
+ */
+export function MoreButton() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState(false);
+  const ref = useDialog(open);
+  // Desde dónde salen las opciones (el botón, respecto al centro de la pantalla) y qué tan lejos quedan.
+  const [geo, setGeo] = useState({ sx: 0, sy: 0, r: 180 });
+  const timer = useRef(0);
+
+  const show = () => {
+    window.clearTimeout(timer.current);
+    const b = trigger.current?.getBoundingClientRect();
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    setGeo({
+      sx: b ? b.left + b.width / 2 - w / 2 : 0,
+      sy: b ? b.top + b.height / 2 - h / 2 : 0,
+      r: Math.round(Math.max(108, Math.min(210, Math.min(w, h) * 0.33))),
+    });
+    setOpen(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
+  };
+  // Al cerrar, las opciones vuelven al botón y luego se cierra.
+  const hide = () => {
+    setShown(false);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setOpen(false), 320);
+  };
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const go = (href: string) => {
+    window.clearTimeout(timer.current);
+    setShown(false);
+    setOpen(false);
+    navigate(href);
+  };
+  const here = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const n = beyondJourney.length;
+
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className={`dock__sound dock__more${open ? ' is-open' : ''}`}
+        onClick={show}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label="Más del documental"
+        title="Más del documental"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor">
+          <circle cx="10" cy="10" r="2.6" />
+          <circle cx="10" cy="3.2" r="1.6" />
+          <circle cx="16.5" cy="7.9" r="1.6" />
+          <circle cx="14" cy="15.6" r="1.6" />
+          <circle cx="6" cy="15.6" r="1.6" />
+          <circle cx="3.5" cy="7.9" r="1.6" />
+        </svg>
+      </button>
+      <dialog
+        ref={ref}
+        className={`more${shown ? ' is-shown' : ''}`}
+        aria-label="Más del documental"
+        onCancel={(e) => {
+          e.preventDefault();
+          hide();
+        }}
+        onClick={(e) => e.target === ref.current && hide()}
+        style={{ ['--sx' as string]: `${geo.sx}px`, ['--sy' as string]: `${geo.sy}px` }}
+      >
+        <div className="more__ring">
+          <button type="button" className="more__hub" onClick={hide} aria-label="Cerrar">
+            <span aria-hidden="true">✕</span>
+          </button>
+          <p className="more__title" aria-hidden="true">Más del documental</p>
+          <ul className="more__list">
+            {beyondJourney.map((item, i) => {
+              // En círculo, empezando arriba.
+              const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+              const style = {
+                ['--x' as string]: `${Math.round(Math.cos(a) * geo.r)}px`,
+                ['--y' as string]: `${Math.round(Math.sin(a) * geo.r)}px`,
+                ['--i' as string]: i,
+              };
+              const src = item.image && (item.image.startsWith('/') ? item.image : mediaUrl(item.image, true));
+              return (
+                <li key={item.label} className="more__item" style={style}>
+                  <button
+                    type="button"
+                    className={`more__opt${here(item.href!) ? ' is-here' : ''}`}
+                    onClick={() => go(item.href!)}
+                    aria-current={here(item.href!) ? 'page' : undefined}
+                  >
+                    <span className="more__photo" aria-hidden="true">{src && <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />}</span>
+                    <span className="more__name">{item.label}</span>
+                    {item.hint && <span className="more__hint">{item.hint}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </dialog>
     </>
