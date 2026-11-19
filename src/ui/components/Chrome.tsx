@@ -438,12 +438,55 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
   );
 }
 
-/** Lo de fuera del recorrido. El orden es el del abanico, desde el lado de arriba (o de abajo) hasta el del costado:
- * los nombres cortos quedan en las puntas, donde hay menos espacio. */
+/** Lo de fuera del recorrido, en el orden del abanico del computador (de arriba hacia el costado). En el celular va al
+ * revés, para que abajo, donde los nombres quedan más juntos, vaya uno corto («Tienda»). */
 const BEYOND_ORDER = ['/el-proyecto', '/visita-nuqui', '/cuenta-tu-historia', '/album-musical', '/tienda'];
 export const beyondJourney = menu
   .filter((item) => !item.to && item.href)
   .sort((a, b) => BEYOND_ORDER.indexOf(a.href!) - BEYOND_ORDER.indexOf(b.href!));
+
+/** Íconos de las opciones, con el trazo de los demás botones (la clienta prefirió íconos a fotos, 19/11/2026). */
+const iconProps = { width: 18, height: 18, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+const FAB_ICONS: Record<string, ReactNode> = {
+  // Una cámara de cine: quiénes lo hicimos y cómo.
+  '/el-proyecto': (
+    <svg {...iconProps}>
+      <rect x="2.5" y="7" width="10.5" height="8" rx="1.5" />
+      <path d="m13 10 4.5-2.5v7L13 12" />
+      <circle cx="5.5" cy="4.5" r="2" />
+      <circle cx="10.5" cy="4.5" r="2" />
+    </svg>
+  ),
+  // Un pin de lugar: ir a Nuquí.
+  '/visita-nuqui': (
+    <svg {...iconProps}>
+      <path d="M10 18s5.5-5.2 5.5-9.5a5.5 5.5 0 0 0-11 0C4.5 12.8 10 18 10 18Z" />
+      <circle cx="10" cy="8.5" r="2" />
+    </svg>
+  ),
+  // Un globo de diálogo con un lápiz: contar.
+  '/cuenta-tu-historia': (
+    <svg {...iconProps}>
+      <path d="M17 10.5a6.5 6 0 0 1-9.6 5.3L3 17l1.2-3.6A6.5 6 0 1 1 17 10.5Z" />
+      <path d="M7 10.5h6M7 8h4" />
+    </svg>
+  ),
+  // Una nota musical.
+  '/album-musical': (
+    <svg {...iconProps}>
+      <path d="M8 15V4.5l8-1.5v10.5" />
+      <circle cx="6" cy="15" r="2" />
+      <circle cx="14" cy="13.5" r="2" />
+    </svg>
+  ),
+  // Una bolsa de compras.
+  '/tienda': (
+    <svg {...iconProps}>
+      <path d="M4 6.5h12l-1 11H5l-1-11Z" />
+      <path d="M7.5 8.5V5.5a2.5 2.5 0 0 1 5 0v3" />
+    </svg>
+  ),
+};
 
 /**
  * «Más del documental» (pedido de la clienta, 19/11/2026): un botón dorado justo encima del sonido que, al tocarlo, se
@@ -470,7 +513,7 @@ export function MoreButton() {
     const [w, h] = [window.innerWidth, window.innerHeight];
     if (b) {
       const vy = b.top + b.height / 2 < h / 2 ? 1 : -1;
-      setFan({ hx: b.left + b.width / 2 < w / 2 ? 1 : -1, vy, r: vy > 0 ? 176 : 210 });
+      setFan({ hx: b.left + b.width / 2 < w / 2 ? 1 : -1, vy, r: vy > 0 ? 158 : 132 });
     }
     setOpen(true);
   };
@@ -527,7 +570,7 @@ export function MoreButton() {
         </svg>
       </button>
       <ul className="fab__list" id="fab-opciones" aria-label="Más del documental" inert={!open}>
-        {beyondJourney.map((item, i) => {
+        {(fan.vy > 0 ? [...beyondJourney].reverse() : beyondJourney).map((item, i) => {
           const a = angle(i);
           const [cx, cy] = [Math.sin(a) * fan.hx, Math.cos(a) * fan.vy];
           const style = {
@@ -537,12 +580,11 @@ export function MoreButton() {
             ['--ly' as string]: cy.toFixed(3),
             ['--i' as string]: i,
           };
-          const src = item.image && (item.image.startsWith('/') ? item.image : mediaUrl(item.image, true));
           const on = here(item.href!);
           return (
             <li key={item.label} className="fab__item" style={style}>
               <button type="button" className={`fab__opt${on ? ' is-here' : ''}`} onClick={() => { setOpen(false); navigate(item.href!); }} aria-current={on ? 'page' : undefined} title={item.hint}>
-                <span className="fab__photo" aria-hidden="true">{src && <img src={src} alt="" loading="lazy" decoding="async" draggable={false} />}</span>
+                <span className="fab__icon" aria-hidden="true">{FAB_ICONS[item.href!]}</span>
                 <span className="fab__name">{item.label}</span>
               </button>
             </li>

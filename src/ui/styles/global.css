@@ -3052,18 +3052,17 @@ button.ap-kpi:hover { background: var(--ap-head); }
   transition: transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1) calc(var(--i) * 45ms), opacity 0.25s ease calc(var(--i) * 45ms);
 }
 .fab__opt { position: absolute; left: 0; top: 0; padding: 0; border: 0; background: none; }
-.fab__photo {
-  position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; background: #0c1d17;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 6px 18px rgba(0, 0, 0, 0.45); transition: transform 0.2s var(--ease), box-shadow 0.2s;
+.fab__icon {
+  position: absolute; left: -20px; top: -20px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  color: #fff; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(8, 20, 16, 0.7); backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); transition: transform 0.2s var(--ease), background 0.2s, color 0.2s, border-color 0.2s;
 }
-.fab__photo img { width: 100%; height: 100%; object-fit: cover; }
-.fab__opt:hover .fab__photo, .fab__opt:focus-visible .fab__photo, .fab__opt.is-here .fab__photo {
-  transform: scale(1.1); box-shadow: 0 0 0 3px var(--gold), 0 8px 22px rgba(0, 0, 0, 0.5);
-}
+.fab__opt:hover .fab__icon, .fab__opt:focus-visible .fab__icon { transform: scale(1.1); background: #fff; color: var(--forest); }
+.fab__opt.is-here .fab__icon { color: var(--gold); border-color: rgba(232, 187, 82, 0.75); }
 .fab__opt:focus-visible { outline: none; }
 /* El nombre, por fuera del círculo y hacia donde salió la opción. */
 .fab__name {
-  position: absolute; left: calc(var(--lx) * 31px); top: calc(var(--ly) * 31px);
+  position: absolute; left: calc(var(--lx) * 26px); top: calc(var(--ly) * 26px);
   transform: translate(calc(-50% + var(--lx) * 50%), calc(-50% + var(--ly) * 50%));
   white-space: nowrap; padding: 4px 9px; border-radius: 999px; background: rgba(8, 20, 16, 0.85); backdrop-filter: blur(6px);
   font: 600 12.5px/1.2 var(--sans); color: #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); transition: color 0.2s;
@@ -3073,8 +3072,8 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .fab__item, .fab.is-open .fab__item, .dock__more svg { transition-duration: 0.25s !important; }
 }
 @media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
-  .fab__photo { left: -22px; top: -22px; width: 44px; height: 44px; }
-  .fab__name { left: calc(var(--lx) * 28px); top: calc(var(--ly) * 28px); font-size: 12px; padding: 3px 8px; }
+  .fab__icon { left: -21px; top: -21px; width: 42px; height: 42px; }
+  .fab__name { left: calc(var(--lx) * 27px); top: calc(var(--ly) * 27px); font-size: 12px; padding: 3px 8px; }
 }
 /* El proyecto, Visita Nuquí y el álbum: en pantallas angostas el botón va arriba, junto al menú (las redes, en el menú). */
 @media (max-width: 900px) {
