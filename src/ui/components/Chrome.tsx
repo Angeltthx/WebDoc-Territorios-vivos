@@ -177,6 +177,9 @@ const stationOf = (page: string) => page.split('-')[0];
  *   nombre del tramo de río (las transiciones); al final, el mapa y, ya en el mar, lo que está fuera del recorrido.
  * - Lo que tiene partes (las estaciones, El proyecto, Visita Nuquí) se despliega al tocarlo, de a uno; la estación que se
  *   está viendo llega abierta. Lo de fuera del recorrido lleva una línea que dice para qué sirve.
+ * - Desde el 19/11/2026 lo de fuera del recorrido (El proyecto, Visita Nuquí, el álbum, «Cuenta tu historia», la
+ *   tienda) ya no está aquí: quedaba al final, aparte y poco a la vista. Ahora tiene su propio botón junto al sonido
+ *   (`MoreButton`), que despliega esas opciones alrededor (pedido de la clienta). El río termina en el mapa.
  * - El agua corre siempre despacio y, al bajar o subir por el menú, se acelera: el río se mueve con uno. Al abrir, el
  *   agua baja dibujando el cauce, como el mapa de las transiciones.
  */
@@ -192,7 +195,6 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const journey = menu.filter((item) => item.to);
-  const beyond = menu.filter((item) => !item.to);
   const isStation = (item: MenuItem) => !!item.to && !!item.children;
   const here = (item: MenuItem) =>
     item.to
@@ -224,7 +226,7 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
    * un chorro brillante con una gota al frente, que al llegar hace ondas; entonces se cierra el menú y se va allá.
    * Fuera del recorrido y sin estar en ninguna parada, el agua sale desde arriba.
    */
-  const stops = [...journey, ...beyond];
+  const stops = journey;
   const measureRef = useRef<SVGPathElement>(null);
   const trailRef = useRef<SVGPathElement>(null);
   const dropRef = useRef<SVGCircleElement>(null);
@@ -423,18 +425,6 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
                 })}
               </ol>
             </nav>
-            <nav aria-labelledby="menu-mas">
-              <h2 id="menu-mas" className="rio__sea" style={{ ['--i' as string]: order++ }}>Más del documental</h2>
-              <ul className="rio__list">
-                {beyond.map((item) => (
-                  <li key={item.label} {...itemProps('group', item)}>
-                    <Bubble image={item.image} onClick={() => pick(item, item)} />
-                    {row(item, item.label, item.hint)}
-                    {item.children && parts(item)}
-                  </li>
-                ))}
-              </ul>
-            </nav>
           </div>
           <div className="menu__foot">
             <SocialLinks className="menu__social" />
@@ -445,6 +435,193 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
         </div>
       </dialog>
     </>
+  );
+}
+
+/** Lo de fuera del recorrido, en el orden del abanico del computador (de arriba hacia el costado). En el celular va al
+ * revés, para que abajo, donde los nombres quedan más juntos, vaya uno corto («Tienda»). */
+const BEYOND_ORDER = ['/el-proyecto', '/visita-nuqui', '/cuenta-tu-historia', '/album-musical', '/tienda'];
+export const beyondJourney = menu
+  .filter((item) => !item.to && item.href)
+  .sort((a, b) => BEYOND_ORDER.indexOf(a.href!) - BEYOND_ORDER.indexOf(b.href!));
+
+/** Íconos de las opciones, con el trazo de los demás botones (la clienta prefirió íconos a fotos, 19/11/2026). */
+const iconProps = { width: 18, height: 18, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+const FAB_ICONS: Record<string, ReactNode> = {
+  // Una cámara de cine: quiénes lo hicimos y cómo.
+  '/el-proyecto': (
+    <svg {...iconProps}>
+      <rect x="2.5" y="7" width="10.5" height="8" rx="1.5" />
+      <path d="m13 10 4.5-2.5v7L13 12" />
+      <circle cx="5.5" cy="4.5" r="2" />
+      <circle cx="10.5" cy="4.5" r="2" />
+    </svg>
+  ),
+  // Un pin de lugar: ir a Nuquí.
+  '/visita-nuqui': (
+    <svg {...iconProps}>
+      <path d="M10 18s5.5-5.2 5.5-9.5a5.5 5.5 0 0 0-11 0C4.5 12.8 10 18 10 18Z" />
+      <circle cx="10" cy="8.5" r="2" />
+    </svg>
+  ),
+  // Un globo de diálogo con un lápiz: contar.
+  '/cuenta-tu-historia': (
+    <svg {...iconProps}>
+      <path d="M17 10.5a6.5 6 0 0 1-9.6 5.3L3 17l1.2-3.6A6.5 6 0 1 1 17 10.5Z" />
+      <path d="M7 10.5h6M7 8h4" />
+    </svg>
+  ),
+  // Una nota musical.
+  '/album-musical': (
+    <svg {...iconProps}>
+      <path d="M8 15V4.5l8-1.5v10.5" />
+      <circle cx="6" cy="15" r="2" />
+      <circle cx="14" cy="13.5" r="2" />
+    </svg>
+  ),
+  // Volver: una flecha que regresa.
+  volver: (
+    <svg {...iconProps}>
+      <path d="M8 5 3.5 9.5 8 14" />
+      <path d="M4 9.5h7.5a5 5 0 0 1 0 10H10" />
+    </svg>
+  ),
+  // Una bolsa de compras.
+  '/tienda': (
+    <svg {...iconProps}>
+      <path d="M4 6.5h12l-1 11H5l-1-11Z" />
+      <path d="M7.5 8.5V5.5a2.5 2.5 0 0 1 5 0v3" />
+    </svg>
+  ),
+};
+
+/**
+ * «Más del documental» (pedido de la clienta, 19/11/2026): un botón con una claqueta justo encima del sonido que, al tocarlo, se
+ * vuelve una ✕ y despliega a su alrededor, en abanico, un botón por cada cosa de fuera del recorrido (como el botón
+ * flotante de Adobe Acrobat). Antes estaban al final del menú y casi nadie las veía.
+ *
+ * El abanico se abre hacia donde hay pantalla: en el computador el botón está abajo a la izquierda y las opciones suben
+ * y van hacia la derecha; en el celular está arriba a la derecha y bajan hacia la izquierda. El nombre de cada opción
+ * va por fuera, en la dirección en que salió, para que no choquen entre sí.
+ * (Primero se hizo como un círculo en el centro de la pantalla, con el fondo oscurecido; a la clienta no le gustó.)
+ */
+export function MoreButton() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { pathname } = location;
+  const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  // Hacia dónde se abre (1: derecha / abajo; -1: izquierda / arriba) y qué tan lejos quedan las opciones.
+  const [fan, setFan] = useState({ hx: 1, vy: -1, r: 210, bx: 0, by: 0 });
+
+  const toggle = () => {
+    if (open) return setOpen(false);
+    const b = trigger.current?.getBoundingClientRect();
+    const [w, h] = [window.innerWidth, window.innerHeight];
+    if (b) {
+      const vy = b.top + b.height / 2 < h / 2 ? 1 : -1;
+      const [bx, by] = [Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2)];
+      setFan({ hx: bx < w / 2 ? 1 : -1, vy, r: vy > 0 ? 158 : 132, bx, by });
+    }
+    setOpen(true);
+  };
+  // Se cierra al tocar fuera, con Esc o al cambiar de página.
+  useEffect(() => {
+    if (!open) return;
+    const outside = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  useEffect(() => setOpen(false), [pathname]);
+
+  const here = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // Estando en una de estas páginas, su opción se vuelve «Volver al recorrido» (pedido de la clienta, 19/11/2026: seguía
+  // ofreciendo la misma página). Vuelve como el «Volver» de arriba: a la página del recorrido desde donde se llegó.
+  const inside = beyondJourney.some((item) => here(item.href!));
+  const goBack = () => {
+    setOpen(false);
+    if (location.key !== 'default') navigate(-1);
+    else navigate('/');
+  };
+  // De una de estas páginas a otra, se reemplaza en el historial: así «Volver» sigue llevando al recorrido.
+  const go = (href: string) => {
+    setOpen(false);
+    navigate(href, { replace: inside });
+  };
+  const n = beyondJourney.length;
+  // Abajo a la izquierda (computador): de 10° junto a la vertical (para no salirse por el borde) hasta la horizontal.
+  // Arriba (celular): el botón está en fila con el sonido y la información, así que va de la vertical a 70°, sin tapar
+  // esa fila.
+  const [from, span] = fan.vy > 0 ? [0, 70] : [10, 80];
+  const angle = (i: number) => ((from + (span * i) / (n - 1)) * Math.PI) / 180;
+
+  return (
+    <div className={`fab${open ? ' is-open' : ''}`} ref={box}>
+      <button
+        ref={trigger}
+        type="button"
+        className="dock__sound dock__more"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls="fab-opciones"
+        aria-label={open ? 'Cerrar «Más del documental»' : 'Más del documental'}
+        title={open ? 'Cerrar' : 'Más del documental'}
+      >
+        {/* Una claqueta de cine: lo demás del documental (19/11/2026; antes eran puntos dorados en círculo). */}
+        <svg className="fab__dots" {...iconProps}>
+          <path d="M3 9h14v7.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9Z" />
+          <path d="m3 9-.4-2.6a1 1 0 0 1 .8-1.1l11.9-2.1a1 1 0 0 1 1.2.8L16.8 6 3 9Z" />
+          <path d="m6.6 4.7 1.9 2.7M10.6 4 12.5 6.7" />
+        </svg>
+        <svg className="fab__close" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <path d="M4 4l10 10M14 4 4 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      {/* Un difuminado oscuro detrás de las opciones, más fuerte junto al botón (pedido de la clienta, 19/11/2026): las
+          opciones caen sobre los textos de cada página y, sin él, se mezclaban. Tocarlo cierra. */}
+      <div className="fab__scrim" aria-hidden="true" onClick={() => setOpen(false)} style={{ ['--bx' as string]: `${fan.bx}px`, ['--by' as string]: `${fan.by}px` }} />
+      <ul className="fab__list" id="fab-opciones" aria-label="Más del documental" inert={!open}>
+        {(fan.vy > 0 ? [...beyondJourney].reverse() : beyondJourney).map((item, i) => {
+          const a = angle(i);
+          const [cx, cy] = [Math.sin(a) * fan.hx, Math.cos(a) * fan.vy];
+          const style = {
+            ['--x' as string]: `${Math.round(cx * fan.r)}px`,
+            ['--y' as string]: `${Math.round(cy * fan.r)}px`,
+            ['--lx' as string]: cx.toFixed(3),
+            ['--ly' as string]: cy.toFixed(3),
+            ['--i' as string]: i,
+          };
+          const on = here(item.href!);
+          return (
+            <li key={item.label} className="fab__item" style={style}>
+              {on ? (
+                <button type="button" className="fab__opt fab__opt--back" onClick={goBack}>
+                  <span className="fab__icon" aria-hidden="true">{FAB_ICONS.volver}</span>
+                  <span className="fab__name">Volver al recorrido</span>
+                </button>
+              ) : (
+                <button type="button" className="fab__opt" onClick={() => go(item.href!)} title={item.hint}>
+                  <span className="fab__icon" aria-hidden="true">{FAB_ICONS[item.href!]}</span>
+                  <span className="fab__name">{item.label}</span>
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

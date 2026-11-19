@@ -2859,7 +2859,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .dock .social { display: none; }
   .dock__sound { width: 44px; height: 44px; }
   /* Sonido, información y menú: el rótulo de la página se recorta antes de llegar a ellos. */
-  .stack-page .topbar { padding-right: 172px; }
+  .stack-page .topbar { padding-right: 224px; }
   .stack-page .topbar__right { display: none; }
   .stack-page .chip { max-width: 100%; }
   .tips { margin-top: 14px; padding-top: 12px; gap: 6px; }
@@ -2903,7 +2903,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .dock { left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; flex-direction: row-reverse; }
   .dock .social, .chapter .dock { display: none; }
   .dock__sound { width: 44px; height: 44px; }
-  .stack-page .topbar { padding-right: 172px; }
+  .stack-page .topbar { padding-right: 224px; }
   .tips { display: none; }
   .stack-page .topbar__right { display: none; }
   .cue, .scroll-hint { display: none; }
@@ -3024,4 +3024,64 @@ button.ap-kpi:hover { background: var(--ap-head); }
    debajo del video. */
 @media (max-height: 500px) and (orientation: landscape) {
   .trailer__about .trailer__note { display: none; }
+}
+
+/* ───────── Más del documental (19/11/2026) ─────────
+   Un botón (una claqueta) sobre el del sonido que, al tocarlo, se vuelve una ✕ y despliega a su alrededor, en abanico, un botón
+   por cada opción (como el botón flotante de Acrobat; ver MoreButton). --x/--y: dónde queda cada opción respecto al
+   botón; --lx/--ly: hacia dónde salió (el nombre va por fuera, en esa dirección). */
+.fab { position: relative; display: grid; }
+.dock__sound.dock__more { position: relative; z-index: 4; transition: transform 0.25s var(--ease), background 0.25s, color 0.25s; }
+.dock__sound.dock__more:hover { transform: scale(1.08); }
+.fab.is-open .dock__more { background: #fff; color: var(--forest); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+.dock__more svg { grid-area: 1 / 1; transition: transform 0.3s var(--ease), opacity 0.2s; }
+.dock__more .fab__close { opacity: 0; transform: rotate(-90deg) scale(0.5); }
+.fab.is-open .fab__dots { opacity: 0; transform: rotate(90deg) scale(0.5); }
+.fab.is-open .fab__close { opacity: 1; transform: none; }
+.fab__scrim {
+  position: fixed; inset: 0; z-index: 1; opacity: 0; pointer-events: none; transition: opacity 0.35s ease;
+  background: radial-gradient(circle at var(--bx) var(--by), rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.7) 240px, rgba(0, 0, 0, 0.35) 70%, rgba(0, 0, 0, 0.2));
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.fab.is-open .fab__scrim { opacity: 1; pointer-events: auto; }
+.fab__list { list-style: none; margin: 0; padding: 0; position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 3; }
+.fab__item {
+  position: absolute; left: 0; top: 0; width: 0; height: 0;
+  transform: scale(0.3); opacity: 0; pointer-events: none;
+  transition: transform 0.25s var(--ease) calc((4 - var(--i)) * 25ms), opacity 0.18s ease calc((4 - var(--i)) * 25ms);
+}
+.fab.is-open .fab__item {
+  transform: translate(var(--x), var(--y)); opacity: 1; pointer-events: auto;
+  transition: transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1) calc(var(--i) * 45ms), opacity 0.25s ease calc(var(--i) * 45ms);
+}
+.fab__opt { position: absolute; left: 0; top: 0; padding: 0; border: 0; background: none; }
+.fab__icon {
+  position: absolute; left: -20px; top: -20px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  color: #fff; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(8, 20, 16, 0.7); backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); transition: transform 0.2s var(--ease), background 0.2s, color 0.2s, border-color 0.2s;
+}
+.fab__opt:hover .fab__icon, .fab__opt:focus-visible .fab__icon { transform: scale(1.1); background: #fff; color: var(--forest); }
+/* «Volver al recorrido» (en lugar de la página donde se está): con el borde claro, para distinguirla. */
+.fab__opt--back .fab__icon { border-color: rgba(255, 255, 255, 0.75); }
+.fab__opt:focus-visible { outline: none; }
+/* El nombre, por fuera del círculo y hacia donde salió la opción. */
+.fab__name {
+  position: absolute; left: calc(var(--lx) * 26px); top: calc(var(--ly) * 26px);
+  transform: translate(calc(-50% + var(--lx) * 50%), calc(-50% + var(--ly) * 50%));
+  white-space: nowrap; padding: 4px 9px; border-radius: 999px; background: rgba(8, 20, 16, 0.85); backdrop-filter: blur(6px);
+  font: 600 12.5px/1.2 var(--sans); color: #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); transition: color 0.2s;
+}
+.fab__opt:hover .fab__name, .fab__opt:focus-visible .fab__name { color: var(--gold); }
+@media (prefers-reduced-motion: reduce) {
+  .fab__item, .fab.is-open .fab__item, .dock__more svg { transition-duration: 0.25s !important; }
+}
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .fab__icon { left: -21px; top: -21px; width: 42px; height: 42px; }
+  .fab__name { left: calc(var(--lx) * 27px); top: calc(var(--ly) * 27px); font-size: 12px; padding: 3px 8px; }
+}
+/* El proyecto, Visita Nuquí y el álbum: en pantallas angostas el botón va arriba, junto al menú (las redes, en el menú). */
+@media (max-width: 900px) {
+  .chapter .dock, .album-page .dock { display: flex; left: auto; right: 66px; top: max(14px, env(safe-area-inset-top)); bottom: auto; transform: none; }
+  .chapter .dock .social, .album-page .dock .social { display: none; }
+  .chapter .dock__sound, .album-page .dock__sound { width: 44px; height: 44px; }
 }

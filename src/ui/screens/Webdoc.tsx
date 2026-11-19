@@ -6,7 +6,7 @@ import { useScrollJourney } from '../../application/journey';
 import { clearTrack, initAudioUnlock, isMuted, playTransition, preloadTrack, setMuted, setTrack, setVoice } from '../../application/sound';
 import { Backdrop } from '../components/Media';
 import {
-  Arrow, CreditMark, GuideButton, JourneyNav, PageTabs, SiteMenu, SocialLinks,
+  Arrow, CreditMark, GuideButton, JourneyNav, MoreButton, PageTabs, SiteMenu, SocialLinks,
   TopBar, TransitionSymbol, useJourneyNav,
 } from '../components/Chrome';
 import { AboutButton } from '../components/InfoDialog';
@@ -83,6 +83,7 @@ export function Webdoc() {
       <ScrollCue page={active} off={pages[active].kind === 'closing' || pages[active].kind === 'welcome'} onNext={() => scrollToIndex(active + 1)} />
       <SiteMenu open={menuOpen} onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)} current={pages[active].id} />
       <div className="dock">
+        <MoreButton />
         <button
           type="button"
           className="dock__sound"
