@@ -479,6 +479,13 @@ const FAB_ICONS: Record<string, ReactNode> = {
       <circle cx="14" cy="13.5" r="2" />
     </svg>
   ),
+  // Volver: una flecha que regresa.
+  volver: (
+    <svg {...iconProps}>
+      <path d="M8 5 3.5 9.5 8 14" />
+      <path d="M4 9.5h7.5a5 5 0 0 1 0 10H10" />
+    </svg>
+  ),
   // Una bolsa de compras.
   '/tienda': (
     <svg {...iconProps}>
@@ -500,7 +507,8 @@ const FAB_ICONS: Record<string, ReactNode> = {
  */
 export function MoreButton() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -538,6 +546,19 @@ export function MoreButton() {
   useEffect(() => setOpen(false), [pathname]);
 
   const here = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // Estando en una de estas páginas, su opción se vuelve «Volver al recorrido» (pedido de la clienta, 19/11/2026: seguía
+  // ofreciendo la misma página). Vuelve como el «Volver» de arriba: a la página del recorrido desde donde se llegó.
+  const inside = beyondJourney.some((item) => here(item.href!));
+  const goBack = () => {
+    setOpen(false);
+    if (location.key !== 'default') navigate(-1);
+    else navigate('/');
+  };
+  // De una de estas páginas a otra, se reemplaza en el historial: así «Volver» sigue llevando al recorrido.
+  const go = (href: string) => {
+    setOpen(false);
+    navigate(href, { replace: inside });
+  };
   const n = beyondJourney.length;
   // Abajo a la izquierda (computador): de 10° junto a la vertical (para no salirse por el borde) hasta la horizontal.
   // Arriba (celular): el botón está en fila con el sonido y la información, así que va de la vertical a 70°, sin tapar
@@ -581,10 +602,17 @@ export function MoreButton() {
           const on = here(item.href!);
           return (
             <li key={item.label} className="fab__item" style={style}>
-              <button type="button" className={`fab__opt${on ? ' is-here' : ''}`} onClick={() => { setOpen(false); navigate(item.href!); }} aria-current={on ? 'page' : undefined} title={item.hint}>
-                <span className="fab__icon" aria-hidden="true">{FAB_ICONS[item.href!]}</span>
-                <span className="fab__name">{item.label}</span>
-              </button>
+              {on ? (
+                <button type="button" className="fab__opt fab__opt--back" onClick={goBack}>
+                  <span className="fab__icon" aria-hidden="true">{FAB_ICONS.volver}</span>
+                  <span className="fab__name">Volver al recorrido</span>
+                </button>
+              ) : (
+                <button type="button" className="fab__opt" onClick={() => go(item.href!)} title={item.hint}>
+                  <span className="fab__icon" aria-hidden="true">{FAB_ICONS[item.href!]}</span>
+                  <span className="fab__name">{item.label}</span>
+                </button>
+              )}
             </li>
           );
         })}

@@ -3055,7 +3055,8 @@ button.ap-kpi:hover { background: var(--ap-head); }
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); transition: transform 0.2s var(--ease), background 0.2s, color 0.2s, border-color 0.2s;
 }
 .fab__opt:hover .fab__icon, .fab__opt:focus-visible .fab__icon { transform: scale(1.1); background: #fff; color: var(--forest); }
-.fab__opt.is-here .fab__icon { color: var(--gold); border-color: rgba(232, 187, 82, 0.75); }
+/* «Volver al recorrido» (en lugar de la página donde se está): con el borde claro, para distinguirla. */
+.fab__opt--back .fab__icon { border-color: rgba(255, 255, 255, 0.75); }
 .fab__opt:focus-visible { outline: none; }
 /* El nombre, por fuera del círculo y hacia donde salió la opción. */
 .fab__name {
@@ -3064,7 +3065,7 @@ button.ap-kpi:hover { background: var(--ap-head); }
   white-space: nowrap; padding: 4px 9px; border-radius: 999px; background: rgba(8, 20, 16, 0.85); backdrop-filter: blur(6px);
   font: 600 12.5px/1.2 var(--sans); color: #fff; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); transition: color 0.2s;
 }
-.fab__opt:hover .fab__name, .fab__opt:focus-visible .fab__name, .fab__opt.is-here .fab__name { color: var(--gold); }
+.fab__opt:hover .fab__name, .fab__opt:focus-visible .fab__name { color: var(--gold); }
 @media (prefers-reduced-motion: reduce) {
   .fab__item, .fab.is-open .fab__item, .dock__more svg { transition-duration: 0.25s !important; }
 }
