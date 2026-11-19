@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { SHOP_ITEMS, pesos, type ShopItem } from '../../content/stories';
-import { type Buyer, type Catalog, DEPARTAMENTOS, OrderError, createOrder, fetchCatalog, loadBag, saveBag } from '../../application/shop-api';
+import { type Buyer, type Catalog, DEPARTAMENTOS, ENVIO_RESPALDO, OrderError, createOrder, envioPara, fetchCatalog, loadBag, saveBag } from '../../application/shop-api';
 import { LineIcon, Sheet, type Origin } from '../components/Sheet';
 import { OrderTracker } from '../components/OrderTracker';
 
@@ -14,7 +14,10 @@ type Size = ShopItem['sizes'][number];
 type Line = { item: ShopItem; size: Size; qty: number; price: number };
 /** Más de esto por producto no se puede pedir de una vez. */
 const MAX_QTY = 10;
-const ENVIO_RESPALDO = 15000;
+/** Las tarifas de envío: las del servidor o, sin él, las del código. */
+const tarifas = (catalog: Catalog | null) => (catalog ? { bogota: catalog.envioBogota, resto: catalog.envio } : ENVIO_RESPALDO);
+/** «$ 9.500 en Bogotá y $ 18.500 al resto del país». */
+const envioTexto = (t: { bogota: number; resto: number }) => `${pesos(t.bogota)} en Bogotá y ${pesos(t.resto)} al resto del país`;
 
 /** Galería: la foto grande con lupa (sigue al mouse) y, al lado, las miniaturas de los detalles. */
 function Gallery({ item }: { item: ShopItem }) {
@@ -55,11 +58,10 @@ function Gallery({ item }: { item: ShopItem }) {
   );
 }
 
-/** Lo que se ve de las existencias. */
+/** Lo que se ve de las existencias: solo si se agotó (la clienta no quiere mostrar cuántos quedan, 17/11/2026). */
 function Stock({ left }: { left: number | null }) {
-  if (left === null) return null;
-  if (left <= 0) return <p className="shop-stock is-out">Agotado por ahora</p>;
-  return <p className={`shop-stock${left <= 3 ? ' is-low' : ''}`}>{left === 1 ? 'Queda 1' : `Quedan ${left}`} en existencia</p>;
+  if (left === null || left > 0) return null;
+  return <p className="shop-stock is-out">Agotado por ahora</p>;
 }
 
 /** La ficha del producto. */
@@ -101,7 +103,10 @@ function Product({ item, catalog, inBag, onBack, onAdd, onBuy }: {
           <p className="shop-buy__summary">{item.summary}</p>
 
           <p className="shop-buy__price">{pesos(price * qty)}</p>
-          <p className="shop-buy__sample">Precio de prueba · el envío se suma al pagar</p>
+          {/* Junto al precio, que incluye la realidad aumentada (pedido de la clienta, 17/11/2026; antes decía «Precio
+              de prueba»). */}
+          <p className="shop-buy__ar"><PerkIcon name="ar" />Incluye una experiencia de Realidad Aumentada</p>
+          <p className="shop-buy__sample">El envío se suma al pagar</p>
           <Stock left={left} />
 
           {item.sizes.length > 1 ? (
@@ -155,7 +160,7 @@ function Product({ item, catalog, inBag, onBack, onAdd, onBuy }: {
           {room <= 0 && left !== null && left > 0 && <p className="shop-notice" role="status">Ya tienes en tu bolsa todos los que hay.</p>}
 
           <ul className="shop-perks">
-            <li><PerkIcon name="truck" />Envío a toda Colombia por {pesos(catalog?.envio ?? ENVIO_RESPALDO)}</li>
+            <li><PerkIcon name="truck" />Envío: {envioTexto(tarifas(catalog))}</li>
             <li><PerkIcon name="leaf" />Papel ecológico de caña de azúcar, sin impacto forestal</li>
             <li><PerkIcon name="frame" />Enmarcado en pino natural y sin vidrio: ligero y fácil de colgar</li>
           </ul>
@@ -180,13 +185,15 @@ function Product({ item, catalog, inBag, onBack, onAdd, onBuy }: {
   );
 }
 
-function PerkIcon({ name }: { name: 'truck' | 'frame' | 'leaf' | 'lock' }) {
+function PerkIcon({ name }: { name: 'truck' | 'frame' | 'leaf' | 'lock' | 'ar' }) {
   const c = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
       {name === 'truck' && <><path {...c} d="M3 7h11v9H3zM14 10h4l3 3v3h-7" /><circle {...c} cx="7" cy="17.5" r="1.8" /><circle {...c} cx="17" cy="17.5" r="1.8" /></>}
       {name === 'frame' && <><rect {...c} x="4" y="3" width="16" height="18" rx="1" /><rect {...c} x="7.5" y="6.5" width="9" height="11" /></>}
       {name === 'leaf' && <><path {...c} d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z" /><path {...c} d="M5 19l7-7" /></>}
+      {/* Un cubo: lo que aparece en realidad aumentada. */}
+      {name === 'ar' && <><path {...c} d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Z" /><path {...c} d="M4 7.5 12 12l8-4.5M12 12v9" /></>}
       {name === 'lock' && <><rect {...c} x="5" y="10.5" width="14" height="10" rx="2" /><path {...c} d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></>}
     </svg>
   );
@@ -195,9 +202,10 @@ function PerkIcon({ name }: { name: 'truck' | 'frame' | 'leaf' | 'lock' }) {
 const EMPTY_BUYER: Buyer = { nombre: '', correo: '', celular: '', direccion: '', ciudad: '', departamento: '', notas: '' };
 
 /** El pago: datos de envío a la izquierda, resumen a la derecha; al confirmar, el pedido se crea y se va a Wompi. */
-function Checkout({ lines, envio, onBack, onStock }: {
+function Checkout({ lines, rates, onBack, onStock }: {
   lines: Line[];
-  envio: number;
+  /** Las tarifas de envío: el valor depende de la ciudad que se escriba. */
+  rates: { bogota: number; resto: number };
   onBack: () => void;
   /** Si al crear el pedido ya no había suficientes, se ajusta la bolsa a lo que queda. */
   onStock: (sku: string, quedan: number) => void;
@@ -208,6 +216,9 @@ function Checkout({ lines, envio, onBack, onStock }: {
   const [error, setError] = useState('');
   const set = (k: keyof Buyer) => (e: { target: { value: string } }) => setBuyer((b) => ({ ...b, [k]: e.target.value }));
   const subtotal = lines.reduce((n, l) => n + l.qty * l.price, 0);
+  // El envío se sabe cuando hay ciudad o departamento; antes, se dicen las dos tarifas.
+  const known = !!(buyer.departamento || buyer.ciudad.trim().length >= 3);
+  const envio = envioPara(buyer.ciudad, buyer.departamento, rates);
   const top = useRef<HTMLFormElement>(null);
   useEffect(() => {
     top.current?.closest('.sheet__body')?.scrollTo({ top: 0 });
@@ -296,12 +307,13 @@ function Checkout({ lines, envio, onBack, onStock }: {
           </ul>
           <dl className="shop-summary__sums">
             <div><dt>Productos</dt><dd>{pesos(subtotal)}</dd></div>
-            <div><dt>Envío</dt><dd>{pesos(envio)}</dd></div>
-            <div className="is-total"><dt>Total</dt><dd>{pesos(subtotal + envio)}</dd></div>
+            <div><dt>Envío{known ? (envio === rates.bogota ? ' a Bogotá' : '') : ''}</dt><dd>{known ? pesos(envio) : `${pesos(rates.bogota)} o ${pesos(rates.resto)}`}</dd></div>
+            <div className="is-total"><dt>Total</dt><dd>{known ? pesos(subtotal + envio) : <>{pesos(subtotal)} <small>+ envío</small></>}</dd></div>
           </dl>
+          {!known && <p className="shop-summary__note">El envío es de {envioTexto(rates)}: se calcula con tu ciudad.</p>}
           {error && <p className="story-error" role="alert">{error}</p>}
           <button type="submit" className="shop-cta" disabled={busy || !lines.length}>
-            {busy ? 'Preparando el pago…' : `Pagar ${pesos(subtotal + envio)}`}
+            {busy ? 'Preparando el pago…' : known ? `Pagar ${pesos(subtotal + envio)}` : 'Pagar'}
           </button>
           <p className="shop-summary__secure"><PerkIcon name="lock" />Pagas en Wompi, de Bancolombia: tarjeta, PSE o Nequi. Nosotros no vemos los datos de tu tarjeta.</p>
           <p className="shop-summary__test">Tienda en modo de prueba: no se cobra dinero real.</p>
@@ -377,7 +389,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
     else delete next[sku];
     return next;
   });
-  const envio = catalog?.envio ?? ENVIO_RESPALDO;
+  const rates = tarifas(catalog);
   const from = (item: ShopItem) => Math.min(...item.sizes.map(priceOf));
   const leftOf = (item: ShopItem) => (catalog ? item.sizes.reduce((n, s) => n + (catalog.productos[s.sku]?.existencias ?? 0), 0) : null);
 
@@ -439,7 +451,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
                 })}
               </ul>
               <p className="shop-bag__total"><span>Productos</span><strong>{pesos(total)}</strong></p>
-              <p className="shop-bag__ship">El envío ({pesos(envio)}) se suma al pagar.</p>
+              <p className="shop-bag__ship">El envío ({envioTexto(rates)}) se suma al pagar.</p>
               <button type="button" className="shop-cta" onClick={() => { setBagOpen(false); setView('pago'); }}>Continuar con el pago</button>
             </>
           )}
@@ -451,7 +463,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
       ) : view === 'pago' ? (
         <Checkout
           lines={lines}
-          envio={envio}
+          rates={rates}
           onBack={() => setView('lista')}
           onStock={(sku, quedan) => {
             setBag((b) => {
@@ -482,7 +494,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
                 <button type="button" className="shop-card" onClick={() => setView(item)}>
                   <span className="shop-card__pic"><img src={item.photos[0].thumb ?? item.photos[0].src} alt={item.photos[0].alt} /></span>
                   <span className="shop-card__body">
-                    <span className="shop-card__kind">{item.kind}{left !== null && (left > 0 ? ` · quedan ${left}` : ' · agotado')}</span>
+                    <span className="shop-card__kind">{item.kind}{left !== null && left <= 0 && ' · agotado'}</span>
                     <span className="shop-card__name">{item.name}</span>
                     <span className="shop-card__summary">{item.summary}</span>
                     <span className="shop-card__foot">

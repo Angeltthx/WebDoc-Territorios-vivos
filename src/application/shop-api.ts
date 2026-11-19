@@ -9,7 +9,9 @@ export interface Catalog {
   productos: Record<string, { precio: number; existencias: number; activo: boolean }>;
   /** Los productos creados desde el panel (con sus textos y fotos en la base), listos para mostrarse como los del código. */
   extras: ShopItem[];
+  /** Envío al resto de Colombia y a Bogotá. */
   envio: number;
+  envioBogota: number;
 }
 
 interface DbProduct {
@@ -34,9 +36,10 @@ export async function fetchCatalog(): Promise<Catalog | null> {
   try {
     const res = await fetch('/api/tienda/productos');
     if (!res.ok || !res.headers.get('content-type')?.includes('json')) return null;
-    const data = (await res.json()) as { productos: DbProduct[]; envio: number };
+    const data = (await res.json()) as { productos: DbProduct[]; envio: number; envioBogota?: number };
     return {
       envio: data.envio,
+      envioBogota: data.envioBogota ?? data.envio,
       productos: Object.fromEntries(data.productos.map((p) => [p.sku, { precio: p.precio, existencias: p.existencias, activo: p.activo }])),
       // Los que traen fotos son los creados desde el panel; solo los que están a la venta.
       extras: data.productos.filter((p) => p.fotos?.length && p.activo).map(toItem),
@@ -123,6 +126,16 @@ export function saveBag(bag: Record<string, number>) {
   } catch {
     // Sin almacenamiento: la bolsa dura mientras la página esté abierta.
   }
+}
+
+/** Envío si el servidor no responde (los mismos valores de api/_lib/tienda.ts). */
+export const ENVIO_RESPALDO = { bogota: 9500, resto: 18500 };
+
+/** Lo que cuesta el envío a esa dirección: la misma cuenta del servidor (`envioPara` en api/_lib/tienda.ts), solo para
+ * mostrarla; el que cobra es el servidor. */
+export function envioPara(ciudad: string, departamento: string, tarifas: { bogota: number; resto: number }) {
+  const plano = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+  return plano(departamento).startsWith('bogota') || plano(ciudad).startsWith('bogota') ? tarifas.bogota : tarifas.resto;
 }
 
 /** Los departamentos de Colombia (para la dirección de envío). */

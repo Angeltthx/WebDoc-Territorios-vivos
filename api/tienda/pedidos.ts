@@ -5,7 +5,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { sql } from '../_lib/db.js';
-import { ENVIO, PLAZO_MIN, applyTx, checkoutUrl, expireOld, fetchTx, wompi } from '../_lib/tienda.js';
+import { PLAZO_MIN, envioPara, applyTx, checkoutUrl, expireOld, fetchTx, wompi } from '../_lib/tienda.js';
 import { clean, ipHash, json } from '../_lib/util.js';
 
 /**
@@ -93,7 +93,8 @@ export async function POST(request: Request) {
   }
 
   const subtotal = apartados.reduce((t, a) => t + a.precio * a.cantidad, 0);
-  const total = subtotal + ENVIO;
+  const envio = envioPara(comprador.ciudad, comprador.departamento);
+  const total = subtotal + envio;
   const referencia = `TV-${Date.now().toString(36).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`;
   const expira = new Date(Date.now() + PLAZO_MIN * 60 * 1000);
   expira.setMilliseconds(0);
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
     const [p] = (await db`
       insert into pedidos (referencia, expira, nombre, correo, celular, direccion, ciudad, departamento, notas, subtotal, envio, total, ip_hash)
       values (${referencia}, ${expira.toISOString()}, ${comprador.nombre}, ${comprador.correo}, ${comprador.celular}, ${comprador.direccion},
-        ${comprador.ciudad}, ${comprador.departamento}, ${comprador.notas}, ${subtotal}, ${ENVIO}, ${total}, ${huella})
+        ${comprador.ciudad}, ${comprador.departamento}, ${comprador.notas}, ${subtotal}, ${envio}, ${total}, ${huella})
       returning id`) as { id: string }[];
     for (const a of apartados) {
       await db`insert into pedido_items (pedido_id, sku, nombre, cantidad, precio) values (${p.id}, ${a.sku}, ${a.nombre}, ${a.cantidad}, ${a.precio})`;

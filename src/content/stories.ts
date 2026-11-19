@@ -41,7 +41,7 @@ export const SHOP_ITEMS: ShopItem[] = [
       { src: '/media/tienda/cuadro-mapa.webp', thumb: '/media/tienda/cuadro-mapa-sm.webp', alt: 'El cuadro del mapa de Nuquí, con su marco de madera' },
     ],
     sizes: [
-      { id: 'cuadro', sku: 'poster-mapa-pliego', label: 'Cuadro', detail: 'Aprox. 42 × 37 × 3 cm', price: 50000 },
+      { id: 'cuadro', sku: 'poster-mapa-pliego', label: 'Cuadro', detail: 'Aprox. 42 × 37 × 3 cm', price: 169000 },
     ],
     description: [
       'El mismo mapa que acompaña el recorrido de Territorios Vivos, enmarcado para tenerlo en la pared de la casa. La costa de Nuquí de norte a sur, con Jurubidá, Tribugá, Nuquí, Panguí, Joví y Coquí, y lo que vive en ella: la ballena jorobada, la tortuga golfina, el cangrejo fantasma, la pava del Baudó y la rana arlequín.',
