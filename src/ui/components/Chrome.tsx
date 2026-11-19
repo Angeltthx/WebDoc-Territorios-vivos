@@ -489,7 +489,7 @@ const FAB_ICONS: Record<string, ReactNode> = {
 };
 
 /**
- * «Más del documental» (pedido de la clienta, 19/11/2026): un botón dorado justo encima del sonido que, al tocarlo, se
+ * «Más del documental» (pedido de la clienta, 19/11/2026): un botón con una claqueta justo encima del sonido que, al tocarlo, se
  * vuelve una ✕ y despliega a su alrededor, en abanico, un botón por cada cosa de fuera del recorrido (como el botón
  * flotante de Adobe Acrobat). Antes estaban al final del menú y casi nadie las veía.
  *
@@ -557,13 +557,11 @@ export function MoreButton() {
         aria-label={open ? 'Cerrar «Más del documental»' : 'Más del documental'}
         title={open ? 'Cerrar' : 'Más del documental'}
       >
-        <svg className="fab__dots" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="currentColor">
-          <circle cx="10" cy="10" r="2.6" />
-          <circle cx="10" cy="3.2" r="1.6" />
-          <circle cx="16.5" cy="7.9" r="1.6" />
-          <circle cx="14" cy="15.6" r="1.6" />
-          <circle cx="6" cy="15.6" r="1.6" />
-          <circle cx="3.5" cy="7.9" r="1.6" />
+        {/* Una claqueta de cine: lo demás del documental (19/11/2026; antes eran puntos dorados en círculo). */}
+        <svg className="fab__dots" {...iconProps}>
+          <path d="M3 9h14v7.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9Z" />
+          <path d="m3 9-.4-2.6a1 1 0 0 1 .8-1.1l11.9-2.1a1 1 0 0 1 1.2.8L16.8 6 3 9Z" />
+          <path d="m6.6 4.7 1.9 2.7M10.6 4 12.5 6.7" />
         </svg>
         <svg className="fab__close" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
           <path d="M4 4l10 10M14 4 4 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

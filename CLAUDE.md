@@ -45,7 +45,7 @@ Guía para Claude Code en el webdoc **Territorios Vivos · Relatos del Pacífico
   que pasa por todas las paradas (bolitas con foto, partes plegables como afluentes). El agua corre con el scroll y, al
   escoger algo, viaja hasta esa parada antes de navegar. Termina en el mapa: lo de fuera del recorrido (El proyecto,
   Visita Nuquí, álbum, «Cuenta tu historia», tienda) va en «Más del documental» (`MoreButton`, mismo archivo), un botón
-  dorado sobre el del sonido que despliega esas opciones en abanico a su alrededor, como el de Acrobat (19/11/2026;
+  con una claqueta sobre el del sonido que despliega esas opciones en abanico a su alrededor, como el de Acrobat (19/11/2026;
   la clienta no quiso la versión a pantalla completa).
 - **Paso a paso con luz** (`src/ui/components/Coach.tsx`): alumbra partes reales de una vista con una tarjeta al lado.
   Lo usan el mapa (planeta → el Chocó; costa → filtro, pueblos, herramientas, «Ver el planeta») y «Cuenta tu historia».

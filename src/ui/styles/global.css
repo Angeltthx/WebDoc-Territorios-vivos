@@ -3027,16 +3027,13 @@ button.ap-kpi:hover { background: var(--ap-head); }
 }
 
 /* ───────── Más del documental (19/11/2026) ─────────
-   Un botón dorado sobre el del sonido que, al tocarlo, se vuelve una ✕ y despliega a su alrededor, en abanico, un botón
+   Un botón (una claqueta) sobre el del sonido que, al tocarlo, se vuelve una ✕ y despliega a su alrededor, en abanico, un botón
    por cada opción (como el botón flotante de Acrobat; ver MoreButton). --x/--y: dónde queda cada opción respecto al
    botón; --lx/--ly: hacia dónde salió (el nombre va por fuera, en esa dirección). */
 .fab { position: relative; display: grid; }
-.dock__sound.dock__more {
-  position: relative; z-index: 2; color: var(--gold); border-color: rgba(232, 187, 82, 0.7); box-shadow: 0 0 12px rgba(232, 187, 82, 0.3);
-  transition: transform 0.25s var(--ease), box-shadow 0.25s, background 0.25s, color 0.25s;
-}
-.dock__sound.dock__more:hover { transform: scale(1.08); box-shadow: 0 0 18px rgba(232, 187, 82, 0.5); }
-.fab.is-open .dock__more { background: var(--gold); color: var(--forest); box-shadow: 0 0 0 5px rgba(232, 187, 82, 0.22), 0 6px 20px rgba(0, 0, 0, 0.4); }
+.dock__sound.dock__more { position: relative; z-index: 2; transition: transform 0.25s var(--ease), background 0.25s, color 0.25s; }
+.dock__sound.dock__more:hover { transform: scale(1.08); }
+.fab.is-open .dock__more { background: #fff; color: var(--forest); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 .dock__more svg { grid-area: 1 / 1; transition: transform 0.3s var(--ease), opacity 0.2s; }
 .dock__more .fab__close { opacity: 0; transform: rotate(-90deg) scale(0.5); }
 .fab.is-open .fab__dots { opacity: 0; transform: rotate(90deg) scale(0.5); }
