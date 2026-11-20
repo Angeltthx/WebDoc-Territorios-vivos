@@ -177,9 +177,9 @@ const stationOf = (page: string) => page.split('-')[0];
  *   nombre del tramo de río (las transiciones); al final, el mapa y, ya en el mar, lo que está fuera del recorrido.
  * - Lo que tiene partes (las estaciones, El proyecto, Visita Nuquí) se despliega al tocarlo, de a uno; la estación que se
  *   está viendo llega abierta. Lo de fuera del recorrido lleva una línea que dice para qué sirve.
- * - Desde el 19/11/2026 lo de fuera del recorrido (El proyecto, Visita Nuquí, el álbum, «Cuenta tu historia», la
- *   tienda) ya no está aquí: quedaba al final, aparte y poco a la vista. Ahora tiene su propio botón junto al sonido
- *   (`MoreButton`), que despliega esas opciones alrededor (pedido de la clienta). El río termina en el mapa.
+ * - Lo de fuera del recorrido (El proyecto, Visita Nuquí, el álbum, «Cuenta tu historia», la tienda) está aquí y,
+ *   desde el 19/11/2026, también en su propio botón junto al sonido (`MoreButton`), que despliega esas opciones
+ *   alrededor: al final del menú quedaba poco a la vista. Por un día solo estuvo en el botón; la clienta pidió las dos.
  * - El agua corre siempre despacio y, al bajar o subir por el menú, se acelera: el río se mueve con uno. Al abrir, el
  *   agua baja dibujando el cauce, como el mapa de las transiciones.
  */
@@ -195,6 +195,7 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const journey = menu.filter((item) => item.to);
+  const beyond = menu.filter((item) => !item.to);
   const isStation = (item: MenuItem) => !!item.to && !!item.children;
   const here = (item: MenuItem) =>
     item.to
@@ -226,7 +227,7 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
    * un chorro brillante con una gota al frente, que al llegar hace ondas; entonces se cierra el menú y se va allá.
    * Fuera del recorrido y sin estar en ninguna parada, el agua sale desde arriba.
    */
-  const stops = journey;
+  const stops = [...journey, ...beyond];
   const measureRef = useRef<SVGPathElement>(null);
   const trailRef = useRef<SVGPathElement>(null);
   const dropRef = useRef<SVGCircleElement>(null);
@@ -424,6 +425,18 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
                   );
                 })}
               </ol>
+            </nav>
+            <nav aria-labelledby="menu-mas">
+              <h2 id="menu-mas" className="rio__sea" style={{ ['--i' as string]: order++ }}>Más del documental</h2>
+              <ul className="rio__list">
+                {beyond.map((item) => (
+                  <li key={item.label} {...itemProps('group', item)}>
+                    <Bubble image={item.image} onClick={() => pick(item, item)} />
+                    {row(item, item.label, item.hint)}
+                    {item.children && parts(item)}
+                  </li>
+                ))}
+              </ul>
             </nav>
           </div>
           <div className="menu__foot">
