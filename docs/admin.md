@@ -10,15 +10,20 @@
 
 ## Cómo se ve
 
-A pantalla completa: el menú a la izquierda (Resumen, Pedidos, Historias, Productos, con lo pendiente en dorado) y el
-trabajo a la derecha, en tablas. Al tocar una fila, su detalle se abre en un panel a la derecha con sus acciones.
-El nombre del panel y la ruta «Panel / …» llevan siempre al resumen.
+Rediseñado el 20/11/2026 (estilos en `src/ui/styles/admin.css`, que solo carga `/admin`). Un marco verde apagado (el
+bosque del webdoc) sostiene el menú y la barra de arriba; el trabajo va en una hoja blanca con bordes suaves. Letra IBM
+Plex Sans, la del webdoc. El verde de la marca va en las gráficas y en el botón principal; el **dorado, solo en lo que
+espera al equipo** (pedidos por despachar, historias por revisar). Cada sección abre con su título y una línea que dice
+qué toca hacer. Al tocar una fila, su detalle se abre en un panel a la derecha con sus acciones.
+
+En el celular el marco desaparece: arriba el logo con «Actualizar», «Ver la web» y «Salir»; abajo, las cuatro secciones
+como pestañas. Las tablas de pedidos e historias se vuelven filas de dos líneas.
 
 ## Qué tiene
 
 | Sección | Qué se hace |
 |---------|-------------|
-| Resumen | Historias por revisar, pedidos por despachar, ventas (30 días y total), existencias y las últimas ventas. Cada cifra lleva a su sección. |
+| Resumen | **El camino de los pedidos**: un río con cinco paradas (esperando pago, por empacar, en empaque, en camino, entregados) con cuántos hay en cada una; cada parada abre su lista. Cifras de visitas (hoy, 7 días frente a la semana anterior, 30 días) y ventas de 30 días. Una gráfica por día de los últimos 30 días que cambia entre **Visitas** y **Ventas** (al pasar por un día sale su cifra; hoy va en verde lleno). Páginas más vistas. A la derecha, «Por hacer»: pedidos por despachar, historias por revisar, existencias (con la foto) y las últimas ventas. |
 | Historias | Leer, ver y oír lo que mandó la gente. Las coordenadas vienen puestas (las que compartió la persona, o las del lugar o el municipio que escribió) y se ajustan. «Publicar en el mapa», «Corregir el texto», «Rechazar» / «Quitar del mapa» y «Borrar» (para siempre, con sus archivos). |
 | Pedidos | Por despachar · En camino · Entregados · Sin pagar · Todos · Eliminados, y búsqueda por código, nombre, correo o celular. Cada pedido: a dónde va, WhatsApp y correo del cliente, lo que lleva y el total. Los cuatro pasos (Pagado, En empaque, En camino, Entregado) son botones: se toca el paso en que va, adelante o atrás. Transportadora y guía, opcionales (con la guía el cliente lo rastrea). Nota interna. El cliente ve cada paso, con su fecha, en «Consultar mi pedido». **«Eliminar pedido»** pide el motivo y queda en «Eliminados» (ver abajo). |
 | Productos | Arriba, el **envío** (a Bogotá y al resto del país): lo que se cobre aquí es lo que cobra la tienda. Precio, existencias y si está a la venta, en la misma tabla, con vendidos y apartados. **«+ Nuevo producto»**: nombre, categoría, tamaño y medidas, frase corta, descripción, fotos (se suben al almacén, la primera es la principal), precio, existencias y características; sale en la tienda con el mismo diseño del póster. «Editar todo» para cambiarlo después. **«Eliminar»** lo manda a la **papelera** (se oculta en la tienda); de ahí se restaura, oculto, para revisarlo antes de volver a venderlo. |

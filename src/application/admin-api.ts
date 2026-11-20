@@ -40,7 +40,8 @@ export interface Resumen {
   /** Contador propio: personas distintas por día (sumadas en 7 y 30 días), páginas vistas y las más vistas (30 días). */
   visitas: {
     hoy: number; semana: number; mes: number; movil: number; vistas: number;
-    porDia: { dia: string; visitas: number }[];
+    /** Los últimos 30 días: personas distintas y lo vendido (pesos, por el día del pago). */
+    porDia: { dia: string; visitas: number; ventas: number }[];
     paginas: { ruta: string; vistas: number }[];
   };
 }

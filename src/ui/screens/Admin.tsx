@@ -1,19 +1,23 @@
-// Panel del equipo: /admin (sin indexar), con usuario y clave. A pantalla completa y sobrio (IBM Plex Sans, cifras en
-// columnas), con un toque del webdoc: el verde oscuro del menú y el dorado de lo pendiente.
-//   - Resumen: las cifras de hoy y, en tablas, los últimos pedidos y las historias por revisar.
+// Panel del equipo: /admin (sin indexar), con usuario y clave. Rediseñado el 20/11/2026 (pedido del equipo: «que se vea
+// moderno e intuitivo»): un marco verde apagado con el menú y una hoja blanca con el trabajo (estilos en admin.css). El
+// verde de la marca va en los datos y en el botón principal; el dorado del webdoc, solo en lo que espera al equipo.
+//   - Resumen: qué hay que hacer hoy (el camino de los pedidos, las historias por revisar), visitas y ventas por día,
+//     las páginas más vistas y las existencias.
 //   - Pedidos, Historias, Productos: en tablas; al tocar una fila, su detalle se abre a la derecha con sus acciones.
 // El nombre del panel (arriba en el menú) y la ruta «Panel / …» llevan siempre al resumen.
 // Todo pasa por la API (api/admin), que revisa la sesión en cada paso.
 
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import '../styles/admin.css';
 import { CHOCO_POINTS, EMBLEM_LABEL, type Emblem } from '../../content/choco';
-import { pesos } from '../../content/stories';
+import { SHOP_ITEMS, pesos } from '../../content/stories';
 import { pages } from '../../content/pages';
 import { transitions } from '../../content/journey';
 import * as api from '../../application/admin-api';
 
 type Seccion = 'resumen' | 'pedidos' | 'historias' | 'productos';
+type Go = (s: Seccion, id?: string | null, vista?: api.VistaPedidos | null) => void;
 const SECCIONES: { id: Seccion; label: string; icon: IconName }[] = [
   { id: 'resumen', label: 'Resumen', icon: 'home' },
   { id: 'pedidos', label: 'Pedidos', icon: 'box' },
@@ -93,7 +97,9 @@ export default function Admin() {
   const [seccion, setSeccion] = useState<Seccion>('resumen');
   /** Al ir desde el resumen a una fila concreta: la sección la abre. */
   const [abrir, setAbrir] = useState<string | null>(null);
-  const [pend, setPend] = useState({ historias: 0, pedidos: 0 });
+  /** Al tocar una parada del camino de los pedidos: la pestaña de pedidos que se abre. */
+  const [vistaPedidos, setVistaPedidos] = useState<api.VistaPedidos | null>(null);
+  const [pend, setPend] = useState<{ historias: number; pedidos: number } | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -119,51 +125,83 @@ export default function Admin() {
     if (state === 'dentro') refresh();
   }, [state, seccion, tick, refresh]);
 
-  const go = (s: Seccion, id: string | null = null) => {
+  const go: Go = (s, id = null, vista = null) => {
     setAbrir(id);
+    setVistaPedidos(vista);
     setSeccion(s);
   };
 
   if (state !== 'dentro') return <LoginScreen loading={state === 'cargando'} onIn={() => setState('dentro')} />;
 
-  const badge: Partial<Record<Seccion, number>> = { pedidos: pend.pedidos, historias: pend.historias };
-  const title = SECCIONES.find((s) => s.id === seccion)!.label;
+  const badge: Partial<Record<Seccion, number>> = { pedidos: pend?.pedidos ?? 0, historias: pend?.historias ?? 0 };
+  const np = pend?.pedidos ?? 0;
+  const nh = pend?.historias ?? 0;
+  const title = SECCIONES.find((x) => x.id === seccion)!.label;
+  const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+  // La línea bajo el título: lo que espera al equipo en esa sección.
+  const tareas = [
+    np > 0 && <strong key="p">{plural(np, 'pedido por despachar', 'pedidos por despachar')}</strong>,
+    nh > 0 && <strong key="h">{plural(nh, 'historia por revisar', 'historias por revisar')}</strong>,
+  ].filter(Boolean);
+  const sub: Record<Seccion, ReactNode> = {
+    resumen: !pend ? ' ' : tareas.length
+      ? <>Hoy toca: {tareas[0]}{tareas[1] && <> y {tareas[1]}</>}.</>
+      : 'Todo al día: no hay pedidos por despachar ni historias por revisar.',
+    pedidos: np ? <><strong>{plural(np, 'pedido espera', 'pedidos esperan')}</strong> {np === 1 ? 'que lo empaquen o lo envíen' : 'que los empaquen o los envíen'}.</> : 'No hay pedidos por despachar.',
+    historias: nh ? <><strong>{plural(nh, 'historia espera', 'historias esperan')}</strong> revisión antes de salir en el mapa.</> : 'No hay historias por revisar.',
+    productos: 'Lo que se vende en la tienda, sus existencias y el valor del envío.',
+  };
+  const hoy = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+  const salir = () => void api.logout().finally(() => setState('fuera'));
   return (
     <div className="ap">
       <aside className="ap-side">
         <button type="button" className="ap-brand" onClick={() => go('resumen')} title="Ir al resumen">
           <span className="ap-logo"><img src="/media/logo-territorios-vivos.webp" alt="Territorios Vivos" /></span>
-          <small>Administración</small>
+          <small>Panel del equipo</small>
         </button>
         <nav className="ap-nav" aria-label="Secciones">
-          {SECCIONES.map((s) => (
-            <button key={s.id} type="button" className={`ap-nav__item${s.id === seccion ? ' is-on' : ''}`} aria-current={s.id === seccion} onClick={() => go(s.id)}>
-              <Icon name={s.icon} />
-              <span>{s.label}</span>
-              {!!badge[s.id] && <span className="ap-nav__badge" title="Pendientes">{badge[s.id]}</span>}
+          {SECCIONES.map((x) => (
+            <button key={x.id} type="button" className={`ap-nav__item${x.id === seccion ? ' is-on' : ''}`} aria-current={x.id === seccion} onClick={() => go(x.id)}>
+              <Icon name={x.icon} />
+              <span>{x.label}</span>
+              {!!badge[x.id] && <span className="ap-nav__badge" title="Esperan al equipo">{badge[x.id]}</span>}
             </button>
           ))}
         </nav>
         <div className="ap-side__foot">
+          <p className="ap-side__note">Hoy es {hoy}</p>
           <Link className="ap-nav__item" to="/"><Icon name="web" /><span>Ver la web</span></Link>
-          <button type="button" className="ap-nav__item" onClick={() => void api.logout().finally(() => setState('fuera'))}><Icon name="out" /><span>Salir</span></button>
+          <button type="button" className="ap-nav__item" onClick={salir}><Icon name="out" /><span>Salir</span></button>
         </div>
       </aside>
 
+      <header className="ap-top">
+        <span className="ap-top__mlogo"><img src="/media/logo-territorios-vivos.webp" alt="Territorios Vivos" /></span>
+        <p className="ap-crumbs">
+          <button type="button" onClick={() => go('resumen')}>Panel</button>
+          <span aria-hidden="true">/</span><strong>{title}</strong>
+        </p>
+        <div className="ap-top__actions">
+          <button type="button" className="ap-btn ap-btn--ghost ap-btn--sm" onClick={() => setTick((t) => t + 1)}><Icon name="refresh" /> Actualizar</button>
+          <Link className="ap-icon-btn ap-only-narrow" to="/" aria-label="Ver la web" title="Ver la web"><Icon name="web" /></Link>
+          <button type="button" className="ap-icon-btn ap-only-narrow" aria-label="Salir" title="Salir" onClick={salir}><Icon name="out" /></button>
+        </div>
+      </header>
+
       <main className="ap-main">
-        <header className="ap-top">
-          <div>
-            <p className="ap-crumbs">
-              <button type="button" onClick={() => go('resumen')}>Panel</button>
-              {seccion !== 'resumen' && <><span aria-hidden="true">/</span><span>{title}</span></>}
-            </p>
-            <h1 className="ap-title">{title}</h1>
-          </div>
-          <button type="button" className="ap-btn ap-btn--ghost" onClick={() => setTick((t) => t + 1)}><Icon name="refresh" /> Actualizar</button>
-        </header>
         <div className="ap-content" key={`${seccion}-${tick}`}>
+          <div className="ap-head">
+            <div>
+              <h1 className="ap-title">{title}</h1>
+              <p className="ap-head__sub">{sub[seccion]}</p>
+            </div>
+            {seccion === 'resumen' && np > 0 && (
+              <button type="button" className="ap-btn ap-btn--primary" onClick={() => go('pedidos', null, 'despachar')}>Despachar pedidos</button>
+            )}
+          </div>
           {seccion === 'resumen' && <ResumenView run={run} go={go} />}
-          {seccion === 'pedidos' && <PedidosView run={run} open={abrir} onChange={refresh} />}
+          {seccion === 'pedidos' && <PedidosView run={run} open={abrir} vista0={vistaPedidos} onChange={refresh} />}
           {seccion === 'historias' && <HistoriasView run={run} open={abrir} onChange={refresh} />}
           {seccion === 'productos' && <ProductosView run={run} />}
         </div>
@@ -198,7 +236,7 @@ function LoginScreen({ loading, onIn }: { loading: boolean; onIn: () => void }) 
       {loading ? <p className="ap-muted">Un momento…</p> : (
         <form className="ap-login__card" onSubmit={submit}>
           <h1>Iniciar sesión</h1>
-          <p className="ap-muted">Administración de pedidos, historias y productos.</p>
+          <p className="ap-muted">Panel del equipo: pedidos, historias y productos.</p>
           <label className="ap-field">
             <span>Usuario</span>
             <input required autoComplete="username" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
@@ -221,12 +259,12 @@ function Pill({ estado, label }: { estado: string; label: string }) {
   return <span className={`ap-pill is-${estado}`}>{label}</span>;
 }
 
-function Tabs<T extends string>({ items, value, onChange }: { items: { id: T; label: string; n?: number }[]; value: T; onChange: (v: T) => void }) {
+function Tabs<T extends string>({ items, value, onChange }: { items: { id: T; label: string; n?: number; todo?: boolean }[]; value: T; onChange: (v: T) => void }) {
   return (
     <div className="ap-tabs" role="tablist">
       {items.map((t) => (
         <button key={t.id} type="button" role="tab" aria-selected={t.id === value} className={`ap-tab${t.id === value ? ' is-on' : ''}`} onClick={() => onChange(t.id)}>
-          {t.label}{t.n !== undefined && <span className="ap-tab__n">{t.n}</span>}
+          {t.label}{t.n !== undefined && <span className={`ap-tab__n${t.todo && t.n ? ' is-todo' : ''}`}>{t.n}</span>}
         </button>
       ))}
     </div>
@@ -234,11 +272,11 @@ function Tabs<T extends string>({ items, value, onChange }: { items: { id: T; la
 }
 
 /** Tabla con cabeceras; si no hay filas, un aviso. */
-function Table({ head, children, empty }: { head: ReactNode[]; children: ReactNode; empty?: string }) {
+function Table({ head, children, empty, rows }: { head: ReactNode[]; children: ReactNode; empty?: string; rows?: boolean }) {
   const has = Array.isArray(children) ? children.length > 0 : !!children;
   return (
     <div className="ap-table-wrap">
-      <table className="ap-table">
+      <table className={`ap-table${rows ? ' ap-table--rows' : ''}`}>
         <thead><tr>{head.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
         <tbody>{has ? children : <tr><td colSpan={head.length} className="ap-table__empty">{empty ?? 'No hay nada aquí.'}</td></tr>}</tbody>
       </table>
@@ -284,122 +322,253 @@ function Confirm({ label, sure, onYes, busy, danger }: { label: string; sure: st
 
 const Loading = () => <p className="ap-muted ap-pad">Cargando…</p>;
 
-/** Un tope «redondo» para el eje (1, 2, 5, 10, 20, 50…) que quede por encima del máximo. */
-function niceMax(n: number) {
-  if (n <= 4) return 4;
-  const pow = 10 ** Math.floor(Math.log10(n));
-  return [1, 2, 2.5, 5, 10].map((f) => f * pow).find((v) => v >= n)!;
+/**
+ * La escala del eje: pasos redondos (1, 2, 5, 10, 20, 50…) y a lo sumo cinco, con el tope por encima del máximo. Así
+ * las cifras del eje son enteras (antes salían 18,75 o 6,25). `min`: el tope cuando no hay datos o son muy pocos.
+ */
+function escala(max: number, min: number) {
+  const m = Math.max(max, min - 1e-9);
+  for (let pow = 1; ; pow *= 10) {
+    for (const f of [1, 2, 5]) {
+      const step = f * pow;
+      const k = Math.floor(m / step) + 1;
+      if (k <= 5) {
+        const top = step * k;
+        return { top, ticks: Array.from({ length: k + 1 }, (_, i) => top - i * step) };
+      }
+    }
+  }
 }
+/** Pesos cortos para el eje: $ 0, $ 50 mil, $ 1,5 M. */
+const pesosCorto = (n: number) => (n >= 1_000_000 ? `$ ${(n / 1_000_000).toLocaleString('es-CO', { maximumFractionDigits: 1 })} M` : n >= 1000 ? `$ ${Math.round(n / 1000)} mil` : `$ ${n}`);
+const diaCorto = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }).replace('.', '');
 
-/** Barras por día (las visitas de las dos últimas semanas), con eje de cifras y líneas de guía. */
-function Bars({ data }: { data: { dia: string; visitas: number }[] }) {
-  const top = niceMax(Math.max(0, ...data.map((d) => d.visitas)));
-  const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => Math.round(top * f));
-  const day = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+/**
+ * Columnas por día: eje con cuatro pasos redondos a la izquierda, líneas de guía suaves, hoy en el verde lleno y los
+ * demás días en el verde claro. Al pasar por un día (o al enfocarlo con el teclado) aparece su cifra.
+ */
+function DayBars({ data, fmt, label, min = 4 }: { data: { dia: string; v: number }[]; fmt: (n: number) => string; label: string; min?: number }) {
+  const { top, ticks } = escala(Math.max(0, ...data.map((d) => d.v)), min);
+  const tick = (t: number) => (fmt === pesos ? pesosCorto(t) : t.toLocaleString('es-CO'));
+  const n = data.length;
+  // Una fecha cada 7 días, contando desde hoy hacia atrás, para que la última sea hoy.
+  const showX = (i: number) => (n - 1 - i) % 7 === 0;
   return (
-    <div className="ap-chart" role="img" aria-label={`Visitas por día: ${data.map((d) => `${day(d.dia)} ${d.visitas}`).join(', ')}`}>
-      <div className="ap-chart__y" aria-hidden="true">{ticks.map((t, i) => <span key={i}>{t}</span>)}</div>
+    <div className="ap-chart" style={{ '--n': n } as CSSProperties} role="img" aria-label={`${label}: ${data.map((d) => `${diaCorto(d.dia)} ${fmt(d.v)}`).join(', ')}`}>
+      <div className="ap-chart__y" aria-hidden="true">{ticks.map((t, i) => <span key={i}>{tick(t)}</span>)}</div>
       <div className="ap-chart__plot">
         <div className="ap-chart__grid" aria-hidden="true">{ticks.map((_, i) => <span key={i} />)}</div>
-        {data.map((d, i) => (
-          <div key={d.dia} className={`ap-chart__col${i === data.length - 1 ? ' is-today' : ''}`} title={`${day(d.dia)}: ${d.visitas} visita${d.visitas === 1 ? '' : 's'}`}>
-            <span className="ap-chart__bar" style={{ height: `${(d.visitas / top) * 100}%` }} />
-          </div>
-        ))}
+        {data.map((d, i) => {
+          const h = `${(d.v / top) * 100}%`;
+          return (
+            <div key={d.dia} className={`ap-chart__col${i === n - 1 ? ' is-today' : ''}`} style={{ '--h': h } as CSSProperties}>
+              <span className={`ap-chart__bar${d.v ? '' : ' is-zero'}`} style={{ height: h }} />
+              <span className="ap-chart__tip">{i === n - 1 ? 'Hoy' : diaCorto(d.dia)} · {fmt(d.v)}</span>
+            </div>
+          );
+        })}
       </div>
       <div className="ap-chart__x" aria-hidden="true">
-        {data.map((d, i) => <span key={d.dia}>{i % 2 === data.length % 2 || i === data.length - 1 ? day(d.dia) : ''}</span>)}
+        {data.map((d, i) => <span key={d.dia}>{showX(i) ? (i === n - 1 ? 'Hoy' : diaCorto(d.dia)) : ''}</span>)}
       </div>
     </div>
   );
 }
 
+/** La foto de un producto: la primera subida al panel o, para el cuadro original, la de la web. */
+function fotoDe(sku: string, fotos?: api.FotoProducto[]) {
+  if (fotos?.[0]?.url) return fotos[0].url;
+  const item = SHOP_ITEMS.find((it) => it.sizes.some((z) => z.sku === sku));
+  return item ? item.photos[0].thumb ?? item.photos[0].src : '';
+}
+
 /* ───────── Resumen ───────── */
-function ResumenView({ run, go }: { run: Run; go: (s: Seccion, id?: string | null) => void }) {
+/** Las paradas del camino de los pedidos: cada una abre su pestaña en Pedidos. */
+const CAMINO: { estado: string; label: string; sub: string; vista: api.VistaPedidos; todo?: boolean }[] = [
+  { estado: 'pendiente', label: 'Esperando pago', sub: 'el cliente está pagando', vista: 'pendientes' },
+  { estado: 'pagado', label: 'Por empacar', sub: 'llegó el pago', vista: 'despachar', todo: true },
+  { estado: 'empacando', label: 'En empaque', sub: 'los están alistando', vista: 'despachar', todo: true },
+  { estado: 'enviado', label: 'En camino', sub: 'con la transportadora', vista: 'camino' },
+  { estado: 'entregado', label: 'Entregados', sub: 'ya le llegaron', vista: 'entregados' },
+];
+
+function ResumenView({ run, go }: { run: Run; go: Go }) {
   const [r, setR] = useState<api.Resumen | null>(null);
   const [error, setError] = useState('');
+  const [serie, setSerie] = useState<'visitas' | 'ventas'>('visitas');
   useEffect(() => {
     run(api.resumen).then(setR).catch((e) => setError(e.message));
   }, [run]);
   if (error) return <p className="ap-error">{error}</p>;
   if (!r) return <Loading />;
-  const despachar = (r.pedidos.pagado ?? 0) + (r.pedidos.empacando ?? 0);
   const promedio = r.ventas.pedidos ? Math.round(r.ventas.total / r.ventas.pedidos) : 0;
+  const dias = r.visitas.porDia;
+  const semana = dias.slice(-7).reduce((n, d) => n + d.visitas, 0);
+  const semanaAntes = dias.slice(-14, -7).reduce((n, d) => n + d.visitas, 0);
+  const cambio = semana - semanaAntes;
+  const mejor = dias.reduce((a, d) => (d.visitas > a.visitas ? d : a), dias[0] ?? { dia: '', visitas: 0, ventas: 0 });
+  const vendidoMes = dias.reduce((n, d) => n + d.ventas, 0);
+  const diasConVenta = dias.filter((d) => d.ventas > 0).length;
+  const topPag = Math.max(1, ...r.visitas.paginas.map((p) => p.vistas));
+  const porDespachar = r.ultimos.filter((o) => o.estado === 'pagado' || o.estado === 'empacando').slice(0, 5);
   return (
-    <div className="ap-stack">
-      <div className="ap-kpis">
-        <div className="ap-kpi">
-          <p className="ap-kpi__l">Visitas hoy</p>
-          <p className="ap-kpi__n">{r.visitas.hoy}</p>
-          <p className="ap-kpi__s">{r.visitas.semana} en 7 días · {r.visitas.mes} en 30 días · {r.visitas.movil} % desde el celular</p>
+    <>
+      <section aria-labelledby="ap-camino">
+        <h2 className="ap-section-title" id="ap-camino">El camino de los pedidos</h2>
+        <div className="ap-river">
+          {CAMINO.map((c) => {
+            const n = r.pedidos[c.estado] ?? 0;
+            return (
+              <button key={c.estado} type="button" className={`ap-river__stop${n ? ' has' : ''}${c.todo ? ' is-todo' : ''}`} onClick={() => go('pedidos', null, c.vista)}>
+                <span className="ap-river__dot" aria-hidden="true" />
+                <span className="ap-river__n">{n}</span>
+                <span className="ap-river__l">{c.label}</span>
+                <span className="ap-river__s">{c.sub}</span>
+              </button>
+            );
+          })}
         </div>
-        <div className="ap-kpi">
-          <p className="ap-kpi__l">Ventas · últimos 30 días</p>
-          <p className="ap-kpi__n">{pesos(r.ventas.mes)}</p>
-          <p className="ap-kpi__s">{pesos(r.ventas.total)} en total · {r.ventas.pedidos} pedidos · promedio {pesos(promedio)}</p>
+      </section>
+
+      <div className="ap-board">
+        <div className="ap-board__main">
+          <div className="ap-kpis">
+            <div className="ap-kpi">
+              <p className="ap-kpi__l">Visitas hoy</p>
+              <p className="ap-kpi__n">{r.visitas.hoy}</p>
+              <p className="ap-kpi__s">personas distintas</p>
+            </div>
+            <div className="ap-kpi">
+              <p className="ap-kpi__l">Últimos 7 días</p>
+              <p className="ap-kpi__n">{semana}</p>
+              <p className="ap-kpi__s">{cambio === 0 ? 'igual que la semana anterior' : `${cambio > 0 ? '+' : '−'}${Math.abs(cambio)} frente a la semana anterior`}</p>
+            </div>
+            <div className="ap-kpi">
+              <p className="ap-kpi__l">Últimos 30 días</p>
+              <p className="ap-kpi__n">{r.visitas.mes}</p>
+              <p className="ap-kpi__s">{r.visitas.movil} % desde el celular</p>
+            </div>
+            <div className="ap-kpi">
+              <p className="ap-kpi__l">Ventas en 30 días</p>
+              <p className="ap-kpi__n">{pesos(r.ventas.mes)}</p>
+              <p className="ap-kpi__s">{r.ventas.pedidos ? `${r.ventas.pedidos} ${r.ventas.pedidos === 1 ? 'pedido' : 'pedidos'} en total · promedio ${pesos(promedio)}` : 'todavía no hay ventas'}</p>
+            </div>
+          </div>
+
+          <section className="ap-card">
+            <header className="ap-card__head">
+              <h2>{serie === 'visitas' ? 'Visitas por día' : 'Ventas por día'}<small>últimos 30 días</small></h2>
+              <div className="ap-seg" role="group" aria-label="Qué mostrar">
+                <button type="button" aria-pressed={serie === 'visitas'} onClick={() => setSerie('visitas')}>Visitas</button>
+                <button type="button" aria-pressed={serie === 'ventas'} onClick={() => setSerie('ventas')}>Ventas</button>
+              </div>
+            </header>
+            {serie === 'visitas'
+              ? <DayBars key="v" label="Visitas por día" data={dias.map((d) => ({ dia: d.dia, v: d.visitas }))} fmt={(n) => `${n} ${n === 1 ? 'visita' : 'visitas'}`} />
+              : <DayBars key="s" label="Ventas por día" data={dias.map((d) => ({ dia: d.dia, v: d.ventas }))} fmt={pesos} min={200_000} />}
+            <p className="ap-chart__note">
+              {serie === 'visitas'
+                ? mejor.visitas > 0 ? <>El día con más visitas fue el <strong>{diaCorto(mejor.dia)}</strong>, con {mejor.visitas}. En 30 días se vieron {r.visitas.vistas.toLocaleString('es-CO')} páginas.</> : 'Todavía no hay visitas contadas.'
+                : vendidoMes > 0 ? <>En 30 días se vendieron <strong>{pesos(vendidoMes)}</strong>, en {diasConVenta} {diasConVenta === 1 ? 'día' : 'días'} distintos.</> : 'En los últimos 30 días no hubo ventas pagadas.'}
+            </p>
+          </section>
+
+          <section className="ap-card">
+            <header className="ap-card__head"><h2>Páginas más vistas<small>últimos 30 días</small></h2></header>
+            {r.visitas.paginas.length ? (
+              <ol className="ap-barlist">
+                {r.visitas.paginas.slice(0, 8).map((p) => (
+                  <li key={p.ruta} style={{ '--w': `${(p.vistas / topPag) * 100}%` } as CSSProperties}>
+                    <span>{pageName(p.ruta)}</span><b>{p.vistas.toLocaleString('es-CO')}</b>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="ap-list__empty">Todavía no hay visitas contadas.</p>}
+          </section>
         </div>
-        <button type="button" className={`ap-kpi${despachar ? ' is-todo' : ''}`} onClick={() => go('pedidos')}>
-          <p className="ap-kpi__l">Pedidos por despachar</p>
-          <p className="ap-kpi__n">{despachar}</p>
-          <p className="ap-kpi__s">{r.pedidos.pagado ?? 0} por empacar · {r.pedidos.empacando ?? 0} en empaque · {r.pedidos.enviado ?? 0} en camino</p>
-        </button>
-        <button type="button" className={`ap-kpi${r.historias.pendiente ? ' is-todo' : ''}`} onClick={() => go('historias')}>
-          <p className="ap-kpi__l">Historias por revisar</p>
-          <p className="ap-kpi__n">{r.historias.pendiente ?? 0}</p>
-          <p className="ap-kpi__s">{r.historias.aprobada ?? 0} en el mapa · {r.historias.rechazada ?? 0} rechazadas</p>
-        </button>
-        {r.productos.map((p) => (
-          <button key={p.sku} type="button" className={`ap-kpi${p.existencias <= 3 ? ' is-warn' : ''}`} onClick={() => go('productos')}>
-            <p className="ap-kpi__l">Existencias</p>
-            <p className="ap-kpi__n">{p.existencias}</p>
-            <p className="ap-kpi__s">{p.nombre}{!p.activo ? ' · no está a la venta' : p.existencias <= 3 ? ' · quedan pocos' : ''}</p>
-          </button>
-        ))}
-      </div>
 
-      <div className="ap-grid2">
-        <section className="ap-card">
-          <header className="ap-card__head"><h2>Visitas · últimos 14 días</h2><span className="ap-muted">{r.visitas.vistas} páginas vistas en 30 días</span></header>
-          <Bars data={r.visitas.porDia} />
-        </section>
-        <section className="ap-card">
-          <header className="ap-card__head"><h2>Páginas más vistas · 30 días</h2></header>
-          <Table head={['Página', <span className="ap-num" key="v">Vistas</span>]} empty="Todavía no hay visitas contadas.">
-            {r.visitas.paginas.map((p) => (
-              <tr key={p.ruta}><td>{pageName(p.ruta)}</td><td className="ap-num">{p.vistas}</td></tr>
-            ))}
-          </Table>
-        </section>
-      </div>
+        <aside className="ap-board__rail" aria-label="Por hacer">
+          <h2 className="ap-section-title">Por hacer</h2>
+          <section className="ap-card">
+            <header className="ap-card__head">
+              <h2>Pedidos por despachar</h2>
+              <button type="button" className="ap-link" onClick={() => go('pedidos', null, 'despachar')}>Ver todos</button>
+            </header>
+            {porDespachar.length ? (
+              <ul className="ap-list">
+                {porDespachar.map((o) => (
+                  <li key={o.referencia}>
+                    <button type="button" className="ap-list__row" onClick={() => go('pedidos', o.referencia, 'todos')}>
+                      <span><strong>{o.nombre}</strong><small>{o.ciudad} · {fecha(o.creado)}</small></span>
+                      <Pill estado={o.estado} label={ESTADO_PEDIDO[o.estado] ?? o.estado} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="ap-list__empty">Nada por despachar. Cuando llegue un pago, aparece aquí.</p>}
+          </section>
 
-      <div className="ap-grid2">
-        <section className="ap-card">
-          <header className="ap-card__head"><h2>Últimos pedidos</h2><button type="button" className="ap-link" onClick={() => go('pedidos')}>Ver todos</button></header>
-          <Table head={['Código', 'Cliente', 'Estado', <span className="ap-num" key="t">Total</span>]} empty="Todavía no hay ventas.">
-            {r.ultimos.map((o) => (
-              <tr key={o.referencia} className="is-click" onClick={() => go('pedidos', o.referencia)}>
-                <td className="ap-mono">{o.referencia}<small>{fecha(o.creado)}</small></td>
-                <td>{o.nombre}<small>{o.ciudad}</small></td>
-                <td><Pill estado={o.estado} label={ESTADO_PEDIDO[o.estado] ?? o.estado} /></td>
-                <td className="ap-num">{pesos(o.total)}</td>
-              </tr>
-            ))}
-          </Table>
-        </section>
-        <section className="ap-card">
-          <header className="ap-card__head"><h2>Historias por revisar</h2><button type="button" className="ap-link" onClick={() => go('historias')}>Ver todas</button></header>
-          <Table head={['Título', 'Contada por', 'Lugar']} empty="No hay historias por revisar.">
-            {r.porRevisar.map((h) => (
-              <tr key={h.id} className="is-click" onClick={() => go('historias', h.id)}>
-                <td className="ap-strong">{h.titulo}<small>{fecha(h.creada)}{h.archivos ? ` · ${h.archivos} archivo${h.archivos > 1 ? 's' : ''}` : ''}</small></td>
-                <td>{h.autor}</td>
-                <td>{h.municipio}<small>{h.lugar}</small></td>
-              </tr>
-            ))}
-          </Table>
-        </section>
+          <section className="ap-card">
+            <header className="ap-card__head">
+              <h2>Historias por revisar</h2>
+              <button type="button" className="ap-link" onClick={() => go('historias')}>Ver todas</button>
+            </header>
+            {r.porRevisar.length ? (
+              <ul className="ap-list">
+                {r.porRevisar.slice(0, 5).map((h) => (
+                  <li key={h.id}>
+                    <button type="button" className="ap-list__row" onClick={() => go('historias', h.id)}>
+                      <span><strong>{h.titulo}</strong><small>{h.autor} · {h.municipio}{h.archivos ? ` · ${h.archivos} archivo${h.archivos > 1 ? 's' : ''}` : ''}</small></span>
+                      <b className="ap-muted">{fecha(h.creada)}</b>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="ap-list__empty">No hay historias por revisar. {r.historias.aprobada ?? 0} ya están en el mapa.</p>}
+          </section>
+
+          <section className="ap-card">
+            <header className="ap-card__head">
+              <h2>Existencias</h2>
+              <button type="button" className="ap-link" onClick={() => go('productos')}>Productos</button>
+            </header>
+            <ul className="ap-list">
+              {r.productos.map((p) => (
+                <li key={p.sku}>
+                  <button type="button" className="ap-list__row has-pic" onClick={() => go('productos')}>
+                    {fotoDe(p.sku) ? <img className="ap-thumb" src={fotoDe(p.sku)} alt="" /> : <span className="ap-thumb" />}
+                    <span><strong>{p.nombre}</strong><small>{pesos(p.precio)}{!p.activo ? ' · oculto en la tienda' : ''}</small></span>
+                    <span className="ap-stock">
+                      <b className={p.existencias <= 3 ? 'is-low' : ''}>{p.existencias}</b>
+                      <small>{p.existencias === 0 ? 'agotado' : p.existencias <= 3 ? 'quedan pocos' : 'en existencia'}</small>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="ap-card">
+            <header className="ap-card__head">
+              <h2>Últimas ventas</h2>
+              <button type="button" className="ap-link" onClick={() => go('pedidos', null, 'todos')}>Ver pedidos</button>
+            </header>
+            {r.ultimos.length ? (
+              <ul className="ap-list">
+                {r.ultimos.slice(0, 5).map((o) => (
+                  <li key={o.referencia}>
+                    <button type="button" className="ap-list__row" onClick={() => go('pedidos', o.referencia, 'todos')}>
+                      <span><strong>{o.nombre}</strong><small>{o.ciudad} · {fecha(o.creado)}</small></span>
+                      <b>{pesos(o.total)}</b>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="ap-list__empty">Todavía no hay ventas. La primera aparecerá aquí.</p>}
+          </section>
+        </aside>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -410,8 +579,8 @@ const PASO_AYUDA = ['Llegó el pago: falta empacarlo.', 'Lo están empacando.', 
 
 type VistaPedidos = api.VistaPedidos | 'eliminados';
 
-function PedidosView({ run, open, onChange }: { run: Run; open: string | null; onChange: () => void }) {
-  const [vista, setVista] = useState<VistaPedidos>(open ? 'todos' : 'despachar');
+function PedidosView({ run, open, vista0, onChange }: { run: Run; open: string | null; vista0: api.VistaPedidos | null; onChange: () => void }) {
+  const [vista, setVista] = useState<VistaPedidos>(vista0 ?? (open ? 'todos' : 'despachar'));
   const [q, setQ] = useState('');
   const [buscar, setBuscar] = useState('');
   const [data, setData] = useState<{ pedidos: api.AdminPedido[]; conteo: api.Conteo } | null>(null);
@@ -441,7 +610,7 @@ function PedidosView({ run, open, onChange }: { run: Run; open: string | null; o
     <div className="ap-stack">
       <div className="ap-toolbar">
         <Tabs value={vista} onChange={(v) => { setVista(v); setData(null); setSel(null); }} items={[
-          { id: 'despachar', label: 'Por despachar', n: (c.pagado ?? 0) + (c.empacando ?? 0) },
+          { id: 'despachar', label: 'Por despachar', n: (c.pagado ?? 0) + (c.empacando ?? 0), todo: true },
           { id: 'camino', label: 'En camino', n: c.enviado ?? 0 },
           { id: 'entregados', label: 'Entregados', n: c.entregado ?? 0 },
           { id: 'pendientes', label: 'Sin pagar', n: (c.pendiente ?? 0) + (c.rechazado ?? 0) + (c.expirado ?? 0) },
@@ -460,18 +629,18 @@ function PedidosView({ run, open, onChange }: { run: Run; open: string | null; o
       {vista === 'eliminados' ? <EliminadosView run={run} /> : (
         <section className="ap-card ap-card--flush">
           {!data ? <Loading /> : (
-            <Table head={['Código', 'Fecha', 'Cliente', 'Destino', <span className="ap-num" key="c">Cant.</span>, <span className="ap-num" key="t">Total</span>, 'Pago', 'Estado']}
+            <Table rows head={['Código', 'Fecha', 'Cliente', 'Destino', <span className="ap-num" key="c">Cant.</span>, <span className="ap-num" key="t">Total</span>, 'Pago', 'Estado']}
               empty={vista === 'despachar' && !buscar ? 'No hay pedidos por despachar.' : 'No hay pedidos aquí.'}>
               {data.pedidos.map((p) => (
                 <tr key={p.referencia} className={`is-click${p.referencia === sel ? ' is-sel' : ''}`} onClick={() => setSel(p.referencia)}>
-                  <td className="ap-mono">{p.referencia}</td>
-                  <td>{fecha(p.creado)}</td>
-                  <td className="ap-strong">{p.nombre}<small>{p.celular}</small></td>
-                  <td>{p.ciudad}<small>{p.departamento}</small></td>
-                  <td className="ap-num">{p.items.reduce((n, i) => n + i.cantidad, 0)}</td>
-                  <td className="ap-num">{pesos(p.total)}</td>
-                  <td>{p.metodo ? METODO[p.metodo] ?? p.metodo : '—'}</td>
-                  <td><Pill estado={p.estado} label={ESTADO_PEDIDO[p.estado] ?? p.estado} /></td>
+                  <td className="ap-mono m-hide">{p.referencia}</td>
+                  <td className="m-hide">{fecha(p.creado)}</td>
+                  <td className="ap-strong m-main">{p.nombre}<small className="m-hide">{p.celular}</small></td>
+                  <td className="m-sub">{p.ciudad}<small>{p.departamento}</small></td>
+                  <td className="ap-num m-hide">{p.items.reduce((n, i) => n + i.cantidad, 0)}</td>
+                  <td className="ap-num m-sub">{pesos(p.total)}</td>
+                  <td className="m-hide">{p.metodo ? METODO[p.metodo] ?? p.metodo : '—'}</td>
+                  <td className="m-side"><Pill estado={p.estado} label={ESTADO_PEDIDO[p.estado] ?? p.estado} /></td>
                 </tr>
               ))}
             </Table>
@@ -497,15 +666,15 @@ function EliminadosView({ run }: { run: Run }) {
     <>
       <section className="ap-card ap-card--flush">
         {!list ? <Loading /> : (
-          <Table head={['Eliminado', 'Código', 'Cliente', <span className="ap-num" key="t">Total</span>, 'Estaba', 'Motivo']} empty="No se ha eliminado ningún pedido.">
+          <Table rows head={['Eliminado', 'Código', 'Cliente', <span className="ap-num" key="t">Total</span>, 'Estaba', 'Motivo']} empty="No se ha eliminado ningún pedido.">
             {list.map((e) => (
               <tr key={`${e.referencia}-${e.eliminado}`} className="is-click" onClick={() => setSel(e)}>
-                <td>{fecha(e.eliminado)}</td>
-                <td className="ap-mono">{e.referencia}</td>
-                <td className="ap-strong">{e.datos.nombre}<small>{e.datos.ciudad}</small></td>
-                <td className="ap-num">{pesos(e.datos.total)}</td>
-                <td><Pill estado={e.estado} label={ESTADO_PEDIDO[e.estado] ?? e.estado} /></td>
-                <td>{e.motivo}</td>
+                <td className="m-hide">{fecha(e.eliminado)}</td>
+                <td className="ap-mono m-hide">{e.referencia}</td>
+                <td className="ap-strong m-main">{e.datos.nombre}<small className="m-hide">{e.datos.ciudad}</small></td>
+                <td className="ap-num m-side">{pesos(e.datos.total)}</td>
+                <td className="m-hide"><Pill estado={e.estado} label={ESTADO_PEDIDO[e.estado] ?? e.estado} /></td>
+                <td className="m-sub">{e.motivo}<small className="ap-only-phone"> · {fecha(e.eliminado)}</small></td>
               </tr>
             ))}
           </Table>
@@ -710,7 +879,7 @@ function HistoriasView({ run, open, onChange }: { run: Run; open: string | null;
     <div className="ap-stack">
       <div className="ap-toolbar">
         <Tabs value={estado} onChange={(v) => { setEstado(v); setData(null); }} items={[
-          { id: 'pendiente', label: 'Por revisar', n: c.pendiente ?? 0 },
+          { id: 'pendiente', label: 'Por revisar', n: c.pendiente ?? 0, todo: true },
           { id: 'aprobada', label: 'En el mapa', n: c.aprobada ?? 0 },
           { id: 'rechazada', label: 'Rechazadas', n: c.rechazada ?? 0 },
         ]} />
@@ -718,17 +887,17 @@ function HistoriasView({ run, open, onChange }: { run: Run; open: string | null;
       {error && <p className="ap-error" role="alert">{error}</p>}
       <section className="ap-card ap-card--flush">
         {!data ? <Loading /> : (
-          <Table head={['Recibida', 'Título', 'Contada por', 'Lugar', 'Categoría', 'Archivos', 'Estado']}
+          <Table rows head={['Recibida', 'Título', 'Contada por', 'Lugar', 'Categoría', 'Archivos', 'Estado']}
             empty={estado === 'pendiente' ? 'No hay historias por revisar.' : 'No hay historias aquí.'}>
             {data.historias.map((h) => (
               <tr key={h.id} className={`is-click${h.id === sel ? ' is-sel' : ''}`} onClick={() => setSel(h.id)}>
-                <td>{fecha(h.creada)}</td>
-                <td className="ap-strong">{h.titulo}</td>
-                <td>{h.autor}{h.contacto && <small>{h.contacto}</small>}</td>
-                <td>{h.municipio}<small>{h.lugar}</small></td>
-                <td>{EMBLEM_LABEL[h.tipo as Emblem] ?? h.tipo}</td>
-                <td>{h.archivos.length ? h.archivos.map((a) => a.tipo).join(', ') : '—'}</td>
-                <td><Pill estado={h.estado} label={ESTADO_HISTORIA[h.estado]} /></td>
+                <td className="m-hide">{fecha(h.creada)}</td>
+                <td className="ap-strong m-main">{h.titulo}</td>
+                <td className="m-sub">{h.autor}{h.contacto && <small className="m-hide">{h.contacto}</small>}</td>
+                <td className="m-hide">{h.municipio}<small>{h.lugar}</small></td>
+                <td className="m-hide">{EMBLEM_LABEL[h.tipo as Emblem] ?? h.tipo}</td>
+                <td className="m-hide">{h.archivos.length ? h.archivos.map((a) => a.tipo).join(', ') : '—'}</td>
+                <td className="m-side"><Pill estado={h.estado === 'pendiente' ? 'revisar' : h.estado} label={ESTADO_HISTORIA[h.estado]} /></td>
               </tr>
             ))}
           </Table>
@@ -762,7 +931,7 @@ function HistoriaDetalle({ h, onAction, onClose }: { h: api.AdminHistoria; onAct
   };
   const search = encodeURIComponent([h.lugar, h.municipio, 'Chocó, Colombia'].filter(Boolean).join(', '));
   return (
-    <Drawer title={editing ? 'Corregir la historia' : h.titulo} sub={<>Recibida el {fecha(h.creada)} · <Pill estado={h.estado} label={ESTADO_HISTORIA[h.estado]} /></>} onClose={onClose}>
+    <Drawer title={editing ? 'Corregir la historia' : h.titulo} sub={<>Recibida el {fecha(h.creada)} · <Pill estado={h.estado === 'pendiente' ? 'revisar' : h.estado} label={ESTADO_HISTORIA[h.estado]} /></>} onClose={onClose}>
       <dl className="ap-dl">
         <dt>Contada por</dt><dd>{h.autor}</dd>
         {h.contacto && <><dt>Contacto</dt><dd>{h.contacto} <small>no se publica</small></dd></>}
@@ -928,7 +1097,12 @@ function PapeleraFila({ p, run, onSaved }: { p: api.AdminProducto; run: Run; onS
   };
   return (
     <tr>
-      <td className="ap-strong">{p.nombre}<small className="ap-mono">{p.sku}</small></td>
+      <td className="ap-strong">
+        <span className="ap-cellpic">
+          {fotoDe(p.sku, p.fotos) ? <img className="ap-thumb ap-thumb--sm" src={fotoDe(p.sku, p.fotos)} alt="" /> : <span className="ap-thumb ap-thumb--sm" />}
+          <span>{p.nombre}<small>{p.sku}</small></span>
+        </span>
+      </td>
       <td className="ap-num">{pesos(p.precio)}</td>
       <td>{fecha(p.eliminado)}</td>
       <td>
@@ -1174,7 +1348,12 @@ function ProductoFila({ p, run, onSaved, onEdit }: { p: api.AdminProducto; run: 
   };
   return (
     <tr>
-      <td className="ap-strong">{p.nombre}<small><span className="ap-mono">{p.sku}</span> · actualizado {fecha(p.actualizado)}</small></td>
+      <td className="ap-strong">
+        <span className="ap-cellpic">
+          {fotoDe(p.sku, p.fotos) ? <img className="ap-thumb" src={fotoDe(p.sku, p.fotos)} alt="" /> : <span className="ap-thumb" />}
+          <span>{p.nombre}<small>{p.categoria ? `${p.categoria} · ` : ''}actualizado {fecha(p.actualizado)}</small></span>
+        </span>
+      </td>
       <td className="ap-num">
         <input className="ap-cell-input" value={precio} inputMode="numeric" aria-label="Precio" onChange={(e) => { setPrecio(e.target.value.replace(/\D/g, '')); setMsg(''); }} />
         <small>{Number(precio) ? pesos(Number(precio)) : ''}</small>
