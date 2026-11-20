@@ -20,8 +20,8 @@ El nombre del panel y la ruta «Panel / …» llevan siempre al resumen.
 |---------|-------------|
 | Resumen | Historias por revisar, pedidos por despachar, ventas (30 días y total), existencias y las últimas ventas. Cada cifra lleva a su sección. |
 | Historias | Leer, ver y oír lo que mandó la gente. Las coordenadas vienen puestas (las que compartió la persona, o las del lugar o el municipio que escribió) y se ajustan. «Publicar en el mapa», «Corregir el texto», «Rechazar» / «Quitar del mapa» y «Borrar» (para siempre, con sus archivos). |
-| Pedidos | Por despachar · En camino · Entregados · Sin pagar · Todos, y búsqueda por código, nombre, correo o celular. Cada pedido: a dónde va, WhatsApp y correo del cliente, lo que lleva y el total. «Empezar a empacar» → «Marcar como enviado» (pide transportadora y guía) → «Marcar como entregado»; «Devolver un paso» para corregir. Nota interna. El cliente ve cada paso, con su fecha, en «Consultar mi pedido». |
-| Productos | Precio, existencias y si está a la venta, en la misma tabla, con vendidos y apartados. **«+ Nuevo producto»**: nombre, categoría, tamaño y medidas, frase corta, descripción, fotos (se suben al almacén, la primera es la principal), precio, existencias y características; sale en la tienda con el mismo diseño del póster. «Editar todo» para cambiarlo después. |
+| Pedidos | Por despachar · En camino · Entregados · Sin pagar · Todos · Eliminados, y búsqueda por código, nombre, correo o celular. Cada pedido: a dónde va, WhatsApp y correo del cliente, lo que lleva y el total. Los cuatro pasos (Pagado, En empaque, En camino, Entregado) son botones: se toca el paso en que va, adelante o atrás. Transportadora y guía, opcionales (con la guía el cliente lo rastrea). Nota interna. El cliente ve cada paso, con su fecha, en «Consultar mi pedido». **«Eliminar pedido»** pide el motivo y queda en «Eliminados» (ver abajo). |
+| Productos | Arriba, el **envío** (a Bogotá y al resto del país): lo que se cobre aquí es lo que cobra la tienda. Precio, existencias y si está a la venta, en la misma tabla, con vendidos y apartados. **«+ Nuevo producto»**: nombre, categoría, tamaño y medidas, frase corta, descripción, fotos (se suben al almacén, la primera es la principal), precio, existencias y características; sale en la tienda con el mismo diseño del póster. «Editar todo» para cambiarlo después. **«Eliminar»** lo manda a la **papelera** (se oculta en la tienda); de ahí se restaura, oculto, para revisarlo antes de volver a venderlo. |
 
 ## Cómo está hecho
 
@@ -37,9 +37,18 @@ Navegador (/admin)                      Servidor (api/admin)                  Ne
   la puede leer y no se manda desde otros sitios. Las acciones piden además el encabezado `x-admin`, que un formulario
   de otro sitio no puede poner.
 - **Intentos:** más de 8 claves erradas en 15 minutos desde la misma conexión, y se frena un rato (tabla `admin_intentos`).
-- **Reglas en el servidor** (no solo en la pantalla): publicar una historia exige coordenadas dentro del Chocó; un pedido
-  solo avanza si está pagado y de un paso en uno; «enviado» exige transportadora o guía; al devolver un paso se borra la
-  fecha del paso deshecho; el precio va de $ 1.000 a $ 50.000.000.
+- **Reglas en el servidor** (no solo en la pantalla): publicar una historia exige coordenadas dentro del Chocó; solo se
+  despacha un pedido pagado; al poner un paso, los de antes quedan con fecha (si se saltaron, la de ese momento) y los de
+  después sin fecha; el precio va de $ 1.000 a $ 50.000.000 y el envío, de $ 0 a $ 500.000.
+- **Existencias sin pisarse:** el panel guarda las existencias «sobre lo que vio». Si mientras tanto cambiaron (un pedido
+  las apartó, o alguien más las editó), no se guardan y avisa cuántas hay ahora (19/11/2026: un panel abierto desde antes
+  volvió a escribir un número viejo).
+- **Pedidos eliminados:** antes de borrarlo se guarda una copia completa (con lo que llevaba) en `pedidos_eliminados`,
+  con el motivo y si sus productos volvieron a las existencias (sin pagar, siempre; pagado, si se marca). La base no deja
+  cambiar ni borrar esa tabla (disparador `pedidos_eliminados_fijo`). Eliminar un pedido no devuelve el dinero en Wompi.
+- **Papelera:** `productos.eliminado` (fecha). Un producto con pedidos no se puede borrar del todo (los pedidos lo
+  nombran), por eso va a la papelera.
+- **Envío:** tabla `ajustes`, clave `envio` (`{"bogota": 9500, "resto": 18500}`).
 - Las fechas de cada paso de un pedido las anota la base sola (disparador `pedidos_fechas`).
 
 Los productos nuevos viven completos en la tabla `productos` (columnas categoria, resumen, descripcion, tamano, medidas, caracteristicas y fotos); sus fotos, en el almacén privado (carpeta `productos/`), y la tienda las muestra con enlaces firmados. El póster original sigue tomando fotos y textos del código.

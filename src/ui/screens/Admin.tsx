@@ -406,9 +406,12 @@ function ResumenView({ run, go }: { run: Run; go: (s: Seccion, id?: string | nul
 /* ───────── Pedidos ───────── */
 const PASOS = ['pagado', 'empacando', 'enviado', 'entregado'];
 const PASO_LABEL = ['Pagado', 'En empaque', 'En camino', 'Entregado'];
+const PASO_AYUDA = ['Llegó el pago: falta empacarlo.', 'Lo están empacando.', 'Ya salió con la transportadora.', 'Le llegó al cliente.'];
+
+type VistaPedidos = api.VistaPedidos | 'eliminados';
 
 function PedidosView({ run, open, onChange }: { run: Run; open: string | null; onChange: () => void }) {
-  const [vista, setVista] = useState<api.VistaPedidos>(open ? 'todos' : 'despachar');
+  const [vista, setVista] = useState<VistaPedidos>(open ? 'todos' : 'despachar');
   const [q, setQ] = useState('');
   const [buscar, setBuscar] = useState('');
   const [data, setData] = useState<{ pedidos: api.AdminPedido[]; conteo: api.Conteo } | null>(null);
@@ -416,11 +419,18 @@ function PedidosView({ run, open, onChange }: { run: Run; open: string | null; o
   const [sel, setSel] = useState<string | null>(open);
   const load = useCallback(() => {
     setError('');
+    if (vista === 'eliminados') return;
     run(() => api.pedidos(vista, buscar)).then((d) => d && setData(d)).catch((e) => setError(e.message));
   }, [run, vista, buscar]);
   useEffect(load, [load]);
   const act = async (body: Record<string, unknown>) => {
     await run(() => api.accionPedido(body));
+    load();
+    onChange();
+  };
+  const remove = async (referencia: string, motivo: string, devolver: boolean) => {
+    await run(() => api.eliminarPedido(referencia, motivo, devolver));
+    setSel(null);
     load();
     onChange();
   };
@@ -430,57 +440,125 @@ function PedidosView({ run, open, onChange }: { run: Run; open: string | null; o
   return (
     <div className="ap-stack">
       <div className="ap-toolbar">
-        <Tabs value={vista} onChange={(v) => { setVista(v); setData(null); }} items={[
+        <Tabs value={vista} onChange={(v) => { setVista(v); setData(null); setSel(null); }} items={[
           { id: 'despachar', label: 'Por despachar', n: (c.pagado ?? 0) + (c.empacando ?? 0) },
           { id: 'camino', label: 'En camino', n: c.enviado ?? 0 },
           { id: 'entregados', label: 'Entregados', n: c.entregado ?? 0 },
           { id: 'pendientes', label: 'Sin pagar', n: (c.pendiente ?? 0) + (c.rechazado ?? 0) + (c.expirado ?? 0) },
           { id: 'todos', label: 'Todos' },
+          { id: 'eliminados', label: 'Eliminados' },
         ]} />
-        <form className="ap-search" onSubmit={(e) => { e.preventDefault(); setBuscar(q.trim()); }}>
-          <Icon name="search" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Código, nombre, correo o celular" aria-label="Buscar pedidos" />
-          {buscar && <button type="button" className="ap-link" onClick={() => { setQ(''); setBuscar(''); }}>Limpiar</button>}
-        </form>
+        {vista !== 'eliminados' && (
+          <form className="ap-search" onSubmit={(e) => { e.preventDefault(); setBuscar(q.trim()); }}>
+            <Icon name="search" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Código, nombre, correo o celular" aria-label="Buscar pedidos" />
+            {buscar && <button type="button" className="ap-link" onClick={() => { setQ(''); setBuscar(''); }}>Limpiar</button>}
+          </form>
+        )}
       </div>
       {error && <p className="ap-error" role="alert">{error}</p>}
+      {vista === 'eliminados' ? <EliminadosView run={run} /> : (
+        <section className="ap-card ap-card--flush">
+          {!data ? <Loading /> : (
+            <Table head={['Código', 'Fecha', 'Cliente', 'Destino', <span className="ap-num" key="c">Cant.</span>, <span className="ap-num" key="t">Total</span>, 'Pago', 'Estado']}
+              empty={vista === 'despachar' && !buscar ? 'No hay pedidos por despachar.' : 'No hay pedidos aquí.'}>
+              {data.pedidos.map((p) => (
+                <tr key={p.referencia} className={`is-click${p.referencia === sel ? ' is-sel' : ''}`} onClick={() => setSel(p.referencia)}>
+                  <td className="ap-mono">{p.referencia}</td>
+                  <td>{fecha(p.creado)}</td>
+                  <td className="ap-strong">{p.nombre}<small>{p.celular}</small></td>
+                  <td>{p.ciudad}<small>{p.departamento}</small></td>
+                  <td className="ap-num">{p.items.reduce((n, i) => n + i.cantidad, 0)}</td>
+                  <td className="ap-num">{pesos(p.total)}</td>
+                  <td>{p.metodo ? METODO[p.metodo] ?? p.metodo : '—'}</td>
+                  <td><Pill estado={p.estado} label={ESTADO_PEDIDO[p.estado] ?? p.estado} /></td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </section>
+      )}
+      {current && <PedidoDetalle key={`${current.referencia}-${current.estado}`} p={current} onAction={act} onRemove={remove} onClose={close} />}
+    </div>
+  );
+}
+
+/** El historial de pedidos eliminados: solo para consultar (la base no deja cambiarlo ni borrarlo). */
+function EliminadosView({ run }: { run: Run }) {
+  const [list, setList] = useState<api.PedidoEliminado[] | null>(null);
+  const [error, setError] = useState('');
+  const [sel, setSel] = useState<api.PedidoEliminado | null>(null);
+  useEffect(() => {
+    run(api.pedidosEliminados).then((d) => d && setList(d.eliminados)).catch((e) => setError(e.message));
+  }, [run]);
+  const close = useCallback(() => setSel(null), []);
+  if (error) return <p className="ap-error">{error}</p>;
+  return (
+    <>
       <section className="ap-card ap-card--flush">
-        {!data ? <Loading /> : (
-          <Table head={['Código', 'Fecha', 'Cliente', 'Destino', <span className="ap-num" key="c">Cant.</span>, <span className="ap-num" key="t">Total</span>, 'Pago', 'Estado']}
-            empty={vista === 'despachar' && !buscar ? 'No hay pedidos por despachar.' : 'No hay pedidos aquí.'}>
-            {data.pedidos.map((p) => (
-              <tr key={p.referencia} className={`is-click${p.referencia === sel ? ' is-sel' : ''}`} onClick={() => setSel(p.referencia)}>
-                <td className="ap-mono">{p.referencia}</td>
-                <td>{fecha(p.creado)}</td>
-                <td className="ap-strong">{p.nombre}<small>{p.celular}</small></td>
-                <td>{p.ciudad}<small>{p.departamento}</small></td>
-                <td className="ap-num">{p.items.reduce((n, i) => n + i.cantidad, 0)}</td>
-                <td className="ap-num">{pesos(p.total)}</td>
-                <td>{p.metodo ? METODO[p.metodo] ?? p.metodo : '—'}</td>
-                <td><Pill estado={p.estado} label={ESTADO_PEDIDO[p.estado] ?? p.estado} /></td>
+        {!list ? <Loading /> : (
+          <Table head={['Eliminado', 'Código', 'Cliente', <span className="ap-num" key="t">Total</span>, 'Estaba', 'Motivo']} empty="No se ha eliminado ningún pedido.">
+            {list.map((e) => (
+              <tr key={`${e.referencia}-${e.eliminado}`} className="is-click" onClick={() => setSel(e)}>
+                <td>{fecha(e.eliminado)}</td>
+                <td className="ap-mono">{e.referencia}</td>
+                <td className="ap-strong">{e.datos.nombre}<small>{e.datos.ciudad}</small></td>
+                <td className="ap-num">{pesos(e.datos.total)}</td>
+                <td><Pill estado={e.estado} label={ESTADO_PEDIDO[e.estado] ?? e.estado} /></td>
+                <td>{e.motivo}</td>
               </tr>
             ))}
           </Table>
         )}
       </section>
-      {current && <PedidoDetalle key={current.referencia} p={current} onAction={act} onClose={close} />}
-    </div>
+      <p className="ap-muted">Este historial no se puede cambiar ni borrar: queda una copia completa de cada pedido eliminado, con su motivo.</p>
+      {sel && (
+        <Drawer title={<span className="ap-mono">{sel.referencia}</span>} sub={<>Eliminado el {fecha(sel.eliminado)} · estaba <Pill estado={sel.estado} label={ESTADO_PEDIDO[sel.estado] ?? sel.estado} /></>} onClose={close}>
+          <dl className="ap-dl">
+            <dt>Motivo</dt><dd>{sel.motivo}</dd>
+            <dt>Existencias</dt><dd>{sel.devuelto ? 'Sus productos volvieron a las existencias.' : 'Sus productos no volvieron a las existencias.'}</dd>
+            <dt>Cliente</dt><dd>{sel.datos.nombre}</dd>
+            <dt>Contacto</dt><dd>{sel.datos.celular} · {sel.datos.correo}</dd>
+            <dt>Dirección</dt><dd>{sel.datos.direccion}<br />{sel.datos.ciudad}, {sel.datos.departamento}</dd>
+            <dt>Creado</dt><dd>{fecha(sel.datos.creado)}</dd>
+            <dt>Pago</dt><dd>{sel.datos.metodo ? `${METODO[sel.datos.metodo] ?? sel.datos.metodo} · ${fecha(sel.datos.pagado)}` : '—'}{sel.datos.wompi_id && <small>Wompi {sel.datos.wompi_id}</small>}</dd>
+          </dl>
+          <table className="ap-table ap-table--compact">
+            <thead><tr><th>Producto</th><th className="ap-num">Cant.</th><th className="ap-num">Valor</th></tr></thead>
+            <tbody>
+              {sel.datos.items.map((i) => <tr key={i.sku}><td>{i.nombre}</td><td className="ap-num">{i.cantidad}</td><td className="ap-num">{pesos(i.cantidad * i.precio)}</td></tr>)}
+              <tr className="is-sub"><td>Envío</td><td /><td className="ap-num">{pesos(sel.datos.envio)}</td></tr>
+              <tr className="is-total"><td>Total</td><td /><td className="ap-num">{pesos(sel.datos.total)}</td></tr>
+            </tbody>
+          </table>
+        </Drawer>
+      )}
+    </>
   );
 }
 
-function PedidoDetalle({ p, onAction, onClose }: { p: api.AdminPedido; onAction: (body: Record<string, unknown>) => Promise<void>; onClose: () => void }) {
+function PedidoDetalle({ p, onAction, onRemove, onClose }: {
+  p: api.AdminPedido;
+  onAction: (body: Record<string, unknown>) => Promise<void>;
+  onRemove: (referencia: string, motivo: string, devolver: boolean) => Promise<void>;
+  onClose: () => void;
+}) {
   const [transportadora, setTransportadora] = useState(p.transportadora);
   const [guia, setGuia] = useState(p.guia);
   const [nota, setNota] = useState(p.nota);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [borrar, setBorrar] = useState(false);
+  const [motivo, setMotivo] = useState('');
   const paso = PASOS.indexOf(p.estado);
+  // Pagado y sin despachar: lo normal al eliminarlo es que sus productos vuelvan. Ya enviado o entregado, no.
+  const [devolver, setDevolver] = useState(paso >= 0 && paso < 2);
   const act = async (body: Record<string, unknown>) => {
     setBusy(true);
     setError('');
     try {
-      await onAction({ referencia: p.referencia, ...body });
+      await onAction({ referencia: p.referencia, transportadora, guia, nota, ...body });
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo.');
@@ -488,16 +566,41 @@ function PedidoDetalle({ p, onAction, onClose }: { p: api.AdminPedido; onAction:
       setBusy(false);
     }
   };
+  const remove = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await onRemove(p.referencia, motivo.trim(), devolver);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo eliminar.');
+      setBusy(false);
+    }
+  };
   const fechas = [p.pagado, p.empacado, p.enviado, p.entregado];
   const touch = () => setSaved(false);
+  const unidades = p.items.reduce((n, i) => n + i.cantidad, 0);
   return (
     <Drawer title={<span className="ap-mono">{p.referencia}</span>} sub={<>Creado el {fecha(p.creado)} · <Pill estado={p.estado} label={ESTADO_PEDIDO[p.estado] ?? p.estado} /></>} onClose={onClose}>
       {paso >= 0 && (
-        <ol className="ap-steps">
-          {PASO_LABEL.map((l, i) => (
-            <li key={l} className={i < paso ? 'is-done' : i === paso ? 'is-now' : ''}><span>{l}</span><small>{fechas[i] ? fecha(fechas[i]) : ''}</small></li>
-          ))}
-        </ol>
+        <section className="ap-stepper" aria-label="Estado del pedido">
+          <p className="ap-stepper__title">¿En qué va este pedido? <small>Toca el paso; el cliente lo ve en «Consultar mi pedido».</small></p>
+          <div className="ap-stepper__row">
+            {PASO_LABEL.map((l, i) => (
+              <button
+                key={l}
+                type="button"
+                className={`ap-stepper__step${i < paso ? ' is-done' : i === paso ? ' is-now' : ''}`}
+                aria-pressed={i === paso}
+                disabled={busy || i === paso}
+                onClick={() => void act({ estado: PASOS[i] })}
+              >
+                <span className="ap-stepper__dot" aria-hidden="true">{i < paso ? '✓' : i + 1}</span>
+                <strong>{l}</strong>
+                <small>{fechas[i] ? fecha(fechas[i]) : PASO_AYUDA[i]}</small>
+              </button>
+            ))}
+          </div>
+        </section>
       )}
 
       <dl className="ap-dl">
@@ -520,10 +623,10 @@ function PedidoDetalle({ p, onAction, onClose }: { p: api.AdminPedido; onAction:
 
       {paso >= 0 ? (
         <div className="ap-form">
-          <label className="ap-field"><span>Transportadora</span>
+          <label className="ap-field"><span>Transportadora <em>opcional</em></span>
             <input value={transportadora} maxLength={60} placeholder="Servientrega, Interrapidísimo…" onChange={(e) => { setTransportadora(e.target.value); touch(); }} />
           </label>
-          <label className="ap-field"><span>Número de guía</span>
+          <label className="ap-field"><span>Número de guía <em>opcional · con ella el cliente lo rastrea</em></span>
             <input value={guia} maxLength={60} onChange={(e) => { setGuia(e.target.value); touch(); }} />
           </label>
           <label className="ap-field ap-field--wide"><span>Nota interna <em>solo la ve el equipo</em></span>
@@ -536,18 +639,32 @@ function PedidoDetalle({ p, onAction, onClose }: { p: api.AdminPedido; onAction:
       {error && <p className="ap-error" role="alert">{error}</p>}
 
       <div className="ap-actions">
-        {p.estado === 'pagado' && <button type="button" className="ap-btn ap-btn--primary" disabled={busy} onClick={() => act({ estado: 'empacando', nota })}>Empezar a empacar</button>}
-        {p.estado === 'empacando' && (
-          <button type="button" className="ap-btn ap-btn--primary" disabled={busy || !(guia.trim() || transportadora.trim())} onClick={() => act({ estado: 'enviado', transportadora, guia, nota })}>
-            Marcar como enviado
-          </button>
-        )}
-        {p.estado === 'enviado' && <button type="button" className="ap-btn ap-btn--primary" disabled={busy} onClick={() => act({ estado: 'entregado', nota })}>Marcar como entregado</button>}
-        {paso >= 0 && <button type="button" className="ap-btn" disabled={busy} onClick={() => act({ transportadora, guia, nota })}>{saved ? '✓ Guardado' : 'Guardar datos'}</button>}
-        {paso > 0 && <Confirm label="Devolver un paso" sure={`Volver a «${PASO_LABEL[paso - 1]}»`} busy={busy} onYes={() => act({ estado: PASOS[paso - 1] })} />}
+        {paso >= 0 && <button type="button" className="ap-btn ap-btn--primary" disabled={busy} onClick={() => void act({})}>{saved ? '✓ Guardado' : 'Guardar datos'}</button>}
         <a className="ap-btn ap-btn--ghost" href={`/tienda/pedido/${p.referencia}`} target="_blank" rel="noreferrer">Ver como el cliente ↗</a>
+        {!borrar && <button type="button" className="ap-btn ap-btn--ghost ap-btn--warn" onClick={() => setBorrar(true)}>Eliminar pedido</button>}
       </div>
-      {p.estado === 'empacando' && !(guia.trim() || transportadora.trim()) && <p className="ap-muted">Para marcarlo enviado, pon la transportadora y la guía.</p>}
+
+      {borrar && (
+        <section className="ap-danger-box">
+          <h3>Eliminar este pedido</h3>
+          <p>Desaparece de la lista, pero queda una copia completa en «Eliminados», que no se puede borrar.
+            {p.estado === 'pagado' || paso > 0 ? ' Ojo: eliminarlo no le devuelve el dinero al cliente en Wompi.' : ''}</p>
+          <label className="ap-field ap-field--wide"><span>¿Por qué se elimina? <em>queda en el historial</em></span>
+            <input value={motivo} maxLength={300} placeholder="Pedido de prueba, cliente canceló…" onChange={(e) => setMotivo(e.target.value)} />
+          </label>
+          {p.estado === 'pendiente' && <p className="ap-muted">Estaba apartando {unidades} {unidades === 1 ? 'unidad' : 'unidades'}: vuelven a las existencias.</p>}
+          {paso >= 0 && (
+            <label className="ap-check">
+              <input type="checkbox" checked={devolver} onChange={(e) => setDevolver(e.target.checked)} />
+              <span>Devolver {unidades === 1 ? 'la unidad' : `las ${unidades} unidades`} a las existencias</span>
+            </label>
+          )}
+          <div className="ap-actions">
+            <button type="button" className="ap-btn ap-btn--danger" disabled={busy || motivo.trim().length < 3} onClick={() => void remove()}>Eliminar pedido</button>
+            <button type="button" className="ap-btn ap-btn--ghost" onClick={() => setBorrar(false)}>Cancelar</button>
+          </div>
+        </section>
+      )}
     </Drawer>
   );
 }
@@ -706,31 +823,119 @@ function HistoriaDetalle({ h, onAction, onClose }: { h: api.AdminHistoria; onAct
 /* ───────── Productos ───────── */
 function ProductosView({ run }: { run: Run }) {
   const [list, setList] = useState<api.AdminProducto[] | null>(null);
+  const [envio, setEnvio] = useState<api.Envio | null>(null);
   const [error, setError] = useState('');
   /** El formulario abierto: uno nuevo, o editar uno existente. */
   const [form, setForm] = useState<api.AdminProducto | 'nuevo' | null>(null);
   const load = useCallback(() => {
-    run(api.productos).then((d) => d && setList(d.productos)).catch((e) => setError(e.message));
+    run(api.productos).then((d) => {
+      if (!d) return;
+      setList(d.productos);
+      setEnvio(d.envio);
+    }).catch((e) => setError(e.message));
   }, [run]);
   useEffect(load, [load]);
   const close = useCallback(() => setForm(null), []);
   if (error) return <p className="ap-error">{error}</p>;
+  const vivos = list?.filter((p) => !p.eliminado) ?? [];
+  const papelera = list?.filter((p) => p.eliminado) ?? [];
   return (
     <div className="ap-stack">
+      {envio && <EnvioCard envio={envio} run={run} onSaved={setEnvio} />}
       <div className="ap-toolbar">
-        <p className="ap-muted">{list ? `${list.length} ${list.length === 1 ? 'producto' : 'productos'} · ${list.filter((p) => p.activo).length} a la venta` : ''}</p>
+        <p className="ap-muted">{list ? `${vivos.length} ${vivos.length === 1 ? 'producto' : 'productos'} · ${vivos.filter((p) => p.activo).length} a la venta` : ''}</p>
         <button type="button" className="ap-btn ap-btn--primary" onClick={() => setForm('nuevo')}>+ Nuevo producto</button>
       </div>
       <section className="ap-card ap-card--flush">
         {!list ? <Loading /> : (
           <Table head={['Producto', <span className="ap-num" key="p">Precio</span>, <span className="ap-num" key="e">Existencias</span>, <span className="ap-num" key="v">Vendidos</span>, <span className="ap-num" key="a">Apartados</span>, 'A la venta', '']}>
-            {list.map((p) => <ProductoFila key={p.sku} p={p} run={run} onSaved={load} onEdit={() => setForm(p)} />)}
+            {vivos.map((p) => <ProductoFila key={p.sku} p={p} run={run} onSaved={load} onEdit={() => setForm(p)} />)}
           </Table>
         )}
       </section>
       <p className="ap-muted">Apartados: en pedidos que esperan pago (vuelven a las existencias si no se pagan). Las fotos y textos del póster original vienen de la web; los de los productos nuevos, de este panel.</p>
+
+      {papelera.length > 0 && (
+        <section className="ap-card">
+          <header className="ap-card__head"><h2>Papelera</h2><p className="ap-muted">Lo eliminado no se ve en la tienda. Si fue un error, restáuralo: vuelve oculto, para que lo revises antes de ponerlo a la venta.</p></header>
+          <Table head={['Producto', <span className="ap-num" key="p">Precio</span>, 'Eliminado', '']}>
+            {papelera.map((p) => <PapeleraFila key={p.sku} p={p} run={run} onSaved={load} />)}
+          </Table>
+        </section>
+      )}
       {form && <ProductoForm key={form === 'nuevo' ? 'nuevo' : form.sku} p={form === 'nuevo' ? null : form} run={run} onClose={close} onSaved={() => { close(); load(); }} />}
     </div>
+  );
+}
+
+/** El valor del envío: lo pone el equipo (antes estaba fijo en el código). */
+function EnvioCard({ envio, run, onSaved }: { envio: api.Envio; run: Run; onSaved: (e: api.Envio) => void }) {
+  const [bogota, setBogota] = useState(String(envio.bogota));
+  const [resto, setResto] = useState(String(envio.resto));
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  const changed = bogota !== String(envio.bogota) || resto !== String(envio.resto);
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg('');
+    try {
+      const r = await run(() => api.guardarEnvio({ bogota: Number(bogota), resto: Number(resto) }));
+      if (r) onSaved(r.envio);
+      setMsg('ok');
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'No se pudo.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const field = (label: string, help: string, value: string, set: (v: string) => void) => (
+    <label className="ap-field"><span>{label} <em>{help}</em></span>
+      <span className="ap-money-input"><span aria-hidden="true">$</span>
+        <input required inputMode="numeric" value={value} onChange={(e) => { set(e.target.value.replace(/\D/g, '')); setMsg(''); }} />
+      </span>
+      <small className="ap-hint">{value !== '' ? `Se cobra ${pesos(Number(value))}` : ' '}</small>
+    </label>
+  );
+  return (
+    <form className="ap-card ap-envio" onSubmit={save}>
+      <header className="ap-card__head"><h2>Envío</h2><p className="ap-muted">Lo que se suma a cada pedido. Si cambias el valor, aplica a los pedidos nuevos.</p></header>
+      <div className="ap-form">
+        {field('A Bogotá', 'pesos', bogota, setBogota)}
+        {field('Al resto de Colombia', 'pesos', resto, setResto)}
+        <div className="ap-actions">
+          <button type="submit" className="ap-btn ap-btn--primary" disabled={busy || !changed || bogota === '' || resto === ''}>{busy ? 'Guardando…' : 'Guardar envío'}</button>
+          {msg === 'ok' && !changed && <small className="ap-ok">✓ Guardado</small>}
+          {msg && msg !== 'ok' && <small className="ap-error">{msg}</small>}
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function PapeleraFila({ p, run, onSaved }: { p: api.AdminProducto; run: Run; onSaved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const restore = async () => {
+    setBusy(true);
+    try {
+      await run(() => api.papelera(p.sku, 'restaurar'));
+      onSaved();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'No se pudo.');
+      setBusy(false);
+    }
+  };
+  return (
+    <tr>
+      <td className="ap-strong">{p.nombre}<small className="ap-mono">{p.sku}</small></td>
+      <td className="ap-num">{pesos(p.precio)}</td>
+      <td>{fecha(p.eliminado)}</td>
+      <td>
+        <button type="button" className="ap-btn ap-btn--sm" disabled={busy} onClick={() => void restore()}>Restaurar</button>
+        {msg && <small className="ap-error">{msg}</small>}
+      </td>
+    </tr>
   );
 }
 
@@ -796,6 +1001,7 @@ function ProductoForm({ p, run, onClose, onSaved }: { p: api.AdminProducto | nul
     setError('');
     const body = {
       sku: p?.sku, nombre, categoria, resumen, descripcion, tamano, medidas, precio: Number(precio), existencias: Number(existencias), activo,
+      existenciasAntes: p?.existencias,
       caracteristicas: specs.filter(([k, v]) => k.trim() && v.trim()),
       fotos: fotos.filter((f) => f.progreso === undefined || f.progreso >= 1).map(({ pathname, alt }) => ({ pathname, alt: alt || nombre })),
     };
@@ -816,7 +1022,7 @@ function ProductoForm({ p, run, onClose, onSaved }: { p: api.AdminProducto | nul
         <div className="ap-preview" aria-hidden="true">
           <div className="ap-preview__pic">{portada ? <img src={portada.url} alt="" /> : <span>Sin foto todavía</span>}</div>
           <div className="ap-preview__body">
-            <p className="ap-preview__kind">{categoria || 'Categoría'}{existencias ? ` · quedan ${existencias}` : ''}</p>
+            <p className="ap-preview__kind">{categoria || 'Categoría'}{existencias === '0' ? ' · agotado' : ''}</p>
             <p className="ap-preview__name">{nombre || 'Nombre del producto'}</p>
             <p className="ap-preview__sum">{resumen || 'La frase corta aparece aquí.'}</p>
             <p className="ap-preview__price">{Number(precio) ? pesos(Number(precio)) : '$ —'}</p>
@@ -928,14 +1134,42 @@ function ProductoFila({ p, run, onSaved, onEdit }: { p: api.AdminProducto; run: 
   const [existencias, setExistencias] = useState(String(p.existencias));
   const [activo, setActivo] = useState(p.activo);
   const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  // Al recargar (después de guardar, o si las existencias cambiaron mientras tanto), la fila toma los números nuevos.
+  useEffect(() => {
+    setPrecio(String(p.precio));
+    setExistencias(String(p.existencias));
+    setActivo(p.activo);
+  }, [p.precio, p.existencias, p.activo]);
   const changed = precio !== String(p.precio) || existencias !== String(p.existencias) || activo !== p.activo;
   const save = async () => {
+    setBusy(true);
     try {
-      await run(() => api.guardarProducto({ sku: p.sku, precio: Number(precio), existencias: Number(existencias), activo }));
+      // Solo lo que cambió. Las existencias van «sobre lo que se vio»: si mientras tanto cambiaron (un pedido las apartó,
+      // o alguien más las editó), el servidor no las pisa y avisa cuántas hay ahora.
+      const body: Record<string, unknown> = { sku: p.sku };
+      if (precio !== String(p.precio)) body.precio = Number(precio);
+      if (existencias !== String(p.existencias)) Object.assign(body, { existencias: Number(existencias), existenciasAntes: p.existencias });
+      if (activo !== p.activo) body.activo = activo;
+      await run(() => api.guardarProducto(body));
       setMsg('ok');
       onSaved();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'No se pudo.');
+      // Con el número de ahora a la vista.
+      if (e instanceof api.AdminError && e.status === 409) onSaved();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await run(() => api.papelera(p.sku, 'eliminar'));
+      onSaved();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'No se pudo.');
+      setBusy(false);
     }
   };
   return (
@@ -949,9 +1183,10 @@ function ProductoFila({ p, run, onSaved, onEdit }: { p: api.AdminProducto; run: 
       <td className="ap-num">{p.vendidos}</td>
       <td className="ap-num">{p.apartados}</td>
       <td><label className="ap-switch"><input type="checkbox" checked={activo} onChange={(e) => { setActivo(e.target.checked); setMsg(''); }} /><span>{activo ? 'Sí' : 'No'}</span></label></td>
-      <td>
-        <button type="button" className="ap-btn ap-btn--primary ap-btn--sm" disabled={!changed} onClick={() => void save()}>Guardar</button>
+      <td className="ap-row-actions">
+        <button type="button" className="ap-btn ap-btn--primary ap-btn--sm" disabled={!changed || busy} onClick={() => void save()}>Guardar</button>
         {p.fotos.length > 0 && <button type="button" className="ap-btn ap-btn--sm ap-btn--ghost" onClick={onEdit}>Editar todo</button>}
+        <Confirm label="Eliminar" sure="A la papelera" danger busy={busy} onYes={() => void remove()} />
         {msg === 'ok' && !changed && <small className="ap-ok">✓ Guardado</small>}
         {msg && msg !== 'ok' && <small className="ap-error">{msg}</small>}
       </td>

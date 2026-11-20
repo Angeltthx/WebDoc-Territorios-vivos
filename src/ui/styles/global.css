@@ -3089,3 +3089,56 @@ button.ap-kpi:hover { background: var(--ap-head); }
   .chapter .dock .social, .album-page .dock .social { display: none; }
   .chapter .dock__sound, .album-page .dock__sound { width: 44px; height: 44px; }
 }
+
+/* ───────── Panel: pasos del pedido, eliminar, envío y papelera (19/11/2026) ───────── */
+/* Los pasos del pedido son botones: se toca el que corresponde (antes se avanzaba de uno en uno). */
+.ap-stepper { display: grid; gap: 8px; }
+.ap-stepper__title { margin: 0; font-weight: 600; }
+.ap-stepper__title small { display: block; font-weight: 400; color: var(--ap-muted); font-size: 12px; }
+.ap-stepper__row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ap-stepper__step {
+  display: grid; justify-items: start; gap: 2px; padding: 9px 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--ap-line); border-radius: 4px; background: var(--ap-card); color: var(--ap-muted); font: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ap-stepper__step:hover:not(:disabled) { border-color: var(--ap-accent); background: var(--ap-hover); color: var(--ap-text); }
+.ap-stepper__step strong { color: var(--ap-text); font-size: 13px; }
+.ap-stepper__step small { font-size: 11.5px; line-height: 1.3; }
+.ap-stepper__dot {
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 600;
+  border: 1.5px solid var(--ap-line); color: var(--ap-muted); background: #fff;
+}
+.ap-stepper__step.is-done .ap-stepper__dot { border-color: var(--ap-accent); background: var(--ap-accent); color: #fff; }
+.ap-stepper__step.is-now { border-color: var(--ap-accent); background: rgba(31, 77, 61, 0.07); cursor: default; }
+.ap-stepper__step.is-now .ap-stepper__dot { border-color: var(--ap-accent); background: var(--ap-accent); color: #fff; }
+.ap-stepper__step:disabled:not(.is-now) { opacity: 0.6; cursor: wait; }
+@media (max-width: 640px) { .ap-stepper__row { grid-template-columns: 1fr 1fr; } }
+/* Eliminar un pedido: en una caja aparte, con el motivo. */
+.ap-danger-box { display: grid; gap: 10px; padding: 14px; border: 1px solid rgba(180, 35, 24, 0.35); border-radius: 4px; background: rgba(180, 35, 24, 0.04); }
+.ap-danger-box h3 { margin: 0; font: 600 13.5px var(--ap-font); color: var(--ap-bad); }
+.ap-danger-box p { margin: 0; font-size: 12.5px; }
+.ap-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.ap-check input { width: 16px; height: 16px; accent-color: var(--ap-accent); }
+/* El envío, arriba de los productos. */
+.ap-envio .ap-card__head { flex-wrap: wrap; justify-content: flex-start; }
+.ap-envio .ap-form { padding: 14px 16px; align-items: end; }
+.ap-row-actions { white-space: nowrap; }
+.ap-row-actions .ap-confirm, .ap-row-actions > .ap-btn { margin-left: 4px; }
+
+/* ───────── Tienda: la ciudad de la lista y los errores de cada campo (19/11/2026) ───────── */
+.shop-field-error { font-size: 12.5px; line-height: 1.35; color: #b3261e; }
+.story-field.is-invalid .story-field__label { color: #b3261e; }
+.story-field.is-invalid input { background-image: linear-gradient(#b3261e, #b3261e), linear-gradient(#b3261e, #b3261e); }
+.shop-readonly { color: var(--ink); cursor: default; }
+.shop-city { position: relative; display: block; }
+.shop-city input { width: 100%; }
+.shop-city__ok { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); color: #2f8a5a; font-weight: 600; pointer-events: none; }
+.shop-city__list {
+  position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+  max-height: 264px; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(15, 35, 28, 0.16);
+}
+.shop-city__list li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 10px; border-radius: 6px; cursor: pointer; font-size: 15px; color: var(--ink); }
+.shop-city__list li span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.shop-city__list li.is-hi { background: rgba(31, 77, 61, 0.08); }
+.shop-city__none { display: block; margin-top: 6px; font-size: 12.5px; color: #a8661a; }

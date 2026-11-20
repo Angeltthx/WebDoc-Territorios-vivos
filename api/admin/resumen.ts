@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     select coalesce(sum(total), 0)::int as total, count(*)::int as pedidos,
       coalesce(sum(total) filter (where pagado > now() - interval '30 days'), 0)::int as mes
     from pedidos where estado in ('pagado', 'empacando', 'enviado', 'entregado')`) as { total: number; pedidos: number; mes: number }[];
-  const productos = await db`select sku, nombre, precio, existencias, activo from productos order by sku`;
+  const productos = await db`select sku, nombre, precio, existencias, activo from productos where eliminado is null order by sku`;
   const ultimos = await db`
     select referencia, creado, estado, nombre, ciudad, total from pedidos
     where estado in ('pagado', 'empacando', 'enviado', 'entregado') order by creado desc limit 8`;

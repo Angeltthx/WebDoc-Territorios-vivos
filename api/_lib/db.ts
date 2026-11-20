@@ -128,6 +128,32 @@ export const SCHEMA = [
   // personas distintas por día (una huella anónima que cambia cada día: no permite seguir a nadie). Ver api/visita.ts.
   `create table if not exists visitas_pagina (dia date not null, ruta text not null, vistas integer not null default 0, primary key (dia, ruta))`,
   `create table if not exists visitas_personas (dia date not null, huella text not null, movil boolean not null default false, primary key (dia, huella))`,
+  // ── Panel, 19/11/2026 ──
+  // Papelera de productos: «eliminar» solo marca la fecha (y lo oculta en la tienda); se puede restaurar.
+  `alter table productos add column if not exists eliminado timestamptz`,
+  // Ajustes que cambia el equipo desde el panel (hoy, el valor del envío). Lo que no esté aquí usa el valor del código.
+  `create table if not exists ajustes (clave text primary key, valor jsonb not null, actualizado timestamptz not null default now())`,
+  `insert into ajustes (clave, valor) values ('envio', '{"bogota": 9500, "resto": 18500}') on conflict (clave) do nothing`,
+  // Historial de pedidos eliminados: una copia completa de cada uno (con lo que llevaba), de quién y por qué. No se puede
+  // cambiar ni borrar: la base lo impide (disparador), ni siquiera desde la consola sin quitarlo antes a propósito.
+  `create table if not exists pedidos_eliminados (
+    id uuid primary key default gen_random_uuid(),
+    eliminado timestamptz not null default now(),
+    referencia text not null,
+    estado text not null,
+    motivo text not null default '',
+    devuelto boolean not null default false,
+    datos jsonb not null
+  )`,
+  `create index if not exists pedidos_eliminados_fecha on pedidos_eliminados (eliminado desc)`,
+  `create or replace function pedidos_eliminados_fijo() returns trigger language plpgsql as $$
+    begin
+      raise exception 'El historial de pedidos eliminados no se puede cambiar ni borrar.';
+    end $$`,
+  `drop trigger if exists pedidos_eliminados_fijo on pedidos_eliminados`,
+  `create trigger pedidos_eliminados_fijo before update or delete on pedidos_eliminados for each row execute function pedidos_eliminados_fijo()`,
+  `drop trigger if exists pedidos_eliminados_fijo_todo on pedidos_eliminados`,
+  `create trigger pedidos_eliminados_fijo_todo before truncate on pedidos_eliminados for each statement execute function pedidos_eliminados_fijo()`,
   // El póster (datos de prueba): solo la primera vez; después el precio y las existencias se cambian en la base.
   `insert into productos (sku, nombre, precio, existencias)
     values ('poster-mapa-pliego', 'Póster del mapa de Territorios Vivos (pliego)', 50000, 10)

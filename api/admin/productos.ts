@@ -5,12 +5,17 @@
 //          caracteristicas: [[nombre, valor]…], fotos: [{ pathname, alt }…] } → un producto nuevo (sus fotos se suben
 //          antes con /api/admin/subir).
 //   POST { accion: 'editar', sku, …lo mismo } → cambiar todo lo de un producto.
+//   POST { accion: 'eliminar' | 'restaurar', sku } → a la papelera (se oculta en la tienda) o de vuelta.
+//   POST { accion: 'envio', bogota, resto } → el valor del envío (tabla `ajustes`).
+// Las existencias se cambian «sobre lo que se vio» (`existenciasAntes`): si mientras tanto cambiaron (un pedido las
+// apartó, o alguien más las editó), no se pisan y se avisa con el número de ahora (19/11/2026: un panel abierto desde
+// antes volvió a escribir un número viejo).
 // El póster original toma sus fotos y textos del código (src/content/stories.ts); los nuevos, de aquí.
 
 import { randomBytes } from 'node:crypto';
 import { isAdmin, noSession } from '../_lib/admin.js';
 import { type Archivo, sql } from '../_lib/db.js';
-import { expireOld } from '../_lib/tienda.js';
+import { ENVIO_MAX, expireOld, tarifasEnvio } from '../_lib/tienda.js';
 import { clean, json, signed } from '../_lib/util.js';
 
 type Foto = { pathname: string; alt: string };
@@ -20,15 +25,21 @@ export async function GET(request: Request) {
   await expireOld();
   const rows = (await sql()`
     select pr.sku, pr.nombre, pr.precio, pr.existencias, pr.activo, pr.actualizado, pr.categoria, pr.resumen, pr.descripcion,
-      pr.tamano, pr.medidas, pr.caracteristicas, pr.fotos, pr.creado,
+      pr.tamano, pr.medidas, pr.caracteristicas, pr.fotos, pr.creado, pr.eliminado,
       coalesce((select sum(i.cantidad) from pedido_items i join pedidos p on p.id = i.pedido_id
         where i.sku = pr.sku and p.estado = 'pendiente'), 0)::int as apartados,
       coalesce((select sum(i.cantidad) from pedido_items i join pedidos p on p.id = i.pedido_id
         where i.sku = pr.sku and p.estado in ('pagado', 'empacando', 'enviado', 'entregado')), 0)::int as vendidos
     from productos pr order by pr.creado, pr.sku`) as { fotos: Foto[] }[];
   const productos = await Promise.all(rows.map(async (p) => ({ ...p, fotos: await signed(p.fotos as unknown as Archivo[]) })));
-  return json({ productos });
+  return json({ productos, envio: await tarifasEnvio() });
 }
+
+/** Las existencias cambiaron desde que se abrió el panel: no se guarda nada y se dice cuántas hay ahora. */
+const conflicto = (ahora: number) => json({
+  error: `Las existencias cambiaron mientras tanto: ahora hay ${ahora}. Revisa el número y vuelve a guardar.`,
+  existencias: ahora,
+}, 409);
 
 /** Lo que manda el formulario, revisado (no se confía en el navegador). */
 function fields(body: Record<string, unknown>) {
@@ -75,6 +86,27 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const db = sql();
 
+  if (body.accion === 'envio') {
+    const bogota = Math.round(Number(body.bogota));
+    const resto = Math.round(Number(body.resto));
+    const ok = (n: number) => Number.isFinite(n) && n >= 0 && n <= ENVIO_MAX;
+    if (!ok(bogota) || !ok(resto)) return json({ error: 'El envío debe ser un valor entre $ 0 y $ 500.000.' }, 400);
+    const valor = JSON.stringify({ bogota, resto });
+    await db`insert into ajustes (clave, valor) values ('envio', ${valor}::jsonb)
+      on conflict (clave) do update set valor = excluded.valor, actualizado = now()`;
+    return json({ ok: true, envio: { bogota, resto } });
+  }
+
+  if (body.accion === 'eliminar' || body.accion === 'restaurar') {
+    const sku = clean(body.sku, 60);
+    // Al eliminar se oculta en la tienda; al restaurar vuelve oculto, para revisarlo antes de ponerlo a la venta.
+    const [r] = (body.accion === 'eliminar'
+      ? await db`update productos set eliminado = now(), activo = false, actualizado = now() where sku = ${sku} and eliminado is null returning sku`
+      : await db`update productos set eliminado = null, actualizado = now() where sku = ${sku} and eliminado is not null returning sku`) as { sku: string }[];
+    if (!r) return json({ error: 'Ese producto no existe o ya estaba así.' }, 404);
+    return json({ ok: true });
+  }
+
   if (body.accion === 'crear' || body.accion === 'editar') {
     const { f, error } = fields(body);
     if (error) return json({ error }, 400);
@@ -89,12 +121,16 @@ export async function POST(request: Request) {
       return json({ ok: true, sku }, 201);
     }
     const sku = clean(body.sku, 60);
+    const antes = Math.round(Number(body.existenciasAntes));
     const [r] = (await db`
       update productos set nombre = ${f.nombre}, precio = ${f.precio}, existencias = ${f.existencias}, activo = ${f.activo},
         categoria = ${f.categoria}, resumen = ${f.resumen}, descripcion = ${f.descripcion}, tamano = ${f.tamano}, medidas = ${f.medidas},
         caracteristicas = ${caracteristicas}::jsonb, fotos = ${fotos}::jsonb, actualizado = now()
-      where sku = ${sku} returning sku`) as { sku: string }[];
-    if (!r) return json({ error: 'Ese producto no existe.' }, 404);
+      where sku = ${sku} and existencias = ${antes} returning sku`) as { sku: string }[];
+    if (!r) {
+      const [now] = (await db`select existencias from productos where sku = ${sku}`) as { existencias: number }[];
+      return now ? conflicto(now.existencias) : json({ error: 'Ese producto no existe.' }, 404);
+    }
     return json({ ok: true, sku });
   }
 
@@ -102,13 +138,18 @@ export async function POST(request: Request) {
   const sku = clean(body.sku, 60);
   const precio = body.precio === undefined ? null : Math.round(Number(body.precio));
   const existencias = body.existencias === undefined ? null : Math.round(Number(body.existencias));
+  const antes = existencias === null ? null : Math.round(Number(body.existenciasAntes));
   const activo = typeof body.activo === 'boolean' ? body.activo : null;
+  if (existencias !== null && !Number.isFinite(antes)) return json({ error: 'Vuelve a cargar la página e inténtalo otra vez.' }, 400);
   if (precio !== null && !(precio >= 1000 && precio <= 50_000_000)) return json({ error: 'El precio debe estar entre $ 1.000 y $ 50.000.000.' }, 400);
   if (existencias !== null && !(existencias >= 0 && existencias <= 100_000)) return json({ error: 'Las existencias deben ser un número de 0 en adelante.' }, 400);
   const [r] = (await db`
     update productos set precio = coalesce(${precio}, precio), existencias = coalesce(${existencias}, existencias),
       activo = coalesce(${activo}, activo), actualizado = now()
-    where sku = ${sku} returning sku`) as { sku: string }[];
-  if (!r) return json({ error: 'Ese producto no existe.' }, 404);
+    where sku = ${sku} and (${existencias}::int is null or existencias = ${antes}) returning sku`) as { sku: string }[];
+  if (!r) {
+    const [now] = (await db`select existencias from productos where sku = ${sku}`) as { existencias: number }[];
+    return now ? conflicto(now.existencias) : json({ error: 'Ese producto no existe.' }, 404);
+  }
   return json({ ok: true });
 }
