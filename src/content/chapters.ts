@@ -196,7 +196,7 @@ export const chapters: Chapter[] = [
           title: 'La experiencia del viche y su compra directa',
           text: 'Conoce el proceso, la medicina ancestral de las mayoras y adquiere el viche directamente de Chachita. El ingreso vuelve completo a la comunidad, sin intermediarios. Es la historia que Chachita nombra en su corto, hecha experiencia.',
           actions: [
-            { label: 'Escríbele a Chachita', pending: true, primary: true },
+            { label: 'Escríbele a Chachita', href: 'https://wa.me/573215870509', primary: true },
             { label: 'Ver el proceso', page: 'pangui-viche' },
           ],
         },
