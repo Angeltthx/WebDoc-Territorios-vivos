@@ -11,6 +11,9 @@ import { sql } from './db.js';
 /** Envío (pesos): a Bogotá y al resto de Colombia (pedido de la clienta, 17/11/2026; antes $ 15.000 a todo el país). */
 export const ENVIO_BOGOTA = 9500;
 export const ENVIO_RESTO = 18500;
+/** Productos sin envío cuando el pedido solo lleva esos: el de prueba del equipo, para probar pagos reales sin pagar el
+ * envío (19/11/2026). Al quitar el producto de prueba, se quita de aquí. */
+export const SIN_ENVIO = ['prueba1-e717'];
 
 /** Lo que cuesta el envío a esa dirección. Bogotá: el departamento «Bogotá D. C.» o una ciudad que se llame Bogotá.
  * La tienda hace la misma cuenta para mostrarla (`envioPara` en src/application/shop-api.ts). */

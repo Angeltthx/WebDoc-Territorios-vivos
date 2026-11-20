@@ -14,6 +14,8 @@ export interface Catalog {
   envioBogota: number;
   /** Wompi con llaves de prueba: no se cobra dinero real (la tienda lo avisa). */
   prueba: boolean;
+  /** Productos sin envío si el pedido solo lleva esos (ver SIN_ENVIO en api/_lib/tienda.ts). */
+  sinEnvio: string[];
 }
 
 interface DbProduct {
@@ -38,11 +40,12 @@ export async function fetchCatalog(): Promise<Catalog | null> {
   try {
     const res = await fetch('/api/tienda/productos');
     if (!res.ok || !res.headers.get('content-type')?.includes('json')) return null;
-    const data = (await res.json()) as { productos: DbProduct[]; envio: number; envioBogota?: number; prueba?: boolean };
+    const data = (await res.json()) as { productos: DbProduct[]; envio: number; envioBogota?: number; prueba?: boolean; sinEnvio?: string[] };
     return {
       envio: data.envio,
       envioBogota: data.envioBogota ?? data.envio,
       prueba: data.prueba ?? true,
+      sinEnvio: data.sinEnvio ?? [],
       productos: Object.fromEntries(data.productos.map((p) => [p.sku, { precio: p.precio, existencias: p.existencias, activo: p.activo }])),
       // Los que traen fotos son los creados desde el panel; solo los que están a la venta.
       extras: data.productos.filter((p) => p.fotos?.length && p.activo).map(toItem),

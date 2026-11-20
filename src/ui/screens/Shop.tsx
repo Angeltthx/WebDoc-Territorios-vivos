@@ -202,8 +202,10 @@ function PerkIcon({ name }: { name: 'truck' | 'frame' | 'leaf' | 'lock' | 'ar' }
 const EMPTY_BUYER: Buyer = { nombre: '', correo: '', celular: '', direccion: '', ciudad: '', departamento: '', notas: '' };
 
 /** El pago: datos de envío a la izquierda, resumen a la derecha; al confirmar, el pedido se crea y se va a Wompi. */
-function Checkout({ lines, rates, test, onBack, onStock }: {
+function Checkout({ lines, rates, test, free, onBack, onStock }: {
   lines: Line[];
+  /** Productos sin envío: si el pedido solo lleva esos, el envío es $ 0. */
+  free: string[];
   /** Wompi en modo de prueba: se avisa que no se cobra dinero real. */
   test: boolean;
   /** Las tarifas de envío: el valor depende de la ciudad que se escriba. */
@@ -219,8 +221,9 @@ function Checkout({ lines, rates, test, onBack, onStock }: {
   const set = (k: keyof Buyer) => (e: { target: { value: string } }) => setBuyer((b) => ({ ...b, [k]: e.target.value }));
   const subtotal = lines.reduce((n, l) => n + l.qty * l.price, 0);
   // El envío se sabe cuando hay ciudad o departamento; antes, se dicen las dos tarifas.
-  const known = !!(buyer.departamento || buyer.ciudad.trim().length >= 3);
-  const envio = envioPara(buyer.ciudad, buyer.departamento, rates);
+  const noShip = lines.length > 0 && lines.every((l) => free.includes(l.size.sku));
+  const known = noShip || !!(buyer.departamento || buyer.ciudad.trim().length >= 3);
+  const envio = noShip ? 0 : envioPara(buyer.ciudad, buyer.departamento, rates);
   const top = useRef<HTMLFormElement>(null);
   useEffect(() => {
     top.current?.closest('.sheet__body')?.scrollTo({ top: 0 });
@@ -309,7 +312,7 @@ function Checkout({ lines, rates, test, onBack, onStock }: {
           </ul>
           <dl className="shop-summary__sums">
             <div><dt>Productos</dt><dd>{pesos(subtotal)}</dd></div>
-            <div><dt>Envío{known ? (envio === rates.bogota ? ' a Bogotá' : '') : ''}</dt><dd>{known ? pesos(envio) : `${pesos(rates.bogota)} o ${pesos(rates.resto)}`}</dd></div>
+            <div><dt>Envío{known && !noShip && envio === rates.bogota ? ' a Bogotá' : ''}</dt><dd>{known ? pesos(envio) : `${pesos(rates.bogota)} o ${pesos(rates.resto)}`}</dd></div>
             <div className="is-total"><dt>Total</dt><dd>{known ? pesos(subtotal + envio) : <>{pesos(subtotal)} <small>+ envío</small></>}</dd></div>
           </dl>
           {!known && <p className="shop-summary__note">El envío es de {envioTexto(rates)}: se calcula con tu ciudad.</p>}
@@ -466,6 +469,7 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
         <Checkout
           lines={lines}
           rates={rates}
+          free={catalog?.sinEnvio ?? []}
           test={catalog?.prueba !== false}
           onBack={() => setView('lista')}
           onStock={(sku, quedan) => {

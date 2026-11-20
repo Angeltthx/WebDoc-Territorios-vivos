@@ -3,7 +3,7 @@
 // sus fotos y textos del código. Más el valor del envío (a Bogotá y al resto del país).
 
 import { type Archivo, sql } from '../_lib/db.js';
-import { ENVIO_BOGOTA, ENVIO_RESTO, expireOld, wompi } from '../_lib/tienda.js';
+import { ENVIO_BOGOTA, ENVIO_RESTO, SIN_ENVIO, expireOld, wompi } from '../_lib/tienda.js';
 import { json, signed } from '../_lib/util.js';
 
 export async function GET() {
@@ -19,5 +19,5 @@ export async function GET() {
   } catch {
     /* sin llaves: no se puede pagar */
   }
-  return json({ productos, envio: ENVIO_RESTO, envioBogota: ENVIO_BOGOTA, prueba });
+  return json({ productos, envio: ENVIO_RESTO, envioBogota: ENVIO_BOGOTA, sinEnvio: SIN_ENVIO, prueba });
 }
