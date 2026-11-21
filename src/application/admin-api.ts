@@ -40,7 +40,8 @@ export interface Resumen {
   /** Contador propio: personas distintas por día (sumadas en 7 y 30 días), páginas vistas y las más vistas (30 días). */
   visitas: {
     hoy: number; semana: number; mes: number; movil: number; vistas: number;
-    porDia: { dia: string; visitas: number }[];
+    /** Los últimos 30 días: personas distintas y lo vendido (pesos, por el día del pago). */
+    porDia: { dia: string; visitas: number; ventas: number }[];
     paginas: { ruta: string; vistas: number }[];
   };
 }
@@ -98,6 +99,20 @@ export interface AdminPedido {
 export const pedidos = (vista: VistaPedidos, q = '') =>
   call<{ pedidos: AdminPedido[]; conteo: Conteo }>(`pedidos?vista=${vista}&q=${encodeURIComponent(q)}`);
 export const accionPedido = (body: Record<string, unknown>) => call<{ ok: true }>('pedidos', { body });
+/** Un pedido eliminado, como quedó en el historial (no se puede cambiar ni borrar). */
+export interface PedidoEliminado {
+  eliminado: string;
+  referencia: string;
+  /** El estado que tenía al eliminarlo. */
+  estado: string;
+  motivo: string;
+  /** Si sus productos volvieron a las existencias. */
+  devuelto: boolean;
+  datos: Omit<AdminPedido, 'items'> & { items: { sku: string; nombre: string; cantidad: number; precio: number }[] };
+}
+export const pedidosEliminados = () => call<{ eliminados: PedidoEliminado[] }>('pedidos?vista=eliminados');
+export const eliminarPedido = (referencia: string, motivo: string, devolver: boolean) =>
+  call<{ ok: true }>('pedidos', { body: { accion: 'eliminar', referencia, motivo, devolver } });
 
 export interface FotoProducto { pathname: string; alt: string; url?: string }
 export interface AdminProducto {
@@ -118,8 +133,14 @@ export interface AdminProducto {
   caracteristicas: [string, string][];
   /** Vacío en los productos del código (el póster original): sus fotos están en src/content. */
   fotos: FotoProducto[];
+  /** En la papelera desde esa fecha (null: no). */
+  eliminado: string | null;
 }
-export const productos = () => call<{ productos: AdminProducto[] }>('productos');
+/** El valor del envío, a Bogotá y al resto del país. */
+export interface Envio { bogota: number; resto: number }
+export const productos = () => call<{ productos: AdminProducto[]; envio: Envio }>('productos');
+export const papelera = (sku: string, accion: 'eliminar' | 'restaurar') => call<{ ok: true }>('productos', { body: { accion, sku } });
+export const guardarEnvio = (envio: Envio) => call<{ ok: true; envio: Envio }>('productos', { body: { accion: 'envio', ...envio } });
 export const guardarProducto = (body: Record<string, unknown>) => call<{ ok: true }>('productos', { body });
 export const crearProducto = (body: Record<string, unknown>) => call<{ ok: true; sku: string }>('productos', { body: { ...body, accion: 'crear' } });
 export const editarProducto = (body: Record<string, unknown>) => call<{ ok: true; sku: string }>('productos', { body: { ...body, accion: 'editar' } });

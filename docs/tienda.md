@@ -28,7 +28,8 @@ Navegador                                   Servidor (api/tienda)               
 | Qué | Cómo |
 |-----|------|
 | Precio y existencias | Los manda la tabla `productos` (las fotos y los textos están en `src/content/stories.ts`, unidos por el SKU). |
-| Envío | $ 9.500 a Bogotá y $ 18.500 al resto del país (`ENVIO_BOGOTA`, `ENVIO_RESTO` y `envioPara` en `api/_lib/tienda.ts`). Es Bogotá si el departamento es «Bogotá D. C.» o la ciudad empieza por «Bogotá». |
+| Envío | Lo pone el equipo en el panel (Productos → Envío; tabla `ajustes`): hoy $ 9.500 a Bogotá y $ 18.500 al resto del país. Es Bogotá si el departamento es «Bogotá D. C.» (`envioPara` en `api/_lib/tienda.ts`). |
+| Datos de envío | Las mismas reglas en la tienda y en el servidor (`src/domain/comprador.ts`): nombre y apellido con letras; correo válido; celular de 10 números que empieza por 3; dirección con número. La ciudad se elige de los 1.122 municipios de Colombia (DIVIPOLA del DANE, `src/content/municipios.ts`) y el departamento sale solo. |
 | Existencias | Se apartan al crear el pedido. Si se rechaza o vence, vuelven. Pagado no las toca (ya estaban apartadas). |
 | Vencimiento | 1 hora (`PLAZO_MIN`). Wompi no deja pagar después: la fecha va en la firma. |
 | Pagado | Solo si Wompi dice `APPROVED` **y** el valor es exactamente el del pedido. Si no, queda rechazado con una nota. |

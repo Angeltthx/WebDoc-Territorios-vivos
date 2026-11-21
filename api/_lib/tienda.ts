@@ -8,18 +8,33 @@
 import { createHash } from 'node:crypto';
 import { sql } from './db.js';
 
-/** Envío (pesos): a Bogotá y al resto de Colombia (pedido de la clienta, 17/11/2026; antes $ 15.000 a todo el país). */
-export const ENVIO_BOGOTA = 9500;
-export const ENVIO_RESTO = 18500;
-/** Productos sin envío cuando el pedido solo lleva esos: el de prueba del equipo, para probar pagos reales sin pagar el
- * envío (19/11/2026). Al quitar el producto de prueba, se quita de aquí. */
-export const SIN_ENVIO = ['prueba1-e717'];
+/** El valor del envío (pesos), a Bogotá y al resto de Colombia. */
+export interface Tarifas { bogota: number; resto: number }
+/** Si la base no tiene el ajuste: lo que pidió la clienta el 17/11/2026 (antes era $ 15.000 a todo el país). */
+export const TARIFAS_INICIALES: Tarifas = { bogota: 9500, resto: 18500 };
+/** Lo más que se puede poner de envío desde el panel (para que un dedo de más no cobre una fortuna). */
+export const ENVIO_MAX = 500_000;
 
-/** Lo que cuesta el envío a esa dirección. Bogotá: el departamento «Bogotá D. C.» o una ciudad que se llame Bogotá.
- * La tienda hace la misma cuenta para mostrarla (`envioPara` en src/application/shop-api.ts). */
-export function envioPara(ciudad: string, departamento: string) {
+/** El valor del envío: lo pone el equipo en el panel (tabla `ajustes`, clave `envio`). */
+export async function tarifasEnvio(): Promise<Tarifas> {
+  let r: { valor: Partial<Tarifas> } | undefined;
+  try {
+    [r] = (await sql()`select valor from ajustes where clave = 'envio'`) as { valor: Partial<Tarifas> }[];
+  } catch {
+    // Sin la tabla (base sin actualizar): los valores iniciales.
+  }
+  const ok = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= ENVIO_MAX;
+  return {
+    bogota: ok(r?.valor?.bogota) ? r.valor.bogota : TARIFAS_INICIALES.bogota,
+    resto: ok(r?.valor?.resto) ? r.valor.resto : TARIFAS_INICIALES.resto,
+  };
+}
+
+/** Lo que cuesta el envío a esa dirección: Bogotá es el departamento «Bogotá D. C.». La tienda hace la misma cuenta
+ * para mostrarla (`envioPara` en src/application/shop-api.ts). */
+export function envioPara(ciudad: string, departamento: string, t: Tarifas) {
   const plano = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
-  return plano(departamento).startsWith('bogota') || plano(ciudad).startsWith('bogota') ? ENVIO_BOGOTA : ENVIO_RESTO;
+  return plano(departamento).startsWith('bogota') || plano(ciudad).startsWith('bogota') ? t.bogota : t.resto;
 }
 /** Minutos que tiene la persona para pagar. */
 export const PLAZO_MIN = 60;

@@ -3,9 +3,10 @@
 // y de ahí al checkout de Wompi. Al volver de pagar, la persona llega a /tienda/pedido/<referencia> (ver OrderPage).
 // El precio y las existencias los manda la base de datos (ver api/tienda); las fotos y los textos, el código.
 
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { SHOP_ITEMS, pesos, type ShopItem } from '../../content/stories';
-import { type Buyer, type Catalog, DEPARTAMENTOS, ENVIO_RESPALDO, OrderError, createOrder, envioPara, fetchCatalog, loadBag, saveBag } from '../../application/shop-api';
+import { type Buyer, type Catalog, ENVIO_RESPALDO, OrderError, createOrder, envioPara, fetchCatalog, loadBag, saveBag } from '../../application/shop-api';
+import { buscarMunicipios, erroresComprador, municipio, plano, type Municipio } from '../../domain/comprador';
 import { LineIcon, Sheet, type Origin } from '../components/Sheet';
 import { OrderTracker } from '../components/OrderTracker';
 
@@ -199,13 +200,105 @@ function PerkIcon({ name }: { name: 'truck' | 'frame' | 'leaf' | 'lock' | 'ar' }
   );
 }
 
+/** Un campo del formulario de envío, con su error debajo. */
+function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
+  return (
+    <label className={`story-field${error ? ' is-invalid' : ''}`}>
+      <span className="story-field__label">{label}{hint && <em>{hint}</em>}</span>
+      {children}
+      {error && <span className="shop-field-error" role="alert">{error}</span>}
+    </label>
+  );
+}
+
+/**
+ * La ciudad: se escribe y se elige de la lista de municipios de Colombia (con su departamento al lado: hay nombres
+ * repetidos, como Albania o San Andrés). Al elegirla, el departamento se llena solo (pedido del equipo, 19/11/2026:
+ * antes se podía escribir cualquier cosa).
+ */
+function CityPicker({ value, picked, invalid, onType, onPick, onBlur }: {
+  value: string;
+  picked: boolean;
+  invalid: boolean;
+  onType: (v: string) => void;
+  onPick: (m: Municipio) => void;
+  onBlur: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const list = picked ? [] : buscarMunicipios(value);
+  const choose = (m: Municipio) => {
+    onPick(m);
+    setOpen(false);
+  };
+  const key = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (!list.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setOpen(true);
+      setHi((i) => (i + 1) % list.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHi((i) => (i - 1 + list.length) % list.length);
+    } else if (e.key === 'Enter' && open) {
+      e.preventDefault();
+      choose(list[hi] ?? list[0]);
+    } else if (e.key === 'Escape') setOpen(false);
+  };
+  return (
+    <span className="shop-city">
+      <input
+        name="ciudad"
+        required
+        role="combobox"
+        aria-expanded={open && list.length > 0}
+        aria-controls="shop-city-list"
+        aria-autocomplete="list"
+        aria-invalid={invalid}
+        autoComplete="off"
+        maxLength={60}
+        placeholder="Bogotá, Medellín, Nuquí…"
+        value={value}
+        onChange={(e) => { onType(e.target.value); setOpen(true); setHi(0); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={key}
+        onBlur={() => {
+          // Si lo escrito es exactamente un municipio (y solo uno), se toma ese.
+          const exact = list.filter((m) => m.clave === plano(value));
+          if (!picked && exact.length === 1) onPick(exact[0]);
+          setOpen(false);
+          onBlur();
+        }}
+      />
+      {picked && <span className="shop-city__ok" aria-hidden="true">✓</span>}
+      {open && list.length > 0 && (
+        <ul className="shop-city__list" id="shop-city-list" role="listbox">
+          {list.map((m, i) => (
+            <li
+              key={`${m.ciudad}-${m.departamento}`}
+              role="option"
+              aria-selected={i === hi}
+              className={i === hi ? 'is-hi' : ''}
+              onMouseDown={(e) => { e.preventDefault(); choose(m); }}
+              onMouseEnter={() => setHi(i)}
+            >
+              <strong>{m.ciudad}</strong> <span>{m.departamento}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && !picked && value.trim().length >= 2 && list.length === 0 && (
+        <span className="shop-city__none">No encontramos «{value.trim()}». Revisa cómo se escribe.</span>
+      )}
+    </span>
+  );
+}
+
 const EMPTY_BUYER: Buyer = { nombre: '', correo: '', celular: '', direccion: '', ciudad: '', departamento: '', notas: '' };
 
 /** El pago: datos de envío a la izquierda, resumen a la derecha; al confirmar, el pedido se crea y se va a Wompi. */
-function Checkout({ lines, rates, test, free, onBack, onStock }: {
+function Checkout({ lines, rates, test, onBack, onStock }: {
   lines: Line[];
-  /** Productos sin envío: si el pedido solo lleva esos, el envío es $ 0. */
-  free: string[];
   /** Wompi en modo de prueba: se avisa que no se cobra dinero real. */
   test: boolean;
   /** Las tarifas de envío: el valor depende de la ciudad que se escriba. */
@@ -219,11 +312,17 @@ function Checkout({ lines, rates, test, free, onBack, onStock }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k: keyof Buyer) => (e: { target: { value: string } }) => setBuyer((b) => ({ ...b, [k]: e.target.value }));
+  // Los errores de cada campo (las mismas reglas del servidor, en src/domain/comprador.ts): se muestran al salir del
+  // campo, o todos al intentar pagar.
+  const errores = erroresComprador(buyer);
+  const [visto, setVisto] = useState<Partial<Record<keyof Buyer, boolean>>>({});
+  const [todos, setTodos] = useState(false);
+  const err = (k: keyof Buyer) => ((todos || visto[k]) && errores[k]) || '';
+  const blur = (k: keyof Buyer) => () => setVisto((v) => ({ ...v, [k]: true }));
   const subtotal = lines.reduce((n, l) => n + l.qty * l.price, 0);
-  // El envío se sabe cuando hay ciudad o departamento; antes, se dicen las dos tarifas.
-  const noShip = lines.length > 0 && lines.every((l) => free.includes(l.size.sku));
-  const known = noShip || !!(buyer.departamento || buyer.ciudad.trim().length >= 3);
-  const envio = noShip ? 0 : envioPara(buyer.ciudad, buyer.departamento, rates);
+  // El envío se sabe cuando se eligió la ciudad; antes, se dicen las dos tarifas.
+  const known = !!municipio(buyer.ciudad, buyer.departamento);
+  const envio = envioPara(buyer.ciudad, buyer.departamento, rates);
   const top = useRef<HTMLFormElement>(null);
   useEffect(() => {
     top.current?.closest('.sheet__body')?.scrollTo({ top: 0 });
@@ -232,6 +331,14 @@ function Checkout({ lines, rates, test, free, onBack, onStock }: {
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (busy) return;
+    if (Object.keys(errores).length || !consent) {
+      setTodos(true);
+      if (!Object.keys(errores).length) return setError('Marca la autorización para usar tus datos en el envío.');
+      // Al primer campo con problema.
+      const first = (['nombre', 'celular', 'correo', 'direccion', 'ciudad', 'notas'] as const).find((k) => errores[k]);
+      e.currentTarget.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -246,7 +353,7 @@ function Checkout({ lines, rates, test, free, onBack, onStock }: {
   };
 
   return (
-    <form className="shop-checkout" ref={top} onSubmit={submit}>
+    <form className="shop-checkout" ref={top} onSubmit={submit} noValidate>
       <button type="button" className="shop-back" onClick={onBack}>
         <span aria-hidden="true">←</span> Seguir viendo la tienda
       </button>
@@ -254,43 +361,43 @@ function Checkout({ lines, rates, test, free, onBack, onStock }: {
         <div className="shop-checkout__form">
           <h3 className="shop-checkout__title">¿A dónde te lo enviamos?</h3>
           <div className="story-row">
-            <label className="story-field">
-              <span className="story-field__label">Nombre completo</span>
-              <input required minLength={3} maxLength={80} autoComplete="name" value={buyer.nombre} onChange={set('nombre')} />
-            </label>
-            <label className="story-field">
-              <span className="story-field__label">Celular</span>
-              <input required type="tel" inputMode="numeric" pattern="3[0-9]{9}" maxLength={10} autoComplete="tel-national"
-                placeholder="3001234567" value={buyer.celular} onChange={(e) => setBuyer((b) => ({ ...b, celular: e.target.value.replace(/\D/g, '') }))} />
-            </label>
+            <Field label="Nombre completo" error={err('nombre')}>
+              <input name="nombre" required maxLength={80} autoComplete="name" value={buyer.nombre} onChange={set('nombre')} onBlur={blur('nombre')} aria-invalid={!!err('nombre')} />
+            </Field>
+            <Field label="Celular" error={err('celular')}>
+              <input name="celular" required type="tel" inputMode="numeric" maxLength={10} autoComplete="tel-national" placeholder="3001234567"
+                value={buyer.celular} onChange={(e) => setBuyer((b) => ({ ...b, celular: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                onBlur={blur('celular')} aria-invalid={!!err('celular')} />
+            </Field>
           </div>
-          <label className="story-field">
-            <span className="story-field__label">Correo <em>ahí te llega la confirmación</em></span>
-            <input required type="email" maxLength={120} autoComplete="email" value={buyer.correo} onChange={set('correo')} />
-          </label>
-          <label className="story-field">
-            <span className="story-field__label">Dirección</span>
-            <input required minLength={5} maxLength={160} autoComplete="street-address" placeholder="Calle, número, barrio, apartamento" value={buyer.direccion} onChange={set('direccion')} />
-          </label>
+          <Field label="Correo" hint="ahí te llega la confirmación" error={err('correo')}>
+            <input name="correo" required type="email" maxLength={120} autoComplete="email" value={buyer.correo}
+              onChange={(e) => setBuyer((b) => ({ ...b, correo: e.target.value.replace(/\s/g, '') }))} onBlur={blur('correo')} aria-invalid={!!err('correo')} />
+          </Field>
+          <Field label="Dirección" error={err('direccion')}>
+            <input name="direccion" required maxLength={160} autoComplete="street-address" placeholder="Calle 10 # 5-20, barrio, apartamento"
+              value={buyer.direccion} onChange={set('direccion')} onBlur={blur('direccion')} aria-invalid={!!err('direccion')} />
+          </Field>
           <div className="story-row">
-            <label className="story-field">
-              <span className="story-field__label">Ciudad o municipio</span>
-              <input required minLength={2} maxLength={60} autoComplete="address-level2" value={buyer.ciudad} onChange={set('ciudad')} />
-            </label>
-            <label className="story-field">
-              <span className="story-field__label">Departamento</span>
-              <select required value={buyer.departamento} onChange={set('departamento')}>
-                <option value="" disabled>Elige el departamento</option>
-                {DEPARTAMENTOS.map((d) => <option key={d}>{d}</option>)}
-              </select>
-            </label>
+            <Field label="Ciudad o municipio" hint="elige de la lista" error={err('ciudad')}>
+              <CityPicker
+                value={buyer.ciudad}
+                picked={known}
+                invalid={!!err('ciudad')}
+                onType={(ciudad) => setBuyer((b) => ({ ...b, ciudad, departamento: '' }))}
+                onPick={(m) => { setBuyer((b) => ({ ...b, ciudad: m.ciudad, departamento: m.departamento })); setVisto((v) => ({ ...v, ciudad: true })); }}
+                onBlur={blur('ciudad')}
+              />
+            </Field>
+            <Field label="Departamento">
+              <input name="departamento" readOnly tabIndex={-1} value={buyer.departamento} placeholder="Sale solo al elegir la ciudad" className="shop-readonly" />
+            </Field>
           </div>
-          <label className="story-field">
-            <span className="story-field__label">Algo que debamos saber <em>opcional</em></span>
-            <input maxLength={300} placeholder="Por ejemplo, a qué hora hay alguien en la casa" value={buyer.notas} onChange={set('notas')} />
-          </label>
+          <Field label="Algo que debamos saber" hint="opcional" error={err('notas')}>
+            <input name="notas" maxLength={300} placeholder="Por ejemplo, a qué hora hay alguien en la casa" value={buyer.notas} onChange={set('notas')} />
+          </Field>
           <label className="story-check">
-            <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <input type="checkbox" required checked={consent} onChange={(e) => { setConsent(e.target.checked); setError(''); }} />
             <span>
               Autorizo a Territorios Vivos a usar estos datos solo para enviarme mi pedido y escribirme sobre él (Ley 1581 de
               2012).
@@ -312,7 +419,7 @@ function Checkout({ lines, rates, test, free, onBack, onStock }: {
           </ul>
           <dl className="shop-summary__sums">
             <div><dt>Productos</dt><dd>{pesos(subtotal)}</dd></div>
-            <div><dt>Envío{known && !noShip && envio === rates.bogota ? ' a Bogotá' : ''}</dt><dd>{known ? pesos(envio) : `${pesos(rates.bogota)} o ${pesos(rates.resto)}`}</dd></div>
+            <div><dt>Envío{known && buyer.departamento === 'Bogotá D. C.' ? ' a Bogotá' : ''}</dt><dd>{known ? pesos(envio) : `${pesos(rates.bogota)} o ${pesos(rates.resto)}`}</dd></div>
             <div className="is-total"><dt>Total</dt><dd>{known ? pesos(subtotal + envio) : <>{pesos(subtotal)} <small>+ envío</small></>}</dd></div>
           </dl>
           {!known && <p className="shop-summary__note">El envío es de {envioTexto(rates)}: se calcula con tu ciudad.</p>}
@@ -469,7 +576,6 @@ export default function Shop({ onClose, origin }: { onClose?: () => void; origin
         <Checkout
           lines={lines}
           rates={rates}
-          free={catalog?.sinEnvio ?? []}
           test={catalog?.prueba !== false}
           onBack={() => setView('lista')}
           onStock={(sku, quedan) => {

@@ -5,7 +5,8 @@
 
 import { randomBytes } from 'node:crypto';
 import { sql } from '../_lib/db.js';
-import { PLAZO_MIN, SIN_ENVIO, envioPara, applyTx, checkoutUrl, expireOld, fetchTx, wompi } from '../_lib/tienda.js';
+import { PLAZO_MIN, envioPara, applyTx, checkoutUrl, expireOld, fetchTx, tarifasEnvio, wompi } from '../_lib/tienda.js';
+import { erroresComprador, municipio } from '../../src/domain/comprador.js';
 import { clean, ipHash, json } from '../_lib/util.js';
 
 /**
@@ -48,11 +49,15 @@ export async function POST(request: Request) {
     departamento: clean(c.departamento, 60),
     notas: clean(c.notas, 300),
   };
-  if (comprador.nombre.length < 3) return json({ error: 'Escribe tu nombre completo.' }, 400);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(comprador.correo)) return json({ error: 'Revisa tu correo.' }, 400);
-  if (!/^3\d{9}$/.test(comprador.celular)) return json({ error: 'Escribe un celular de Colombia (10 números, empieza por 3).' }, 400);
-  if (comprador.direccion.length < 5 || comprador.ciudad.length < 2 || comprador.departamento.length < 3)
-    return json({ error: 'Falta la dirección de envío.' }, 400);
+  // Las mismas reglas de la tienda (src/domain/comprador.ts): la ciudad tiene que ser un municipio de Colombia en ese
+  // departamento, y se guarda con su nombre bien escrito.
+  const errores = erroresComprador(comprador);
+  const primero = Object.values(errores)[0];
+  if (primero) return json({ error: primero }, 400);
+  const lugar = municipio(comprador.ciudad, comprador.departamento)!;
+  comprador.ciudad = lugar.ciudad;
+  comprador.departamento = lugar.departamento;
+  comprador.nombre = comprador.nombre.replace(/\s+/g, ' ');
   if (body.consentimiento !== true) return json({ error: 'Falta tu autorización para usar tus datos en el envío.' }, 400);
 
   // Lo que pide: un producto por línea, sin repetir, con cantidades razonables.
@@ -78,7 +83,7 @@ export async function POST(request: Request) {
   for (const [sku, cantidad] of pedidos) {
     const [r] = (await db`
       update productos set existencias = existencias - ${cantidad}, actualizado = now()
-      where sku = ${sku} and activo and existencias >= ${cantidad}
+      where sku = ${sku} and activo and eliminado is null and existencias >= ${cantidad}
       returning sku, nombre, precio`) as { sku: string; nombre: string; precio: number }[];
     if (!r) {
       await devolver();
@@ -93,7 +98,7 @@ export async function POST(request: Request) {
   }
 
   const subtotal = apartados.reduce((t, a) => t + a.precio * a.cantidad, 0);
-  const envio = apartados.every((a) => SIN_ENVIO.includes(a.sku)) ? 0 : envioPara(comprador.ciudad, comprador.departamento);
+  const envio = envioPara(comprador.ciudad, comprador.departamento, await tarifasEnvio());
   const total = subtotal + envio;
   const referencia = `TV-${Date.now().toString(36).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`;
   const expira = new Date(Date.now() + PLAZO_MIN * 60 * 1000);

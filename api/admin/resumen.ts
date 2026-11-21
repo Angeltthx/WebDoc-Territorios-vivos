@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     select coalesce(sum(total), 0)::int as total, count(*)::int as pedidos,
       coalesce(sum(total) filter (where pagado > now() - interval '30 days'), 0)::int as mes
     from pedidos where estado in ('pagado', 'empacando', 'enviado', 'entregado')`) as { total: number; pedidos: number; mes: number }[];
-  const productos = await db`select sku, nombre, precio, existencias, activo from productos order by sku`;
+  const productos = await db`select sku, nombre, precio, existencias, activo from productos where eliminado is null order by sku`;
   const ultimos = await db`
     select referencia, creado, estado, nombre, ciudad, total from pedidos
     where estado in ('pagado', 'empacando', 'enviado', 'entregado') order by creado desc limit 8`;
@@ -34,11 +34,15 @@ export async function GET(request: Request) {
       coalesce(round(100.0 * count(*) filter (where movil) / nullif(count(*), 0)), 0)::int as movil
     from visitas_personas where dia > ${hoy}::date - 30`) as { hoy: number; semana: number; mes: number; movil: number }[];
   const [{ vistas }] = (await db`select coalesce(sum(vistas), 0)::int as vistas from visitas_pagina where dia > ${hoy}::date - 30`) as { vistas: number }[];
+  // Los últimos 30 días, uno por uno: personas distintas y lo vendido (pedidos pagados, por el día del pago en Colombia).
   const porDia = await db`
-    select to_char(d, 'YYYY-MM-DD') as dia, coalesce(count(p.huella), 0)::int as visitas
-    from generate_series(${hoy}::date - 13, ${hoy}::date, interval '1 day') d
-    left join visitas_personas p on p.dia = d::date
-    group by d order by d`;
+    select to_char(d, 'YYYY-MM-DD') as dia,
+      (select count(*) from visitas_personas p where p.dia = d::date)::int as visitas,
+      (select coalesce(sum(total), 0) from pedidos o
+        where o.estado in ('pagado', 'empacando', 'enviado', 'entregado')
+          and (o.pagado at time zone 'America/Bogota')::date = d::date)::int as ventas
+    from generate_series(${hoy}::date - 29, ${hoy}::date, interval '1 day') d
+    order by d`;
   const paginas = await db`
     select ruta, sum(vistas)::int as vistas from visitas_pagina where dia > ${hoy}::date - 30
     group by ruta order by vistas desc limit 10`;
