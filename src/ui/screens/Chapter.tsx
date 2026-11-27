@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { chapterByPath, type ChapterAction, type ChapterBody, type ChapterTab } from '../../content/chapters';
 import { Backdrop, Img } from '../components/Media';
-import { CreditMark, MoreButton, pagePath, SiteMenu, SocialLinks, useTabsInView } from '../components/Chrome';
+import { CreditMark, MoreButton, pagePath, SiteMenu, SocialLinks, SupportLogos, useTabsInView } from '../components/Chrome';
 import { VideoPanel } from '../components/Sections';
 
 export default function ChapterScreen({ path }: { path: string }) {
@@ -116,6 +116,7 @@ function Body({ body, act }: { body: ChapterBody; act: (a: ChapterAction) => voi
               <figure key={ph.id} className="chapter-photo"><Img photo={ph} sizes="(max-width: 900px) 45vw, 22vw" /></figure>
             ))}
           </div>
+          <SupportLogos className="chapter-team__support" />
         </div>
       );
 

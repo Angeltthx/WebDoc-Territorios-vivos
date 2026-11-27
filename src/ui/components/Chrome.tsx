@@ -444,6 +444,7 @@ export function SiteMenu({ open, onOpen, onClose, current }: {
             <p className="menu__credit">
               Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
             </p>
+            <SupportLogos className="menu__support" />
           </div>
         </div>
       </dialog>
@@ -682,6 +683,27 @@ export function CreditMark() {
   return (
     <div className="credit-mark">
       Una producción de <a href="https://www.doinmedia.com" target="_blank" rel="noopener">Doinmedia</a>
+    </div>
+  );
+}
+
+/** Los logos de quienes apoyaron el proyecto, con la frase de apoyo (pedido de Crea Digital por la clienta, 27/11/2026).
+ * Recortados de su captura y sin fondo, sobre el fondo del sitio; el original está en ../Contenido/Apoyo. */
+const SUPPORT_LOGOS = [
+  { src: '/apoyo/crea-digital.png', alt: 'Crea Digital', w: 182, h: 182 },
+  { src: '/apoyo/mintic.png', alt: 'Ministerio de Tecnologías de la Información y las Comunicaciones (TIC)', w: 79, h: 161 },
+  { src: '/apoyo/mincultura.png', alt: 'Ministerio de las Culturas, las Artes y los Saberes', w: 195, h: 161 },
+  { src: '/apoyo/cocrea.png', alt: 'CoCrea', w: 365, h: 49 },
+];
+export function SupportLogos({ className = '' }: { className?: string }) {
+  return (
+    <div className={`support ${className}`}>
+      <ul className="support__logos" aria-label="Con el apoyo de">
+        {SUPPORT_LOGOS.map((l) => (
+          <li key={l.src}><img src={l.src} alt={l.alt} width={l.w} height={l.h} loading="lazy" decoding="async" /></li>
+        ))}
+      </ul>
+      <p className="support__note">*Este proyecto contó con el apoyo del Ministerio TIC y CoCrea en su etapa de desarrollo.</p>
     </div>
   );
 }

@@ -2459,6 +2459,7 @@ img.media-img:not(.is-loaded) { opacity: 0; }
 .chapter-team__people span { font-size: 11.5px; opacity: 0.8; }
 .chapter-team__thanks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .chapter-team__thanks .chapter-photo { margin: 0; border-radius: 6px; aspect-ratio: 16 / 10; }
+.chapter-team__support { margin-top: 28px; }
 .chapter-video { position: relative; inset: auto; padding: 0; }
 .chapter-blog { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: clamp(24px, 5vw, 70px); max-width: 1180px; margin: 0 auto; align-items: start; }
 .chapter-blog__meta { font-size: 12px !important; opacity: 0.8; }
@@ -2765,3 +2766,24 @@ img.media-img:not(.is-loaded) { opacity: 0; }
 .shop-city__list li span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .shop-city__list li.is-hi { background: rgba(31, 77, 61, 0.08); }
 .shop-city__none { display: block; margin-top: 6px; font-size: 12.5px; color: #a8661a; }
+
+/* Logos de apoyo (Crea Digital, MinTIC, MinCulturas, CoCrea), como en la pieza de Crea Digital: en fila, separados por
+   líneas blancas, y debajo la frase. Solo los logos, sobre el fondo del sitio. */
+.support { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.support__logos { list-style: none; margin: 0; padding: 0; display: flex; align-items: stretch; justify-content: center; flex-wrap: wrap; row-gap: 14px; }
+.support__logos li { display: flex; align-items: center; padding: 0 clamp(14px, 2.4vw, 30px); }
+.support__logos li + li { border-left: 1.5px solid rgba(255, 255, 255, 0.85); }
+.support__logos img { display: block; height: var(--logo-h, 64px); width: auto; }
+.support__logos li:last-child img { height: calc(var(--logo-h, 64px) * 0.3); }
+.support__note { margin: 0; max-width: 80ch; font: 300 13.5px/1.45 var(--sans); color: rgba(255, 255, 255, 0.88); }
+.menu__support { --logo-h: 40px; justify-items: start; text-align: left; margin-top: 6px; }
+.menu__support .support__logos { justify-content: flex-start; }
+.menu__support .support__logos li { padding: 0 12px; }
+.menu__support .support__logos li:first-child { padding-left: 0; }
+.menu__support .support__note { font-size: 11.5px; color: rgba(255, 255, 255, 0.6); }
+@media (max-width: 600px) {
+  .support { --logo-h: 46px; }
+  .menu__support { --logo-h: 32px; }
+  .support__logos li { padding: 0 12px; }
+  .support__note { font-size: 12.5px; }
+}
